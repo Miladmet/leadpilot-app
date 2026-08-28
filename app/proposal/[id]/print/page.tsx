@@ -70,6 +70,13 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </div>
       </header>
 
+      {/* Speculative stamp disclaimer for printable PDF */}
+      {prospect.proposalStatus === 'Speculative' && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 text-xs leading-relaxed">
+          <strong>⚠️ CONSULTATIVE ANALYSIS DISCLAIMER:</strong> This report is generated based on public knowledge archives and limited site crawl evidence. All recommended services and calculations are consultative suggestions. Verification of details during the discovery call is recommended.
+        </div>
+      )}
+
       {/* Trust & Self-Correction Banner */}
       <div className="grid grid-cols-3 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-200">
         <div className="text-center">

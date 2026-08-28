@@ -629,9 +629,9 @@ export default function Dashboard() {
                 </div>
 
                 <div className="col-span-3 md:col-span-1 text-center bg-slate-800 py-1.5 rounded-lg border border-slate-700 text-[10px] font-bold">
-                  {activeProspect.proposalStatus === 'Blocked' ? (
-                    <span className="text-rose-400 flex items-center justify-center gap-0.5 uppercase">
-                      ⚠️ BLOCKED
+                  {activeProspect.proposalStatus === 'Speculative' ? (
+                    <span className="text-amber-400 flex items-center justify-center gap-0.5 uppercase">
+                      ⚠️ SPECULATIVE
                     </span>
                   ) : (
                     <span className="text-emerald-400 flex items-center justify-center gap-0.5 uppercase">
@@ -649,17 +649,17 @@ export default function Dashboard() {
                 <span>Opportunity Range: <strong className="text-slate-700 font-mono">{activeProspect.opportunityRange}</strong></span>
               </div>
 
-              {/* BLOCK PROPOSAL BANNER IF VALIDATION FAILS */}
-              {activeProspect.proposalStatus === 'Blocked' && (
-                <div className="m-6 p-4 bg-rose-50 border-2 border-rose-350 rounded-xl text-rose-950 text-xs flex gap-3 items-start shadow-sm animate-pulse">
-                  <AlertTriangle className="h-6 w-6 text-rose-600 shrink-0 mt-0.5" />
+              {/* SPECULATIVE CAVEAT BANNER IF EVIDENCE IS LOW */}
+              {activeProspect.proposalStatus === 'Speculative' && (
+                <div className="m-6 p-4 bg-amber-50 border-2 border-amber-300 rounded-xl text-amber-950 text-xs flex gap-3 items-start shadow-sm">
+                  <AlertTriangle className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-black text-sm uppercase">Proposal Generation Blocked Due To Insufficient Evidence</h4>
-                    <p className="mt-1 leading-relaxed text-rose-800">
-                      Our **Independent Verification Auditor** blocked proposal generation because the crawled domain provided insufficient text facts (Verification Pass Rate: {activeProspect.verificationPassRate}%, {activeProspect.claimsRejectedCount} claims rejected).
+                    <h4 className="font-black text-sm uppercase">Speculative Proposal Draft</h4>
+                    <p className="mt-1 leading-relaxed text-amber-800">
+                      Our system flagged this profile as speculative due to limited direct text evidence on the audited pages (Verification Pass Rate: {activeProspect.verificationPassRate}%).
                     </p>
-                    <p className="mt-2 font-bold text-rose-900">
-                      💡 Action Required: Navigate the extension to a content-rich page (e.g. Careers, About, or Services) and audit again to sync verification points.
+                    <p className="mt-2 font-bold text-amber-900">
+                      💡 Consultative Tip: You can export and use this proposal freely, but we recommend cross-checking these suggestions during your discovery meeting.
                     </p>
                   </div>
                 </div>
@@ -877,38 +877,33 @@ export default function Dashboard() {
                   <div className="space-y-4 flex-1 flex flex-col justify-between">
                     <div className="overflow-y-auto max-h-[360px] space-y-4 pr-1">
                       
-                      {/* PDF Print Export Bar - disabled if blocked */}
+                      {/* PDF Print Export Bar */}
                       <div className={`p-3.5 rounded-xl border flex justify-between items-center ${
-                        activeProspect.proposalStatus === 'Blocked' 
-                          ? 'bg-rose-50 border-rose-100 opacity-60' 
+                        activeProspect.proposalStatus === 'Speculative' 
+                          ? 'bg-amber-50 border-amber-200' 
                           : 'bg-sky-50 border-sky-100'
                       }`}>
                         <div>
                           <h4 className="text-xs font-bold text-slate-900">Proposal Document Exporter</h4>
                           <p className="text-[10px] text-slate-500">
-                            {activeProspect.proposalStatus === 'Blocked' 
-                              ? 'Disabled. Insufficient evidence metrics.' 
+                            {activeProspect.proposalStatus === 'Speculative' 
+                              ? 'Export caution-stamped consultative proposal.' 
                               : 'Print client-ready verified proposals.'}
                           </p>
                         </div>
-                        {activeProspect.proposalStatus === 'Blocked' ? (
-                          <button
-                            disabled
-                            className="bg-slate-300 text-slate-500 font-bold text-xs px-3.5 py-2 rounded-lg cursor-not-allowed flex items-center gap-1"
-                          >
-                            📄 Proposal Blocked
-                          </button>
-                        ) : (
-                          <a
-                            href={`/proposal/${activeProspect.id}/print`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
-                          >
-                            📄 Open PDF Proposal
-                            <ArrowUpRight className="h-3.5 w-3.5" />
-                          </a>
-                        )}
+                        <a
+                          href={`/proposal/${activeProspect.id}/print`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors ${
+                            activeProspect.proposalStatus === 'Speculative'
+                              ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                              : 'bg-sky-600 hover:bg-sky-700 text-white'
+                          }`}
+                        >
+                          📄 Open PDF Proposal
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </a>
                       </div>
 
                       <div>
