@@ -3,59 +3,59 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export interface VerifiedFact {
   fact: string;
   sourceUrl: string;
-  evidenceText: string; // The exact quote or text snippet verifying the fact
+  confidence: number; // Always 100% for verified facts
 }
 
-export interface AIInference {
-  inference: string;
-  supportedByFacts: string[]; // Reference facts by description/index
-  confidence: number; // 0 to 100 percentage
+export interface AIInsight {
+  finding: string;
+  evidence: string;
+  reasoning: string;
+  confidence: number;
 }
 
-export interface BuyingSignal {
-  signal: string;
-  sourceUrl: string;
-  sourceText: string; // Exact text quote representing the signal
-  dateDiscovered: string; // ISO or date string
-}
-
-export interface EvidenceRecommendation {
+export interface RecommendedService {
   serviceName: string;
   issue: string;
-  estimatedFee: string;
-  confidence: number; // 0 to 100 percentage
-  explanation: string; // Why it was generated
-  evidenceList: string[]; // Quotes/facts from the text supporting it
+  impact: string;
+  estimatedFee: string; // e.g. "$1,500 monthly"
+  estimatedValue: number; // e.g. 1500 (integer)
+  confidence: number;
+  expectedOutcome: string;
+  estimatedRoi: string;
 }
 
-export interface ScoreDetails {
+export interface ScorePoint {
+  label: string;
+  points: number;
+}
+
+export interface ScoreDetail {
   score: number;
   explanation: string;
-  evidence: string[]; // Citing specific facts/urls
+  breakdown: ScorePoint[];
+  evidence: string[]; // Quotes from pages supporting score
 }
 
 export interface ScoreExplanations {
-  opportunityScore: ScoreDetails;
-  buyingSignalScore: ScoreDetails;
+  opportunityScore: ScoreDetail;
+  buyingSignalScore: ScoreDetail;
 }
 
-export interface EvidenceAcquisitionResponse {
+export interface ClientAcquisitionResponse {
   companyName: string;
   verifiedFacts: VerifiedFact[];
-  aiInferences: AIInference[];
-  buyingSignals: BuyingSignal[];
-  recommendations: EvidenceRecommendation[];
+  aiInferences: AIInsight[]; // Mapped to AI Insights
+  recommendations: RecommendedService[]; // Mapped to Service Matches
+  scoreExplanations: ScoreExplanations;
   
   opportunityScore: number;
   buyingSignalScore: number;
-  scoreExplanations: ScoreExplanations;
-  
   potentialRevenue: number;
   closingProbability: number;
   problemSeverity: 'High' | 'Medium' | 'Low';
   leadQuality: 'Hot' | 'Warm' | 'Cold';
   
-  // Proposal Contents (Traceable to facts)
+  // Proposal Contents
   executiveSummary: string;
   expectedResults: string;
   estimatedRoi: string;
@@ -66,12 +66,12 @@ export interface EvidenceAcquisitionResponse {
   // Outreach Center
   coldEmail: string;
   linkedInMessage: string;
-  discoveryScript: string;
-  followUpSequence: string;
-  meetingAgenda: string;
+  discoveryScript: string; // Discovery Call Questions
+  followUpSequence: string; // Follow-up Email
+  meetingAgenda: string; // Sales Angle
 }
 
-export async function analyzeCompany(combinedText: string, companyName: string): Promise<EvidenceAcquisitionResponse> {
+export async function analyzeCompany(combinedText: string, companyName: string): Promise<ClientAcquisitionResponse> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY environment variable is not defined.');
@@ -85,19 +85,18 @@ export async function analyzeCompany(combinedText: string, companyName: string):
     },
   });
 
-  const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
   const prompt = `
 You are an expert sales intelligence auditor that builds Evidence-Based Proposals.
 Analyze the XML-formatted company crawled website text. Every claim you make must be traceable back to specific quotes and source URLs in the text.
 
 Rules:
-1. NEVER present assumptions as facts. Keep facts, inferences, and recommendations strictly separated.
-2. Verified Facts: These must represent statements explicitly written on the crawled pages. Include the exact quote and source URL.
-3. AI Inferences: These are logical deductions about company needs, pain points, or issues. They must reference the supporting verified facts and have a confidence score (0-100%).
-4. Buying Signals: Extract indicators of intent (e.g. open jobs, new releases, contact widgets, expansion notes). Quote the exact text, source page, and use "${currentDate}" for dateDiscovered.
-5. Recommendations: Suggest services. Explain *why* it was generated and list the exact supporting evidence. Provide a confidence score (0-100%).
-6. Score Explanations: Explain why you gave the opportunity and buying signal scores, citing facts.
+1. NEVER present assumptions as facts. Keep facts, insights, and recommendations strictly separated.
+2. Verified Facts: Display only objective observations explicitly present in the crawled text (e.g. Website has no blog, Careers page detected). Never infer. Confidence must be 100%.
+3. AI Insights: Logical deductions based on evidence (e.g. Potential Growth Phase based on active job openings, explanation, confidence).
+4. Business Opportunities & Solution Builder: Translate issues into recommended services. Output the specific issue, business impact, recommended service, estimated fee, estimated project value (integer), expected outcome, estimated ROI, and confidence.
+5. Proposal Generator: Create a complete, client-ready proposal with executive summary, verified findings, business opportunities, recommended services, cost estimate, outcomes, and 30-day and 90-day action plans.
+6. Outreach Center: Generate a cold email, LinkedIn message, follow-up email, discovery call questions, and a sales angle. EVERY outreach asset must explicitly reference evidence quotes.
+7. Show Me Why: Break down the Opportunity Score (0-100) and Buying Signal Score (0-100) mathematically using score points (e.g. +20 Active hiring, +15 funnel defects, etc. totaling the final score).
 
 Return a JSON object conforming exactly to this schema:
 {
@@ -105,56 +104,56 @@ Return a JSON object conforming exactly to this schema:
   
   "verifiedFacts": [
     {
-      "fact": "Verified fact description (e.g. They have a team of 5 developers)",
-      "sourceUrl": "The exact URL of the <page> this came from",
-      "evidenceText": "Exact quote from page text supporting this"
+      "fact": "Objective fact description (e.g. Website has no blog)",
+      "sourceUrl": "URL where this fact is observed",
+      "confidence": 100
     }
   ],
   
   "aiInferences": [
     {
-      "inference": "Deduction description (e.g. They are likely facing client onboarding backlogs)",
-      "supportedByFacts": ["Fact 1", "Fact 2"], // Reference text of facts
-      "confidence": number
-    }
-  ],
-  
-  "buyingSignals": [
-    {
-      "signal": "Description of signal (e.g. Hiring Senior SEO Specialist)",
-      "sourceUrl": "The page URL where signal is found",
-      "sourceText": "Exact quote text of signal",
-      "dateDiscovered": "string"
+      "finding": "Inference description (e.g. Potential Growth Phase)",
+      "evidence": "Website quote or fact showing this",
+      "reasoning": "Reasoning for the inference",
+      "confidence": number // 0-100 percentage
     }
   ],
   
   "recommendations": [
     {
-      "serviceName": "e.g. Local SEO Expansion Package",
-      "issue": "Specific issue addressed",
-      "estimatedFee": "e.g. $750/month",
-      "confidence": number, // 0 to 100 percentage
-      "explanation": "Why this recommendation was generated",
-      "evidenceList": ["Exact quote or fact supporting this"]
+      "serviceName": "Recommended Service (e.g. Local SEO Growth Package)",
+      "issue": "Identified issue (e.g. No SEO metadata detected)",
+      "impact": "Reduced organic visibility",
+      "estimatedFee": "e.g. $1,000 monthly",
+      "estimatedValue": number, // integer (e.g. 1000)
+      "confidence": number, // 0-100 percentage
+      "expectedOutcome": "e.g. More organic inquiries",
+      "estimatedRoi": "e.g. 300% ROI in 90 days"
     }
   ],
   
-  "opportunityScore": number,
-  "buyingSignalScore": number,
+  "opportunityScore": number, // integer (0 to 100)
+  "buyingSignalScore": number, // integer (0 to 100)
   "scoreExplanations": {
     "opportunityScore": {
       "score": number,
-      "explanation": "Reasoning citing facts",
-      "evidence": ["Evidence 1", "Evidence 2"]
+      "explanation": "Reasoning for opportunity score",
+      "breakdown": [
+        { "label": "+20 Active hiring detected", "points": 20 }
+      ],
+      "evidence": ["Exact text quotes showing issues"]
     },
     "buyingSignalScore": {
       "score": number,
-      "explanation": "Reasoning citing jobs/signals",
-      "evidence": ["Evidence 1"]
+      "explanation": "Reasoning for buying signal score",
+      "breakdown": [
+        { "label": "+15 Growth indicators found", "points": 15 }
+      ],
+      "evidence": ["Exact text quotes showing signals"]
     }
   },
   
-  "potentialRevenue": number,
+  "potentialRevenue": number, // sum of estimated values
   "closingProbability": number,
   "problemSeverity": "High" | "Medium" | "Low",
   "leadQuality": "Hot" | "Warm" | "Cold",
@@ -166,11 +165,11 @@ Return a JSON object conforming exactly to this schema:
   "ninetyDayPlan": "string",
   "pricingRecommendation": "string",
   
-  "coldEmail": "string",
-  "linkedInMessage": "string",
-  "discoveryScript": "string",
-  "followUpSequence": "string",
-  "meetingAgenda": "string"
+  "coldEmail": "string", // Reference evidence explicitly
+  "linkedInMessage": "string", // Under 300 characters, referencing evidence
+  "discoveryScript": "Discovery Call Questions listing 3-5 high-value questions",
+  "followUpSequence": "Follow-Up Email pitch with evidence",
+  "meetingAgenda": "Sales Angle hook"
 }
 
 Crawled Website Content:
@@ -182,24 +181,16 @@ ${combinedText}
   try {
     const result = await model.generateContent(prompt);
     const textResponse = result.response.text();
-    const parsedData = JSON.parse(textResponse) as EvidenceAcquisitionResponse;
+    const parsedData = JSON.parse(textResponse) as ClientAcquisitionResponse;
 
-    // RULE 9: Suppress recommendations with confidence below 70%
+    // RULE: Suppress recommendations with confidence below 70%
     const filteredRecommendations = (parsedData.recommendations || []).filter(
       r => typeof r.confidence === 'number' && r.confidence >= 70
     );
 
-    // Re-calculate potential revenue based ONLY on suppressed/filtered recommendations
-    let adjustedRevenue = 0;
-    filteredRecommendations.forEach(r => {
-      // Try to parse fee number (e.g. $1,200 setup -> 1200, $750/mo -> 750)
-      const numMatch = r.estimatedFee.replace(/,/g, '').match(/\d+/);
-      if (numMatch) {
-        adjustedRevenue += parseInt(numMatch[0]);
-      }
-    });
-
-    if (adjustedRevenue === 0) {
+    // Sum estimated project values of filtered recommendations to calculate revenue pipeline
+    let adjustedRevenue = filteredRecommendations.reduce((acc, r) => acc + (r.estimatedValue || 0), 0);
+    if (adjustedRevenue === 0 && parsedData.potentialRevenue) {
       adjustedRevenue = parsedData.potentialRevenue;
     }
 
@@ -207,16 +198,14 @@ ${combinedText}
       companyName: parsedData.companyName || companyName,
       verifiedFacts: parsedData.verifiedFacts || [],
       aiInferences: parsedData.aiInferences || [],
-      buyingSignals: parsedData.buyingSignals || [],
-      recommendations: filteredRecommendations, // Strictly filtered (>= 70%)
+      recommendations: filteredRecommendations,
+      scoreExplanations: parsedData.scoreExplanations || {
+        opportunityScore: { score: 50, explanation: 'Default.', breakdown: [], evidence: [] },
+        buyingSignalScore: { score: 50, explanation: 'Default.', breakdown: [], evidence: [] }
+      },
       
       opportunityScore: parsedData.opportunityScore || 50,
       buyingSignalScore: parsedData.buyingSignalScore || 50,
-      scoreExplanations: parsedData.scoreExplanations || {
-        opportunityScore: { score: 50, explanation: 'Default score.', evidence: [] },
-        buyingSignalScore: { score: 50, explanation: 'Default score.', evidence: [] }
-      },
-      
       potentialRevenue: adjustedRevenue,
       closingProbability: parsedData.closingProbability || 50,
       problemSeverity: parsedData.problemSeverity || 'Medium',
@@ -236,7 +225,7 @@ ${combinedText}
       meetingAgenda: parsedData.meetingAgenda || ''
     };
   } catch (error: any) {
-    console.error('Gemini Evidence Analysis Failure:', error);
-    throw new Error(`Evidence AI generation failed: ${error.message}`);
+    console.error('Gemini Client Acquisition Generator Error:', error);
+    throw new Error(`Gemini generation failed: ${error.message}`);
   }
 }

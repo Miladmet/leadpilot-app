@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Execute WebMCP crawler workflow
-    console.log(`Starting WebMCP crawling workflow for evidence-based opportunities: ${url}`);
+    console.log(`Starting WebMCP crawling workflow for client opportunities: ${url}`);
     const crawlData = await crawlWebsite(url);
 
     if (!crawlData.combinedContent || crawlData.combinedContent.length < 50) {
@@ -44,9 +44,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Perform AI Analysis with Gemini (Evidence Acquisition Engine)
-    console.log(`Running Gemini Evidence Engine for: ${crawlData.companyName}`);
+    // 3. Perform AI Analysis with Gemini (Client Acquisition Engine)
+    console.log(`Running Gemini Client Acquisition Engine for: ${crawlData.companyName}`);
     const aiAnalysis = await analyzeCompany(crawlData.combinedContent, crawlData.companyName);
+
+    // Create synthetic buying signals from high-confidence insights to populate schema
+    const syntheticSignals = aiAnalysis.aiInferences
+      .filter(i => i.confidence >= 70)
+      .map(i => ({
+        signal: i.finding,
+        sourceUrl: aiAnalysis.verifiedFacts[0]?.sourceUrl || crawlData.websiteUrl,
+        sourceText: i.evidence,
+        dateDiscovered: new Date().toLocaleDateString()
+      }));
 
     // 4. Save to Database with new client acquisition layout
     const prospect = await prisma.prospect.create({
@@ -55,17 +65,17 @@ export async function POST(req: NextRequest) {
         companyName: aiAnalysis.companyName,
         websiteUrl: crawlData.websiteUrl,
         
-        // Evidence Vault Serialization
+        // Serialized payloads
         verifiedFacts: JSON.stringify(aiAnalysis.verifiedFacts),
         aiInferences: JSON.stringify(aiAnalysis.aiInferences),
-        buyingSignals: JSON.stringify(aiAnalysis.buyingSignals),
+        buyingSignals: JSON.stringify(syntheticSignals),
         recommendations: JSON.stringify(aiAnalysis.recommendations),
         scoreExplanations: JSON.stringify(aiAnalysis.scoreExplanations),
 
-        // Default solution stubs (not used directly, but populated to prevent schema validation failures)
-        problem: aiAnalysis.verifiedFacts.map(f => f.fact).slice(0, 3).join(', ') || 'See facts audit.',
-        opportunity: aiAnalysis.aiInferences.map(i => i.inference).slice(0, 3).join(', ') || 'See inferences audit.',
-        proposedSolution: aiAnalysis.recommendations.map(r => r.serviceName).slice(0, 3).join(', ') || 'See recommendations.',
+        // Text summary stubs
+        problem: aiAnalysis.verifiedFacts.map(f => f.fact).slice(0, 3).join(', ') || 'Opportunities audited.',
+        opportunity: aiAnalysis.aiInferences.map(i => i.finding).slice(0, 3).join(', ') || 'Inferences mapped.',
+        proposedSolution: aiAnalysis.recommendations.map(r => r.serviceName).slice(0, 3).join(', ') || 'Services matched.',
         
         opportunityScore: aiAnalysis.opportunityScore,
         buyingSignalScore: aiAnalysis.buyingSignalScore,
@@ -105,7 +115,7 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         action: 'ANALYZED_COMPANY',
-        details: `Generated evidence audit for ${aiAnalysis.companyName} (Value: $${aiAnalysis.potentialRevenue})`,
+        details: `Generated proposal for ${aiAnalysis.companyName} (Est. Revenue: $${aiAnalysis.potentialRevenue})`,
       },
     });
 
@@ -113,7 +123,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Analyze API Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error during evidence analysis' },
+      { error: error.message || 'Internal Server Error during client acquisition generation' },
       { status: 500 }
     );
   }

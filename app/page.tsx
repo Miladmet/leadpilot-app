@@ -9,7 +9,7 @@ export default function Home() {
           <span className="text-2xl font-bold bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
             LeadPilot AI
           </span>
-          <span className="bg-sky-100 text-sky-700 text-xs px-2 py-0.5 rounded font-semibold">MVP</span>
+          <span className="bg-sky-100 text-sky-700 text-xs px-2 py-0.5 rounded font-semibold">Platform</span>
         </div>
         <div className="flex items-center gap-4">
           <Link href="/login" className="text-slate-600 hover:text-slate-900 font-medium">
@@ -28,25 +28,25 @@ export default function Home() {
       <main className="flex-1">
         <section className="py-20 px-6 max-w-5xl mx-auto text-center">
           <h1 className="text-5xl md:text-6xl font-black text-slate-900 leading-tight tracking-tight">
-            Find Prospects. Identify Problems.<br />
-            Generate Proposals. <span className="text-sky-600">Win More Clients.</span>
+            Turn Any Company Website Into a <br className="hidden md:inline" />
+            <span className="text-sky-600">Client Proposal</span> in 60 Seconds
           </h1>
           <p className="mt-6 text-xl text-slate-600 max-w-3xl mx-auto">
-            LeadPilot automatically researches businesses, finds opportunities, builds service recommendations, and creates personalized outreach. Turn any company website into a ready-to-send client proposal in 60 seconds.
+            LeadPilot researches businesses, verifies opportunities, recommends services, generates proposals, and creates personalized outreach backed by evidence.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link
               href="/register"
               className="bg-slate-900 hover:bg-slate-800 text-white text-lg px-8 py-4 rounded-xl font-semibold shadow-lg transition-all"
             >
-              Start Generating Proposals Free
+              Start Building Proposals Free
             </Link>
           </div>
           
           <div className="mt-8 text-sm text-slate-500 flex justify-center items-center gap-2">
             <span>✓ No credit card required</span>
             <span>•</span>
-            <span>✓ 10 free proposals per month</span>
+            <span>✓ 10 free scans per month</span>
           </div>
         </section>
 
@@ -54,24 +54,24 @@ export default function Home() {
         <section className="bg-slate-100 py-16 px-6 border-y border-slate-200">
           <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="text-3xl mb-3">🔍</div>
-              <h3 className="text-lg font-bold text-slate-950">AI Opportunity Engine</h3>
+              <div className="text-3xl mb-3">✅</div>
+              <h3 className="text-lg font-bold text-slate-950">Verified Facts</h3>
               <p className="text-slate-600 mt-2 text-sm leading-relaxed">
-                Scan websites for SEO drops, UX defects, missing AI chatbots, outdated designs, and operations bottlenecks in under a minute.
+                Objective website audits containing exact quotes, citations, and source URLs. Never make blind guesses again.
               </p>
             </div>
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="text-3xl mb-3">💰</div>
-              <h3 className="text-lg font-bold text-slate-950">Revenue Estimator</h3>
+              <div className="text-3xl mb-3">📈</div>
+              <h3 className="text-lg font-bold text-slate-950">AI Insights & Opps</h3>
               <p className="text-slate-600 mt-2 text-sm leading-relaxed">
-                Automatically matches problems with services (e.g. SEO retainer, Chatbot setup) and estimates the contract value to prioritize hot leads.
+                Deduce target growth opportunities. Match solutions to technical defects and estimate potential revenue pipelines.
               </p>
             </div>
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
               <div className="text-3xl mb-3">📄</div>
-              <h3 className="text-lg font-bold text-slate-950">One-Click Deliverables</h3>
+              <h3 className="text-lg font-bold text-slate-950">Outreach Center</h3>
               <p className="text-slate-600 mt-2 text-sm leading-relaxed">
-                Download fully-formed PDF Proposals, 30/90 day roadmaps, discovery call scripts, meeting agendas, and cold outreach packages.
+                Personalized emails, LinkedIn messages, and discovery questions citing specific page evidence to hook high-value prospects.
               </p>
             </div>
           </div>
@@ -83,7 +83,7 @@ export default function Home() {
             Simple, Transparent Pricing
           </h2>
           <p className="text-slate-600 text-center mt-2 max-w-md mx-auto">
-            Choose the package that matches your client acquisition volume. Change plans at any time.
+            Choose the package that matches your agency volume. Change plans at any time.
           </p>
 
           <div className="mt-12 grid md:grid-cols-3 gap-8 items-stretch">
