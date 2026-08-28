@@ -384,7 +384,7 @@ export default function Dashboard() {
   // Pipeline metrics
   const totalRevenuePipeline = prospects.reduce((acc, p) => acc + p.potentialRevenue, 0);
   const proposalsReadyCount = prospects.filter(p => p.proposalStatus === 'Ready').length;
-  const verifiedOpportunitiesCount = prospects.reduce((acc, p) => acc + parseRecommendations(p.recommendations).length, 0);
+  const totalVerifiedOpps = prospects.reduce((acc, p) => acc + parseRecommendations(p.recommendations).length, 0);
   const meetingsGeneratedCount = activities.filter(a => a.action === 'DELETED_PROSPECT' || a.action === 'SUBSCRIBED').length + prospects.length;
 
   // New global dashboard metrics calculations
