@@ -75,6 +75,7 @@ model Prospect {
   discoveryScript     String
   followUpSequence    String
   meetingAgenda       String
+  outreachCampaign    String   @default("{}")
 }
 
 model ActivityLog {

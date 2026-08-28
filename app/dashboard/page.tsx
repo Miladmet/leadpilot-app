@@ -181,6 +181,10 @@ export default function Dashboard() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [syncingCrm, setSyncingCrm] = useState(false);
   const [crmSuccess, setCrmSuccess] = useState(false);
+  const [campaignEmail, setCampaignEmail] = useState('');
+  const [campaignSubject, setCampaignSubject] = useState('');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [sendingCampaign, setSendingCampaign] = useState(false);
 
   // Evidence Modals
   const [showWhyModal, setShowWhyModal] = useState(false);
@@ -191,6 +195,19 @@ export default function Dashboard() {
   useEffect(() => {
     fetchUserData();
   }, []);
+
+  useEffect(() => {
+    if (activeProspect) {
+      const cleanDomain = activeProspect.websiteUrl.replace(/https?:\/\/(www\.)?/, '').split('/')[0];
+      setCampaignEmail(`info@${cleanDomain}`);
+      setCampaignSubject(`Systems Optimization Audit & Roadmap for ${activeProspect.companyName}`);
+      
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
+      setScheduledDate(tomorrow.toISOString().slice(0, 16));
+    }
+  }, [activeProspect]);
 
   const fetchUserData = async () => {
     try {
@@ -311,6 +328,67 @@ export default function Dashboard() {
     }
   };
 
+  const handleSendCampaign = async (sendImmediately: boolean) => {
+    if (!activeProspect) return;
+    if (!campaignEmail) {
+      alert('Recipient email is required.');
+      return;
+    }
+    setSendingCampaign(true);
+    try {
+      const emailBody = outreachSubTab === 'email' ? activeProspect.coldEmail : activeProspect.followUpSequence;
+      const res = await fetch('/api/campaigns/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prospectId: activeProspect.id,
+          recipientEmail: campaignEmail,
+          subject: campaignSubject || 'Client Acquisition Pitch',
+          body: emailBody,
+          sendImmediately,
+          scheduledTime: sendImmediately ? null : scheduledDate
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const updatedProspect = data.prospect;
+        setActiveProspect(updatedProspect);
+        setProspects(prev => prev.map(p => p.id === updatedProspect.id ? updatedProspect : p));
+      } else {
+        alert(data.error || 'Failed to dispatch campaign.');
+      }
+    } catch (e) {
+      alert('Network error occurred dispatching campaign.');
+    } finally {
+      setSendingCampaign(false);
+    }
+  };
+
+  const handleResetCampaign = async () => {
+    if (!activeProspect) return;
+    try {
+      const emailBody = outreachSubTab === 'email' ? activeProspect.coldEmail : activeProspect.followUpSequence;
+      const res = await fetch('/api/campaigns/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prospectId: activeProspect.id,
+          recipientEmail: campaignEmail,
+          subject: campaignSubject,
+          body: emailBody,
+          sendImmediately: false,
+          scheduledTime: null
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const updatedProspect = data.prospect;
+        setActiveProspect(updatedProspect);
+        setProspects(prev => prev.map(p => p.id === updatedProspect.id ? updatedProspect : p));
+      }
+    } catch (e) {}
+  };
+
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
@@ -375,6 +453,10 @@ export default function Dashboard() {
 
   const parseScoreExplanations = (jsonStr: string): ScoreExplanations | null => {
     try { return JSON.parse(jsonStr) || null; } catch { return null; }
+  };
+
+  const parseCampaign = (jsonStr: string | undefined): any => {
+    try { return JSON.parse(jsonStr || "{}") || {}; } catch { return {}; }
   };
 
   const parsePricingAssumptions = (jsonStr: string): PricingAssumptions => {
@@ -1169,13 +1251,118 @@ export default function Dashboard() {
                         </button>
                       </div>
 
-                      <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-mono whitespace-pre-wrap leading-relaxed overflow-y-auto h-[260px]">
+                      <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-mono whitespace-pre-wrap leading-relaxed overflow-y-auto h-[180px]">
                         {outreachSubTab === 'email' && activeProspect.coldEmail}
                         {outreachSubTab === 'linkedin' && activeProspect.linkedInMessage}
                         {outreachSubTab === 'followup' && activeProspect.followUpSequence}
                         {outreachSubTab === 'discovery' && activeProspect.discoveryScript}
                         {outreachSubTab === 'angle' && activeProspect.meetingAgenda}
                       </pre>
+
+                      {/* Outbound Campaign Manager */}
+                      {(outreachSubTab === 'email' || outreachSubTab === 'followup') && (() => {
+                        const activeCampaign = parseCampaign(activeProspect.outreachCampaign);
+                        return (
+                          <div className="mt-4 p-4 border border-slate-200 rounded-xl bg-slate-50/50 text-xs space-y-3">
+                            <h5 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1.5 flex justify-between items-center">
+                              <span>Outbound Pitch Scheduler</span>
+                              {activeCampaign?.status && (
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                  activeCampaign.status === 'Sent' ? 'bg-emerald-100 text-emerald-800' :
+                                  activeCampaign.status === 'Scheduled' ? 'bg-sky-100 text-sky-800 animate-pulse' :
+                                  'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {activeCampaign.status}
+                                </span>
+                              )}
+                            </h5>
+
+                            {activeCampaign?.status && activeCampaign.status !== 'Draft' ? (
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                  <div>
+                                    <span className="text-slate-400 block uppercase font-bold text-[8px]">Recipient</span>
+                                    <span className="text-slate-700 font-bold">{activeCampaign.recipientEmail}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block uppercase font-bold text-[8px]">Subject</span>
+                                    <span className="text-slate-700 truncate block font-bold">{activeCampaign.subject}</span>
+                                  </div>
+                                </div>
+
+                                <div className="mt-2 space-y-1 bg-white p-2 rounded border border-slate-150 max-h-[80px] overflow-y-auto font-mono text-[9px] text-slate-500">
+                                  <span className="font-bold text-[8px] text-slate-400 uppercase block mb-1">Execution Logs:</span>
+                                  {activeCampaign.logs?.map((l: any, idx: number) => (
+                                    <div key={idx} className="leading-tight">
+                                      [{new Date(l.timestamp).toLocaleTimeString()}] {l.event}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <button
+                                  onClick={handleResetCampaign}
+                                  className="text-[10px] text-sky-600 hover:text-sky-700 font-bold"
+                                >
+                                  🔄 Schedule another pitch
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Recipient Email</label>
+                                    <input
+                                      type="email"
+                                      value={campaignEmail}
+                                      onChange={(e) => setCampaignEmail(e.target.value)}
+                                      placeholder="e.g. info@company.com"
+                                      className="w-full bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Email Subject</label>
+                                    <input
+                                      type="text"
+                                      value={campaignSubject}
+                                      onChange={(e) => setCampaignSubject(e.target.value)}
+                                      placeholder="e.g. System Audit Roadmap"
+                                      className="w-full bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 pt-1">
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Schedule Delay</label>
+                                    <input
+                                      type="datetime-local"
+                                      value={scheduledDate}
+                                      onChange={(e) => setScheduledDate(e.target.value)}
+                                      className="bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-600 font-sans"
+                                    />
+                                  </div>
+                                  <div className="flex gap-2 w-full md:w-auto">
+                                    <button
+                                      disabled={sendingCampaign}
+                                      onClick={() => handleSendCampaign(false)}
+                                      className="flex-1 md:flex-none text-center bg-white hover:bg-slate-100 border border-slate-250 font-bold text-[10px] text-slate-700 py-1.5 px-3 rounded-lg shadow-sm"
+                                    >
+                                      📅 Schedule
+                                    </button>
+                                    <button
+                                      disabled={sendingCampaign}
+                                      onClick={() => handleSendCampaign(true)}
+                                      className="flex-1 md:flex-none text-center bg-sky-600 hover:bg-sky-700 font-bold text-[10px] text-white py-1.5 px-3.5 rounded-lg shadow-sm"
+                                    >
+                                      {sendingCampaign ? '⏳ Sending...' : '🚀 Send Now'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}

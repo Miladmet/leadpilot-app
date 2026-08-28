@@ -53,9 +53,43 @@ function normalizeUrl(inputUrl: string): string {
 export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
   const normalized = normalizeUrl(url);
   try {
-    const response = await axios.get(normalized, AXIOS_CONFIG);
+    let finalUrl = normalized;
+    let config = { ...AXIOS_CONFIG };
+
+    const proxyApiKey = process.env.SCRAPING_PROXY_API_KEY;
+    const proxyService = (process.env.SCRAPING_PROXY_SERVICE || 'scrapingbee').toLowerCase();
+    const customProxyUrl = process.env.SCRAPING_PROXY_URL;
+
+    if (proxyApiKey) {
+      if (proxyService === 'scrapingbee') {
+        finalUrl = `https://app.scrapingbee.com/api/v1/?api_key=${proxyApiKey}&url=${encodeURIComponent(normalized)}&render_js=false`;
+        config.timeout = 20000;
+      } else if (proxyService === 'zenrows') {
+        finalUrl = `https://api.zenrows.com/v1/?apikey=${proxyApiKey}&url=${encodeURIComponent(normalized)}`;
+        config.timeout = 20000;
+      } else if (proxyService === 'scraperapi') {
+        finalUrl = `http://api.scraperapi.com/?api_key=${proxyApiKey}&url=${encodeURIComponent(normalized)}`;
+        config.timeout = 20000;
+      }
+    } else if (customProxyUrl) {
+      const proxyUrlObj = new URL(customProxyUrl);
+      config = {
+        ...config,
+        proxy: {
+          protocol: proxyUrlObj.protocol.replace(':', ''),
+          host: proxyUrlObj.hostname,
+          port: parseInt(proxyUrlObj.port || '80'),
+          auth: proxyUrlObj.username ? {
+            username: proxyUrlObj.username,
+            password: proxyUrlObj.password
+          } : undefined
+        }
+      };
+    }
+
+    const response = await axios.get(finalUrl, config);
     if (response.status >= 400) {
-      console.warn(`Scrape failed for ${normalized} with status ${response.status}`);
+      console.warn(`Scrape failed for ${normalized} (routed through proxy: ${!!proxyApiKey}) with status ${response.status}`);
       return null;
     }
     const html = response.data;
@@ -67,7 +101,7 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
     const text = cleanText(html);
     return { url: normalized, title, text, html };
   } catch (error: any) {
-    console.error(`Error scraping URL ${normalized}:`, error.message);
+    console.error(`Error scraping URL ${normalized} (proxy active: ${!!process.env.SCRAPING_PROXY_API_KEY}):`, error.message);
     return null;
   }
 }
