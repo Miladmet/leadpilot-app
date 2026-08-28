@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Execute WebMCP crawler workflow
-    console.log(`Starting WebMCP crawling workflow for: ${url}`);
+    console.log(`Starting WebMCP crawling workflow for client opportunities: ${url}`);
     const crawlData = await crawlWebsite(url);
 
     if (!crawlData.combinedContent || crawlData.combinedContent.length < 50) {
@@ -44,24 +44,40 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Perform AI Analysis with Gemini
-    console.log(`Running Gemini AI Sales Intelligence generation for: ${crawlData.companyName}`);
+    // 3. Perform AI Analysis with Gemini (Client Acquisition Engine)
+    console.log(`Running Gemini Client Acquisition Engine for: ${crawlData.companyName}`);
     const aiAnalysis = await analyzeCompany(crawlData.combinedContent, crawlData.companyName);
 
-    // 4. Save to Database
+    // 4. Save to Database with new client acquisition layout
     const prospect = await prisma.prospect.create({
       data: {
         userId: user.id,
         companyName: aiAnalysis.companyName,
         websiteUrl: crawlData.websiteUrl,
-        summary: aiAnalysis.summary,
-        painPoints: JSON.stringify(aiAnalysis.painPoints),
-        opportunityScore: aiAnalysis.opportunityScore,
-        buyingSignalScore: aiAnalysis.buyingSignalScore,
+        
+        problem: aiAnalysis.problem,
+        opportunity: aiAnalysis.opportunity,
+        proposedSolution: aiAnalysis.proposedSolution,
+        servicesSuggested: JSON.stringify(aiAnalysis.servicesSuggested),
+        
+        potentialRevenue: aiAnalysis.potentialRevenue,
+        closingProbability: aiAnalysis.closingProbability,
+        problemSeverity: aiAnalysis.problemSeverity,
+        leadQuality: aiAnalysis.leadQuality,
+        proposalStatus: 'Ready',
+
+        executiveSummary: aiAnalysis.executiveSummary,
+        expectedResults: aiAnalysis.expectedResults,
+        estimatedRoi: aiAnalysis.estimatedRoi,
+        thirtyDayPlan: aiAnalysis.thirtyDayPlan,
+        ninetyDayPlan: aiAnalysis.ninetyDayPlan,
+        pricingRecommendation: aiAnalysis.pricingRecommendation,
+
         coldEmail: aiAnalysis.coldEmail,
         linkedInMessage: aiAnalysis.linkedInMessage,
-        salesAngle: aiAnalysis.salesAngle,
-        cta: aiAnalysis.cta,
+        discoveryScript: aiAnalysis.discoveryScript,
+        followUpSequence: aiAnalysis.followUpSequence,
+        meetingAgenda: aiAnalysis.meetingAgenda,
       },
     });
 
@@ -80,7 +96,7 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         action: 'ANALYZED_COMPANY',
-        details: `Analyzed company ${aiAnalysis.companyName} (${crawlData.websiteUrl})`,
+        details: `Generated proposal for ${aiAnalysis.companyName} (Est. Revenue: $${aiAnalysis.potentialRevenue})`,
       },
     });
 
@@ -88,7 +104,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Analyze API Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error during analysis' },
+      { error: error.message || 'Internal Server Error during client acquisition generation' },
       { status: 500 }
     );
   }

@@ -28,25 +28,25 @@ export default function Home() {
       <main className="flex-1">
         <section className="py-20 px-6 max-w-5xl mx-auto text-center">
           <h1 className="text-5xl md:text-6xl font-black text-slate-900 leading-tight tracking-tight">
-            Turn Any Company Website Into A <br className="hidden md:inline" />
-            <span className="text-sky-600">Personalized Sales Email</span> In 60 Seconds
+            Find Prospects. Identify Problems.<br />
+            Generate Proposals. <span className="text-sky-600">Win More Clients.</span>
           </h1>
-          <p className="mt-6 text-xl text-slate-600 max-w-2xl mx-auto">
-            Stop wasting hours researching leads. Analyze websites, get deep business insights, opportunity scores, and tailored sales outreach instantly.
+          <p className="mt-6 text-xl text-slate-600 max-w-3xl mx-auto">
+            LeadPilot automatically researches businesses, finds opportunities, builds service recommendations, and creates personalized outreach. Turn any company website into a ready-to-send client proposal in 60 seconds.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link
               href="/register"
               className="bg-slate-900 hover:bg-slate-800 text-white text-lg px-8 py-4 rounded-xl font-semibold shadow-lg transition-all"
             >
-              Start Generating for Free
+              Start Generating Proposals Free
             </Link>
           </div>
           
           <div className="mt-8 text-sm text-slate-500 flex justify-center items-center gap-2">
             <span>✓ No credit card required</span>
             <span>•</span>
-            <span>✓ 10 free analyses per month</span>
+            <span>✓ 10 free proposals per month</span>
           </div>
         </section>
 
@@ -55,23 +55,23 @@ export default function Home() {
           <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
               <div className="text-3xl mb-3">🔍</div>
-              <h3 className="text-lg font-bold text-slate-950">WebMCP Scraper</h3>
+              <h3 className="text-lg font-bold text-slate-950">AI Opportunity Engine</h3>
               <p className="text-slate-600 mt-2 text-sm leading-relaxed">
-                Our agent climbs home, about, and service pages to extract rich details about what the prospect sells.
+                Scan websites for SEO drops, UX defects, missing AI chatbots, outdated designs, and operations bottlenecks in under a minute.
               </p>
             </div>
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="text-3xl mb-3">🎯</div>
-              <h3 className="text-lg font-bold text-slate-950">Lead & Buying Score</h3>
+              <div className="text-3xl mb-3">💰</div>
+              <h3 className="text-lg font-bold text-slate-950">Revenue Estimator</h3>
               <p className="text-slate-600 mt-2 text-sm leading-relaxed">
-                Instantly see if a prospect is active or scaling. Focus exclusively on leads with the highest buying intent.
+                Automatically matches problems with services (e.g. SEO retainer, Chatbot setup) and estimates the contract value to prioritize hot leads.
               </p>
             </div>
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="text-3xl mb-3">✍</div>
-              <h3 className="text-lg font-bold text-slate-950">Outreach in Seconds</h3>
+              <div className="text-3xl mb-3">📄</div>
+              <h3 className="text-lg font-bold text-slate-950">One-Click Deliverables</h3>
               <p className="text-slate-600 mt-2 text-sm leading-relaxed">
-                Generate high-conversion cold emails and short, professional LinkedIn templates with custom pain-point hooks.
+                Download fully-formed PDF Proposals, 30/90 day roadmaps, discovery call scripts, meeting agendas, and cold outreach packages.
               </p>
             </div>
           </div>
@@ -83,7 +83,7 @@ export default function Home() {
             Simple, Transparent Pricing
           </h2>
           <p className="text-slate-600 text-center mt-2 max-w-md mx-auto">
-            Choose the package that matches your outreach volume. Change plans at any time.
+            Choose the package that matches your client acquisition volume. Change plans at any time.
           </p>
 
           <div className="mt-12 grid md:grid-cols-3 gap-8 items-stretch">
@@ -97,9 +97,9 @@ export default function Home() {
                   <span className="text-slate-500 text-sm ml-2">/ month</span>
                 </div>
                 <ul className="mt-6 space-y-3 text-slate-600 text-sm">
-                  <li className="flex items-center gap-2">✔ 10 analyses per month</li>
-                  <li className="flex items-center gap-2">✔ Full WebMCP research</li>
-                  <li className="flex items-center gap-2">✔ Email + LinkedIn generation</li>
+                  <li className="flex items-center gap-2">✔ 10 proposals per month</li>
+                  <li className="flex items-center gap-2">✔ AI Opportunity Scans</li>
+                  <li className="flex items-center gap-2">✔ Outreach + Scripts generation</li>
                 </ul>
               </div>
               <Link
@@ -117,15 +117,15 @@ export default function Home() {
               </span>
               <div>
                 <h3 className="text-xl font-bold text-slate-950">Pro</h3>
-                <p className="text-slate-500 text-sm mt-1">For active sales pros & recruiters</p>
+                <p className="text-slate-500 text-sm mt-1">For active agencies & consultants</p>
                 <div className="mt-6 flex items-baseline">
                   <span className="text-4xl font-black">$29</span>
                   <span className="text-slate-500 text-sm ml-2">/ month</span>
                 </div>
                 <ul className="mt-6 space-y-3 text-slate-600 text-sm">
-                  <li className="flex items-center gap-2 font-medium">✔ 200 analyses per month</li>
-                  <li className="flex items-center gap-2">✔ Full WebMCP research</li>
-                  <li className="flex items-center gap-2">✔ Email + LinkedIn generation</li>
+                  <li className="flex items-center gap-2 font-medium">✔ 200 proposals per month</li>
+                  <li className="flex items-center gap-2">✔ Full Audit & PDF Proposals</li>
+                  <li className="flex items-center gap-2">✔ Revenue Estimator metrics</li>
                   <li className="flex items-center gap-2">✔ Access to Chrome Extension</li>
                 </ul>
               </div>
@@ -141,16 +141,16 @@ export default function Home() {
             <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
               <div>
                 <h3 className="text-xl font-bold text-slate-950">Agency</h3>
-                <p className="text-slate-500 text-sm mt-1">For B2B growth agencies</p>
+                <p className="text-slate-500 text-sm mt-1">For high-volume growth agencies</p>
                 <div className="mt-6 flex items-baseline">
                   <span className="text-4xl font-black">$79</span>
                   <span className="text-slate-500 text-sm ml-2">/ month</span>
                 </div>
                 <ul className="mt-6 space-y-3 text-slate-600 text-sm">
-                  <li className="flex items-center gap-2 font-medium">✔ Unlimited analyses</li>
-                  <li className="flex items-center gap-2 font-medium">✔ Multi-user seats</li>
+                  <li className="flex items-center gap-2 font-medium">✔ Unlimited proposals</li>
+                  <li className="flex items-center gap-2 font-medium">✔ Exportable PDF Audits</li>
                   <li className="flex items-center gap-2">✔ Priority API response</li>
-                  <li className="flex items-center gap-2">✔ Full CRM integrations coming soon</li>
+                  <li className="flex items-center gap-2">✔ Custom branding options</li>
                 </ul>
               </div>
               <Link
@@ -167,7 +167,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="py-8 bg-slate-900 text-slate-400 text-center text-sm border-t border-slate-800">
         <p>© {new Date().getFullYear()} LeadPilot AI. All rights reserved.</p>
-        <p className="mt-1 text-slate-500">Built to help sales professionals book more meetings.</p>
+        <p className="mt-1 text-slate-500">Helping service providers identify issues and win more clients.</p>
       </footer>
     </div>
   );

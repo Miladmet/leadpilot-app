@@ -1,6 +1,6 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 generator client {
@@ -30,16 +30,36 @@ model Prospect {
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   companyName         String
   websiteUrl          String
-  summary             String
-  painPoints          String   // JSON string of array
-  opportunityScore    Int
-  buyingSignalScore   Int
-  coldEmail           String
-  linkedInMessage     String
-  salesAngle          String
-  cta                 String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // 1. Audit & Solutions (What is wrong? What can I sell?)
+  problem             String   // Detailed text
+  opportunity         String   // Detailed text
+  proposedSolution    String   // Detailed text
+  servicesSuggested   String   // JSON string of array: { name, issue, estimatedFee, confidence }
+  
+  // 2. Metrics & Revenue Estimator
+  potentialRevenue    Int      // Total estimated contract value (e.g. 4700)
+  closingProbability  Int      // 0 to 100 percentage
+  problemSeverity     String   // High, Medium, Low
+  leadQuality         String   // Hot, Warm, Cold
+  proposalStatus      String   @default("Ready") // Ready, Draft
+
+  // 3. Proposal Builder
+  executiveSummary    String   // Detailed executive summary
+  expectedResults     String   // Detailed expected results
+  estimatedRoi        String   // Estimated return on investment
+  thirtyDayPlan       String   // 30 Day Plan checklist/timeline
+  ninetyDayPlan       String   // 90 Day Plan timeline
+  pricingRecommendation String // Suggested billing models & packages
+
+  // 4. One-Click Deliverables (Outreach Center)
+  coldEmail           String   // Cold email pitch
+  linkedInMessage     String   // LinkedIn message (under 300 chars)
+  discoveryScript     String   // Discovery call script
+  followUpSequence    String   // JSON string or text block of email follow-ups
+  meetingAgenda       String   // Meeting agenda for first call
 }
 
 model ActivityLog {

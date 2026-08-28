@@ -16,25 +16,48 @@ import {
   Copy, 
   Check, 
   TrendingUp, 
-  ChevronRight, 
   ExternalLink,
   Loader2,
   Sparkles,
-  CreditCard
+  CreditCard,
+  FileText,
+  PhoneCall,
+  Calendar,
+  Layers,
+  ArrowUpRight
 } from 'lucide-react';
+
+interface SuggestedService {
+  name: string;
+  issue: string;
+  estimatedFee: string;
+  confidence: number;
+}
 
 interface Prospect {
   id: string;
   companyName: string;
   websiteUrl: string;
-  summary: string;
-  painPoints: string; // JSON string of array
-  opportunityScore: number;
-  buyingSignalScore: number;
+  problem: string;
+  opportunity: string;
+  proposedSolution: string;
+  servicesSuggested: string; // JSON string
+  potentialRevenue: number;
+  closingProbability: number;
+  problemSeverity: string;
+  leadQuality: string;
+  proposalStatus: string;
+  executiveSummary: string;
+  expectedResults: string;
+  estimatedRoi: string;
+  thirtyDayPlan: string;
+  ninetyDayPlan: string;
+  pricingRecommendation: string;
   coldEmail: string;
   linkedInMessage: string;
-  salesAngle: string;
-  cta: string;
+  discoveryScript: string;
+  followUpSequence: string;
+  meetingAgenda: string;
   createdAt: string;
 }
 
@@ -72,7 +95,8 @@ export default function Dashboard() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [copiedText, setCopiedText] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'email' | 'linkedin' | 'angle' | 'details'>('email');
+  const [activeTab, setActiveTab] = useState<'opportunities' | 'proposal' | 'outreach'>('opportunities');
+  const [outreachSubTab, setOutreachSubTab] = useState<'email' | 'linkedin' | 'discovery' | 'followup' | 'agenda'>('email');
   const [billingLoading, setBillingLoading] = useState(false);
 
   const router = useRouter();
@@ -90,8 +114,6 @@ export default function Dashboard() {
       }
       const data = await res.json();
       setUser(data.user);
-
-      // Fetch dashboard metrics and prospects list
       await Promise.all([fetchStats(), fetchProspects()]);
     } catch (err) {
       console.error(err);
@@ -142,15 +164,13 @@ export default function Dashboard() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Analysis failed. Please check the URL.');
+        throw new Error(data.error || 'Acquisition analysis failed. Verify domain.');
       }
 
       const newProspect = data.prospect;
       setActiveProspect(newProspect);
       setProspects(prev => [newProspect, ...prev]);
       setUrl('');
-      
-      // Refresh statistics and user limits
       await Promise.all([fetchStats(), fetchUserData()]);
     } catch (err: any) {
       setError(err.message);
@@ -161,7 +181,7 @@ export default function Dashboard() {
 
   const handleDeleteProspect = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this prospect?')) return;
+    if (!confirm('Are you sure you want to delete this client profile?')) return;
 
     try {
       const res = await fetch(`/api/prospects?id=${id}`, {
@@ -201,10 +221,7 @@ export default function Dashboard() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to initiate checkout.');
-      
-      if (data.url) {
-        window.location.href = data.url;
-      }
+      if (data.url) window.location.href = data.url;
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -217,11 +234,8 @@ export default function Dashboard() {
     try {
       const res = await fetch('/api/subscribe/portal', { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to open billing portal.');
-      
-      if (data.url) {
-        window.location.href = data.url;
-      }
+      if (!res.ok) throw new Error(data.error || 'Failed to open portal.');
+      if (data.url) window.location.href = data.url;
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -235,14 +249,16 @@ export default function Dashboard() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-    if (score >= 50) return 'text-amber-600 bg-amber-50 border-amber-200';
-    return 'text-rose-600 bg-rose-50 border-rose-200';
-  };
+  // Helper Calculations
+  const totalRevenuePipeline = prospects.reduce((acc, p) => acc + p.potentialRevenue, 0);
+  
+  const avgClosingProbability = prospects.length > 0 
+    ? Math.round(prospects.reduce((acc, p) => acc + p.closingProbability, 0) / prospects.length) 
+    : 0;
 
-  // Decode JSON array safely
-  const parsePainPoints = (jsonStr: string): string[] => {
+  const proposalsReadyCount = prospects.filter(p => p.proposalStatus === 'Ready').length;
+
+  const parseSuggestedServices = (jsonStr: string): SuggestedService[] => {
     try {
       return JSON.parse(jsonStr) || [];
     } catch {
@@ -250,12 +266,26 @@ export default function Dashboard() {
     }
   };
 
+  const getSeverityBadgeColor = (severity: string) => {
+    const s = severity?.toLowerCase();
+    if (s === 'high') return 'text-rose-700 bg-rose-50 border-rose-200';
+    if (s === 'medium') return 'text-amber-700 bg-amber-50 border-amber-200';
+    return 'text-sky-700 bg-sky-50 border-sky-200';
+  };
+
+  const getQualityBadgeColor = (quality: string) => {
+    const q = quality?.toLowerCase();
+    if (q === 'hot') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+    if (q === 'warm') return 'text-indigo-700 bg-indigo-50 border-indigo-200';
+    return 'text-slate-600 bg-slate-50 border-slate-200';
+  };
+
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
-          <span className="text-sm font-medium text-slate-500">Loading LeadPilot dashboard...</span>
+          <span className="text-sm font-medium text-slate-500">Loading LeadPilot Client Acquisition Platform...</span>
         </div>
       </div>
     );
@@ -263,23 +293,22 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {/* Header bar */}
+      {/* Top Navbar */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-4">
-          <span className="text-xl font-bold bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
+          <span className="text-xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
             LeadPilot AI
           </span>
           <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-full text-xs font-semibold text-slate-600 border border-slate-200">
-            <span>Tier:</span>
+            <span>Platform:</span>
             <span className="text-sky-600 font-bold uppercase">{user.subscriptionTier}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Usage Meter */}
           <div className="hidden md:flex flex-col items-end gap-1">
             <span className="text-xs text-slate-500 font-medium">
-              Analyses: {user.analysesUsed} / {user.subscriptionTier === 'AGENCY' ? '∞' : user.analysesLimit}
+              Analyses Quota: {user.analysesUsed} / {user.subscriptionTier === 'AGENCY' ? '∞' : user.analysesLimit}
             </span>
             <div className="w-36 bg-slate-200 rounded-full h-1.5 overflow-hidden">
               <div 
@@ -305,90 +334,88 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main SaaS panel */}
+      {/* Main Container */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid lg:grid-cols-3 gap-6">
         
-        {/* Left Column: Analysis & Core Work */}
+        {/* Left Column: Metrics & Redesigned Workspaces */}
         <div className="lg:col-span-2 space-y-6 flex flex-col">
           
-          {/* Dashboard Stats Row */}
+          {/* Revenue & Pipeline Metrics Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-              <div className="bg-sky-50 text-sky-600 p-2.5 rounded-lg border border-sky-100">
-                <Search className="h-5 w-5" />
+              <div className="bg-emerald-50 text-emerald-600 p-2.5 rounded-lg border border-emerald-100">
+                <TrendingUp className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-slate-500 font-medium">Analyzed</p>
-                <p className="text-xl font-bold text-slate-900">{stats.prospectsCount}</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Revenue Pipeline</p>
+                <p className="text-lg font-black text-emerald-600">${totalRevenuePipeline.toLocaleString()}</p>
               </div>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
               <div className="bg-purple-50 text-purple-600 p-2.5 rounded-lg border border-purple-100">
-                <Mail className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-slate-500 font-medium">Outreach Ready</p>
-                <p className="text-xl font-bold text-slate-900">{stats.outreachCount}</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Proposals Ready</p>
+                <p className="text-lg font-bold text-slate-900">{proposalsReadyCount}</p>
               </div>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-              <div className="bg-emerald-50 text-emerald-600 p-2.5 rounded-lg border border-emerald-100">
+              <div className="bg-sky-50 text-sky-600 p-2.5 rounded-lg border border-sky-100">
+                <Search className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Leads Scanned</p>
+                <p className="text-lg font-bold text-slate-900">{stats.prospectsCount}</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+              <div className="bg-amber-50 text-amber-600 p-2.5 rounded-lg border border-amber-100">
                 <Award className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-slate-500 font-medium">Avg Opp Score</p>
-                <p className="text-xl font-bold text-slate-900">{stats.avgOppScore}/100</p>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-              <div className="bg-indigo-50 text-indigo-600 p-2.5 rounded-lg border border-indigo-100">
-                <TrendingUp className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 font-medium">Avg Buying Sign</p>
-                <p className="text-xl font-bold text-slate-900">{stats.avgBuyScore}/100</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Avg Close Rate</p>
+                <p className="text-lg font-bold text-slate-900">{avgClosingProbability}%</p>
               </div>
             </div>
           </div>
 
-          {/* Web Analysis Search Box */}
+          {/* Core Proposal Search Bar */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
               <Sparkles className="h-5 w-5 text-sky-500" />
-              Analyze New Company Website
+              Build Client Proposal & Audit Report
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Provide any company homepage domain. The WebMCP crawling engine will research the homepage, about pages, contact endpoints, and services to compile sales angles.
+              Enter any company homepage URL. The WebMCP crawling engine scans for design vulnerabilities, marketing deficiencies, missing chatbot widgets, and operations bottlenecks.
             </p>
 
             <form onSubmit={handleAnalyze} className="mt-4 flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. stripe.com or https://stripe.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="w-full pl-3 pr-10 py-3 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 text-sm shadow-sm"
-                  disabled={analyzing}
-                />
-              </div>
+              <input
+                type="text"
+                required
+                placeholder="e.g. stripe.com or https://github.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="flex-1 pl-3 pr-4 py-3 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 text-sm shadow-sm"
+                disabled={analyzing}
+              />
               <button
                 type="submit"
                 disabled={analyzing}
-                className="bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm px-5 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {analyzing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing...
+                    Generating Proposal...
                   </>
                 ) : (
                   <>
-                    Research Lead
+                    Generate Proposal
                   </>
                 )}
               </button>
@@ -401,10 +428,11 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Analysis Active Card: ChatGPT style tabs */}
+          {/* Interactive Workspace Panel */}
           {activeProspect ? (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
-              {/* Card Header info */}
+              
+              {/* Proposal Header Metadata */}
               <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-start gap-4">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -421,164 +449,257 @@ export default function Dashboard() {
                   <p className="text-xs text-slate-500 mt-0.5">{activeProspect.websiteUrl}</p>
                 </div>
 
-                <div className="flex gap-2">
-                  <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex flex-col items-center min-w-[70px] ${getScoreColor(activeProspect.opportunityScore)}`}>
-                    <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">Opp Score</span>
-                    <span className="text-sm mt-0.5">{activeProspect.opportunityScore}</span>
+                {/* Revenue & Probability Badges */}
+                <div className="flex gap-2 items-center flex-wrap">
+                  <div className="px-3 py-1.5 rounded-lg border bg-emerald-50 border-emerald-200 text-xs font-bold flex flex-col items-center min-w-[85px]">
+                    <span className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">Est. Revenue</span>
+                    <span className="text-sm mt-0.5 text-emerald-700 font-black">${activeProspect.potentialRevenue.toLocaleString()}</span>
                   </div>
-                  <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex flex-col items-center min-w-[70px] ${getScoreColor(activeProspect.buyingSignalScore)}`}>
-                    <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">Buying Sig</span>
-                    <span className="text-sm mt-0.5">{activeProspect.buyingSignalScore}</span>
+                  <div className="px-3 py-1.5 rounded-lg border bg-amber-50 border-amber-200 text-xs font-bold flex flex-col items-center min-w-[70px]">
+                    <span className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">Close Prob</span>
+                    <span className="text-sm mt-0.5 text-amber-700 font-bold">{activeProspect.closingProbability}%</span>
+                  </div>
+                  <div className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold ${getSeverityBadgeColor(activeProspect.problemSeverity)}`}>
+                    <span className="block text-[8px] uppercase text-slate-500 font-semibold">Severity</span>
+                    <span>{activeProspect.problemSeverity}</span>
+                  </div>
+                  <div className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold ${getQualityBadgeColor(activeProspect.leadQuality)}`}>
+                    <span className="block text-[8px] uppercase text-slate-500 font-semibold">Quality</span>
+                    <span>{activeProspect.leadQuality}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Tabs buttons */}
+              {/* Main Workspace Tabs */}
               <div className="flex border-b border-slate-200 bg-white">
                 <button
-                  onClick={() => setActiveTab('email')}
+                  onClick={() => setActiveTab('opportunities')}
                   className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
-                    activeTab === 'email'
-                      ? 'border-sky-600 text-sky-600'
+                    activeTab === 'opportunities'
+                      ? 'border-sky-600 text-sky-600 bg-sky-50/50'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Search className="h-4 w-4" />
+                  Opportunities (Audit)
+                </button>
+                <button
+                  onClick={() => setActiveTab('proposal')}
+                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                    activeTab === 'proposal'
+                      ? 'border-sky-600 text-sky-600 bg-sky-50/50'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileText className="h-4 w-4" />
+                  Proposal Builder
+                </button>
+                <button
+                  onClick={() => setActiveTab('outreach')}
+                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                    activeTab === 'outreach'
+                      ? 'border-sky-600 text-sky-600 bg-sky-50/50'
                       : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Mail className="h-4 w-4" />
-                  Cold Email
-                </button>
-                <button
-                  onClick={() => setActiveTab('linkedin')}
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
-                    activeTab === 'linkedin'
-                      ? 'border-sky-600 text-sky-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <Linkedin className="h-4 w-4" />
-                  LinkedIn Pitch
-                </button>
-                <button
-                  onClick={() => setActiveTab('angle')}
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
-                    activeTab === 'angle'
-                      ? 'border-sky-600 text-sky-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Sales Angle & CTA
-                </button>
-                <button
-                  onClick={() => setActiveTab('details')}
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
-                    activeTab === 'details'
-                      ? 'border-sky-600 text-sky-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <Award className="h-4 w-4" />
-                  Company Summary
+                  Outreach Center
                 </button>
               </div>
 
               {/* Tab Contents */}
               <div className="p-6 flex-1 flex flex-col bg-white">
                 
-                {/* Email Tab */}
-                {activeTab === 'email' && (
+                {/* 1. Audit & Opportunities Tab */}
+                {activeTab === 'opportunities' && (
+                  <div className="space-y-6 flex-1 flex flex-col">
+                    {/* Problem / Opportunity detail blocks */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Identified Problems</h4>
+                        <p className="mt-1.5 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed max-h-[140px] overflow-y-auto">
+                          {activeProspect.problem}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Growth Opportunities</h4>
+                        <p className="mt-1.5 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed max-h-[140px] overflow-y-auto">
+                          {activeProspect.opportunity}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Service Match Engine Results */}
+                    <div className="flex-1 flex flex-col">
+                      <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Service Match Recommendations</h4>
+                      <div className="border border-slate-200 rounded-xl overflow-hidden flex-1 overflow-y-auto max-h-[220px]">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                              <th className="p-2.5">Recommended Service</th>
+                              <th className="p-2.5">Target Defect</th>
+                              <th className="p-2.5">Est. Retainer / Fee</th>
+                              <th className="p-2.5 text-right">Confidence</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {parseSuggestedServices(activeProspect.servicesSuggested).map((service, index) => (
+                              <tr key={index} className="hover:bg-slate-50/50">
+                                <td className="p-2.5 font-bold text-slate-900">{service.name}</td>
+                                <td className="p-2.5 text-slate-500 truncate max-w-[150px]">{service.issue}</td>
+                                <td className="p-2.5 font-mono font-semibold text-sky-600">{service.estimatedFee}</td>
+                                <td className="p-2.5 text-right">
+                                  <span className={`px-1.5 py-0.5 rounded font-bold ${
+                                    service.confidence >= 80 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    {service.confidence}%
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Proposal Builder Tab */}
+                {activeTab === 'proposal' && (
+                  <div className="space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="overflow-y-auto max-h-[360px] space-y-4 pr-1">
+                      
+                      {/* PDF Print Export Bar */}
+                      <div className="bg-sky-50 border border-sky-100 p-3.5 rounded-xl flex justify-between items-center">
+                        <div>
+                          <h4 className="text-xs font-bold text-sky-900">Proposal Document Ready</h4>
+                          <p className="text-[10px] text-sky-700">Fully structured with Executive Summary, expected results, timelines, and costs.</p>
+                        </div>
+                        <a
+                          href={`/proposal/${activeProspect.id}/print`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                        >
+                          📄 Export PDF
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Executive Summary</h4>
+                        <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{activeProspect.executiveSummary}</p>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Expected Results</h4>
+                          <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-2.5 rounded border border-slate-100">{activeProspect.expectedResults}</p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Estimated ROI</h4>
+                          <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-2.5 rounded border border-slate-100">{activeProspect.estimatedRoi}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">30-Day roadmap</h4>
+                          <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-2.5 rounded border border-slate-100">{activeProspect.thirtyDayPlan}</p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">90-Day expansion</h4>
+                          <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-2.5 rounded border border-slate-100">{activeProspect.ninetyDayPlan}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Pricing Package Recommendations</h4>
+                        <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-3 rounded border border-slate-100">{activeProspect.pricingRecommendation}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Outreach Center Tab */}
+                {activeTab === 'outreach' && (
                   <div className="space-y-4 flex-1 flex flex-col justify-between">
                     <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs text-slate-500 font-semibold">Generated Cold Email Pitch</span>
+                      {/* Outreach Subtabs */}
+                      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold text-slate-600 mb-3">
                         <button
-                          onClick={() => copyToClipboard(activeProspect.coldEmail, 'email')}
+                          onClick={() => setOutreachSubTab('email')}
+                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'email' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                        >
+                          Cold Email
+                        </button>
+                        <button
+                          onClick={() => setOutreachSubTab('linkedin')}
+                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'linkedin' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                        >
+                          LinkedIn
+                        </button>
+                        <button
+                          onClick={() => setOutreachSubTab('discovery')}
+                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'discovery' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                        >
+                          Call Script
+                        </button>
+                        <button
+                          onClick={() => setOutreachSubTab('followup')}
+                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'followup' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                        >
+                          Follow-Ups
+                        </button>
+                        <button
+                          onClick={() => setOutreachSubTab('agenda')}
+                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'agenda' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                        >
+                          Meeting Agenda
+                        </button>
+                      </div>
+
+                      {/* Content panel based on subtab */}
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
+                          Generated Deliverable ({outreachSubTab})
+                        </span>
+                        
+                        {/* Copy button */}
+                        <button
+                          onClick={() => {
+                            let textToCopy = '';
+                            if (outreachSubTab === 'email') textToCopy = activeProspect.coldEmail;
+                            else if (outreachSubTab === 'linkedin') textToCopy = activeProspect.linkedInMessage;
+                            else if (outreachSubTab === 'discovery') textToCopy = activeProspect.discoveryScript;
+                            else if (outreachSubTab === 'followup') textToCopy = activeProspect.followUpSequence;
+                            else if (outreachSubTab === 'agenda') textToCopy = activeProspect.meetingAgenda;
+                            
+                            copyToClipboard(textToCopy, outreachSubTab);
+                          }}
                           className="text-sky-600 hover:text-sky-700 text-xs font-bold flex items-center gap-1 bg-sky-50 px-2.5 py-1 rounded"
                         >
-                          {copiedText === 'email' ? (
+                          {copiedText === outreachSubTab ? (
                             <>
                               <Check className="h-3 w-3" /> Copied
                             </>
                           ) : (
                             <>
-                              <Copy className="h-3 w-3" /> Copy Email
+                              <Copy className="h-3 w-3" /> Copy Script
                             </>
                           )}
                         </button>
                       </div>
-                      <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-mono whitespace-pre-wrap leading-relaxed min-h-[220px]">
-                        {activeProspect.coldEmail}
+
+                      {/* Text display panel */}
+                      <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-mono whitespace-pre-wrap leading-relaxed overflow-y-auto h-[260px]">
+                        {outreachSubTab === 'email' && activeProspect.coldEmail}
+                        {outreachSubTab === 'linkedin' && activeProspect.linkedInMessage}
+                        {outreachSubTab === 'discovery' && activeProspect.discoveryScript}
+                        {outreachSubTab === 'followup' && activeProspect.followUpSequence}
+                        {outreachSubTab === 'agenda' && activeProspect.meetingAgenda}
                       </pre>
-                    </div>
-                  </div>
-                )}
 
-                {/* LinkedIn Tab */}
-                {activeTab === 'linkedin' && (
-                  <div className="space-y-4 flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs text-slate-500 font-semibold">LinkedIn connection message (under 300 characters)</span>
-                        <button
-                          onClick={() => copyToClipboard(activeProspect.linkedInMessage, 'linkedin')}
-                          className="text-sky-600 hover:text-sky-700 text-xs font-bold flex items-center gap-1 bg-sky-50 px-2.5 py-1 rounded"
-                        >
-                          {copiedText === 'linkedin' ? (
-                            <>
-                              <Check className="h-3 w-3" /> Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3" /> Copy Message
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-mono whitespace-pre-wrap leading-relaxed min-h-[120px]">
-                        {activeProspect.linkedInMessage}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-
-                {/* Sales Angle Tab */}
-                {activeTab === 'angle' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Suggested Sales Angle</h4>
-                      <p className="mt-1.5 p-3.5 bg-sky-50 text-slate-800 rounded-xl border border-sky-100 text-sm font-medium">
-                        {activeProspect.salesAngle}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h4 className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Recommended CTA</h4>
-                      <p className="mt-1.5 p-3.5 bg-slate-50 text-slate-800 rounded-xl border border-slate-200 text-sm font-mono">
-                        {activeProspect.cta}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Summary / Pain points Tab */}
-                {activeTab === 'details' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Research Summary</h4>
-                      <p className="mt-1.5 text-slate-700 text-sm leading-relaxed">
-                        {activeProspect.summary}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h4 className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Identified Pain Points</h4>
-                      <ul className="mt-2 space-y-2">
-                        {parsePainPoints(activeProspect.painPoints).map((point, index) => (
-                          <li key={index} className="flex gap-2.5 items-start text-sm text-slate-700">
-                            <span className="mt-1 flex h-2 w-2 shrink-0 rounded-full bg-rose-500" />
-                            <span>{point}</span>
-                          </li>
-                        ))}
-                      </ul>
                     </div>
                   </div>
                 )}
@@ -590,27 +711,27 @@ export default function Dashboard() {
               <Search className="h-12 w-12 text-slate-300 stroke-1 mb-4" />
               <p className="font-bold text-slate-800 text-sm">No analysis active</p>
               <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                Analyze a company homepage URL using the input above or select a past lead from the history panel to view sales outreach templates.
+                Enter a website URL above or select a past lead to load their Client Acquisition Proposal.
               </p>
             </div>
           )}
 
         </div>
 
-        {/* Right Column: History, Billing, Actions */}
+        {/* Right Column: History List, Billing, Logs */}
         <div className="space-y-6">
           
           {/* Billing Plan Manager */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <CreditCard className="h-4.5 w-4.5 text-slate-500" />
-              Billing & Subscriptions
+              Billing & Subscription
             </h3>
 
             {user.subscriptionTier === 'FREE' ? (
               <div className="mt-3 space-y-3">
                 <p className="text-xs text-slate-500">
-                  You are currently on the <span className="font-bold">Free Plan</span> (10 monthly searches). Upgrade for larger quota and extension access.
+                  You are currently on the <span className="font-bold">Free Plan</span> (10 monthly proposal scans). Upgrade to unlock the PDF exporter and extension hooks.
                 </p>
                 <div className="flex gap-2 mt-2">
                   <button
@@ -618,14 +739,14 @@ export default function Dashboard() {
                     onClick={() => triggerStripeCheckout('PRO')}
                     className="flex-1 text-center bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs py-2 rounded-lg transition-colors shadow-sm disabled:opacity-50"
                   >
-                    Upgrade Pro ($29)
+                    Pro ($29/mo)
                   </button>
                   <button
                     disabled={billingLoading}
                     onClick={() => triggerStripeCheckout('AGENCY')}
                     className="flex-1 text-center bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2 rounded-lg transition-colors shadow-sm disabled:opacity-50"
                   >
-                    Upgrade Agency ($79)
+                    Agency ($79)
                   </button>
                 </div>
               </div>
@@ -647,11 +768,11 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Prospects History list */}
+          {/* High-Value Prospects History list */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col max-h-[350px]">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 border-b border-slate-100 pb-3">
               <History className="h-4.5 w-4.5 text-slate-400" />
-              Prospects History
+              High-Value Pipelines
             </h3>
 
             <div className="mt-2 divide-y divide-slate-100 overflow-y-auto flex-1 pr-1 space-y-1">
@@ -666,21 +787,19 @@ export default function Dashboard() {
                         : 'hover:bg-slate-50 border border-transparent'
                     }`}
                   >
-                    <div className="overflow-hidden">
+                    <div className="overflow-hidden mr-2">
                       <p className="text-xs font-semibold text-slate-800 truncate">{p.companyName}</p>
                       <p className="text-[10px] text-slate-400 truncate">{p.websiteUrl}</p>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                        p.opportunityScore >= 70 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {p.opportunityScore}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs font-black text-emerald-600 font-mono">
+                        ${p.potentialRevenue.toLocaleString()}
                       </span>
                       <button
                         onClick={(e) => handleDeleteProspect(p.id, e)}
                         className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        title="Delete record"
+                        title="Delete profile"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -689,17 +808,17 @@ export default function Dashboard() {
                 ))
               ) : (
                 <div className="py-6 text-center text-xs text-slate-400">
-                  No prospects analyzed yet.
+                  No prospects scanned yet.
                 </div>
               )}
             </div>
           </div>
 
-          {/* Recent activities audit trail */}
+          {/* Activity Feed */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col max-h-[300px]">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 border-b border-slate-100 pb-3">
               <BarChart3 className="h-4.5 w-4.5 text-slate-400" />
-              Recent Activity Feed
+              Activity Feed
             </h3>
 
             <div className="mt-3 overflow-y-auto flex-1 pr-1 space-y-3">
@@ -718,7 +837,7 @@ export default function Dashboard() {
                 ))
               ) : (
                 <div className="py-6 text-center text-xs text-slate-400">
-                  No logs recorded.
+                  No activity log.
                 </div>
               )}
             </div>
