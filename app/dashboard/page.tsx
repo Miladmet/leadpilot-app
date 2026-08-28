@@ -80,6 +80,7 @@ interface ScoreDetail {
 interface ScoreExplanations {
   opportunityScore: ScoreDetail;
   buyingSignalScore: ScoreDetail;
+  techStack?: string[];
 }
 
 interface PricingAssumptions {
@@ -696,6 +697,18 @@ export default function Dashboard() {
                 <span>Low Confidence suppressed: <strong className="text-amber-600">{activeProspect.suppressedRecsCount}</strong></span>
                 <span>Opportunity Range: <strong className="text-slate-700 font-mono">{activeProspect.opportunityRange}</strong></span>
               </div>
+
+              {/* Tech Stack Row */}
+              {parseScoreExplanations(activeProspect.scoreExplanations)?.techStack && parseScoreExplanations(activeProspect.scoreExplanations)!.techStack!.length > 0 && (
+                <div className="px-6 py-2.5 bg-slate-100/50 border-b border-slate-200 flex flex-wrap gap-1.5 items-center">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mr-1">Audited Tech Stack:</span>
+                  {parseScoreExplanations(activeProspect.scoreExplanations)?.techStack?.map((tech: string, idx: number) => (
+                    <span key={idx} className="bg-white border border-slate-250 text-slate-700 text-[9px] font-semibold px-2 py-0.5 rounded-full shadow-sm">
+                      💻 {tech}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* SPECULATIVE CAVEAT BANNER IF EVIDENCE IS LOW */}
               {activeProspect.proposalStatus === 'Speculative' && (

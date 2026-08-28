@@ -39,6 +39,12 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
     pricingAssumptions = JSON.parse(prospect.revenueAssumptions) || { assumptions: [], pricingModel: '', disclaimer: '' };
   } catch (e) {}
 
+  let scoreExplanations = { opportunityScore: { score: 50, explanation: '', breakdown: [], evidence: [] }, buyingSignalScore: { score: 50, explanation: '', breakdown: [], evidence: [] }, techStack: [] };
+  try {
+    scoreExplanations = JSON.parse(prospect.scoreExplanations) || { opportunityScore: { score: 50, explanation: '', breakdown: [], evidence: [] }, buyingSignalScore: { score: 50, explanation: '', breakdown: [], evidence: [] }, techStack: [] };
+  } catch (e) {}
+  const techStack = scoreExplanations.techStack || [];
+
   return (
     <div className="min-h-screen bg-white text-slate-800 p-8 max-w-4xl mx-auto print:p-0">
       
@@ -54,6 +60,47 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         >
           🖨️ Export PDF
         </button>
+      </div>
+
+      {/* PRINT STYLES */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          .page-break-before { page-break-before: always; }
+          .page-break-after { page-break-after: always; }
+        }
+      `}} />
+
+      {/* PREMIUM COVER PAGE */}
+      <div className="min-h-[1000px] flex flex-col justify-between border-b-8 border-slate-900 pb-12 mb-12 page-break-after">
+        <div className="pt-24">
+          <span className="text-xs font-bold tracking-widest text-sky-600 uppercase">LEADPILOT AI • SOLUTIONS SUITE</span>
+          <div className="h-2 w-16 bg-sky-600 mt-4 mb-12"></div>
+          
+          <h1 className="text-5xl font-black text-slate-900 leading-tight uppercase tracking-wider mt-6">
+            Client Acquisition<br />
+            & Solution Audit
+          </h1>
+          <p className="text-lg text-slate-500 font-medium mt-4">A complete, evidence-based systems optimization & proposal roadmap.</p>
+        </div>
+
+        <div className="pt-12 space-y-6">
+          <div className="grid grid-cols-2 gap-6 text-xs">
+            <div>
+              <span className="text-slate-400 block font-bold uppercase tracking-wider text-[10px]">PREPARED FOR</span>
+              <strong className="text-slate-800 text-base block mt-1">{prospect.companyName}</strong>
+              <span className="text-slate-500 font-mono mt-0.5 block">{prospect.websiteUrl}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block font-bold uppercase tracking-wider text-[10px]">AUDITED BY</span>
+              <strong className="text-slate-800 text-base block mt-1">LeadPilot AI Safe Auditor</strong>
+              <span className="text-slate-500 mt-0.5 block">Audit Date: {new Date(prospect.createdAt).toLocaleDateString()}</span>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-[10px] text-slate-400 leading-relaxed max-w-xl">
+            This client acquisition blueprint compiles verifiable public facts, gap benchmarks, and recommended services based on observations. All project valuations are illustrative ranges rather than guarantees of performance.
+          </div>
+        </div>
       </div>
 
       {/* PROPOSAL HEADER */}
@@ -130,6 +177,25 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
           ))}
         </div>
       </section>
+
+      {/* SECTION 2.1: OBSERVED TECHNOLOGY STACK */}
+      {techStack.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
+            2.1. Observed Technology Stack
+          </h2>
+          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+            The following external integrations and systems were observed on the client domain during the auditing process:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {techStack.map((tech: string, idx: number) => (
+              <span key={idx} className="bg-slate-50 border border-slate-200 text-slate-800 text-xs px-3 py-1.5 rounded-lg shadow-sm font-bold">
+                💻 {tech}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* SECTION 3: COMPETITOR GAP SNAPSHOT */}
       <section className="mb-8 page-break-before">

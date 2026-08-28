@@ -172,10 +172,11 @@ Your output must be self-corrected. Follow these Self-Auditing rules:
    - Identify 2 to 5 relevant competitors for this prospect domain/industry.
    - Compare publicly observable website features (e.g., Lead Capture Forms, Blog, Online Scheduling, Mobile Responsiveness, SSL, Chatbot) prospect vs competitors.
    - Output a JSON array under "competitorGaps" containing the gap analysis with featureName, prospectStatus ("Detected" | "Not Detected" | "Not Visible" | "No Blog Found"), competitorStatus (e.g. "Present on 3 of 5 sites"), and confidence (100%).
-5. Calculate Trust Scores:
+5. Calculate Trust Scores & Technologies:
    - "evidenceQuality": 0 to 100 percentage. Rate how clear the supporting quotes are.
    - "verificationPassRate": 0 to 100 percentage. Count of (Verified + Likely items) divided by total initial items generated.
    - "findingReliability": 0 to 100 percentage. Combined score of quality and verification success.
+   - Observe script sources, meta elements, and text clues to detect active technologies (e.g. WordPress, Stripe, HubSpot, Google Analytics, Shopify, React). Return this list of systems inside the "techStack" field of "scoreExplanations".
 6. Safe Financial Estimates:
    - NEVER claim future revenue. Calculate a safe "opportunityRange" (e.g. "$15,000 - $35,000") representing the total project contract sizes of the recommended services.
    - Construct "revenueAssumptions" containing: "assumptions" (list), "pricingModel" (explanation), and "disclaimer" (standard caveat stating no future revenues are guaranteed).
@@ -241,7 +242,8 @@ Return a JSON object conforming exactly to this schema:
         { "label": "string", "points": number }
       ],
       "evidence": ["string"]
-    }
+    },
+    "techStack": ["string"]
   },
   
   "potentialRevenue": number,
@@ -360,7 +362,8 @@ ${combinedText}
       competitorGaps: [],
       scoreExplanations: {
         opportunityScore: { score: 40, explanation: 'Scoring locked due to verification limits.', breakdown: [], evidence: [] },
-        buyingSignalScore: { score: 40, explanation: 'Scoring locked due to verification limits.', breakdown: [], evidence: [] }
+        buyingSignalScore: { score: 40, explanation: 'Scoring locked due to verification limits.', breakdown: [], evidence: [] },
+        techStack: []
       },
       opportunityScore: 40,
       buyingSignalScore: 40,
