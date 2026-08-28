@@ -171,7 +171,8 @@ export default function Dashboard() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   
   // Dashboard navigation tabs
-  const [activeTab, setActiveTab] = useState<'opportunities' | 'proposal' | 'outreach' | 'vault' | 'pipeline'>('opportunities');
+  const [activeTab, setActiveTab] = useState<'opportunities' | 'proposal' | 'outreach' | 'vault' | 'valuation'>('opportunities');
+  const [showCalcIndex, setShowCalcIndex] = useState<number | null>(null);
   
   // Subtabs
   const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions'>('facts');
@@ -725,13 +726,13 @@ export default function Dashboard() {
                   Evidence Vault
                 </button>
                 <button
-                  onClick={() => setActiveTab('pipeline')}
+                  onClick={() => setActiveTab('valuation')}
                   className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
-                    activeTab === 'pipeline' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    activeTab === 'valuation' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Briefcase className="h-4 w-4" />
-                  Revenue Pipeline
+                  Opportunity Valuation
                 </button>
               </div>
 
@@ -1156,65 +1157,93 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* 5. Revenue Pipeline & Pricing Model Disclaimers */}
-                {activeTab === 'pipeline' && (
+                {/* 5. Safe Opportunity Valuation Engine */}
+                {activeTab === 'valuation' && (
                   <div className="space-y-4 flex-1 flex flex-col">
                     <div className="flex justify-between items-center border-b border-slate-150 pb-2">
-                      <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Section 8: Opportunity Valuation Range</h4>
+                      <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Estimated Service Opportunity Range</h4>
                       <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">
-                        Range: {activeProspect.opportunityRange}
+                        Total Range: {activeProspect.opportunityRange}
                       </span>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-4">
-                      {/* Left: Pipeline solutions list */}
-                      <div className="border border-slate-200 rounded-xl overflow-hidden overflow-y-auto max-h-[220px]">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-                              <th className="p-2.5">Suggested Service</th>
-                              <th className="p-2.5">Confidence</th>
-                              <th className="p-2.5 text-right">Value</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-150">
-                            {parseRecommendations(activeProspect.recommendations).map((rec, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50/50">
-                                <td className="p-2.5">
-                                  <div className="font-bold text-slate-900">{rec.serviceName}</div>
-                                  {rec.calculation && (
-                                    <div className="text-[10px] text-slate-500 italic mt-0.5 font-sans leading-normal">
-                                      Calc: {rec.calculation}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="p-2.5">
-                                  <span className={`px-1.5 py-0.5 rounded font-semibold text-[9px] border ${getStatusBadgeClass(rec.status)}`}>
-                                    {rec.status} ({rec.confidence}%)
-                                  </span>
-                                </td>
-                                <td className="p-2.5 font-mono font-bold text-emerald-600 text-right">${(rec.estimatedValue || 0).toLocaleString()}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      {/* Left: Valuations range list */}
+                      <div className="space-y-3 overflow-y-auto max-h-[220px] pr-1">
+                        {parseRecommendations(activeProspect.recommendations).map((rec, idx) => {
+                          const fee = rec.estimatedFee || "$0";
+                          const parts = fee.replace(/\$/g, '').replace(/,/g, '').split('-');
+                          const min = parseInt(parts[0]?.trim() || '0') || 0;
+                          const max = parseInt(parts[1]?.trim() || parts[0]?.trim() || '0') || 0;
+                          const confMultiplier = (rec.confidence || 100) / 100;
+                          const weightedMin = Math.round(min * confMultiplier);
+                          const weightedMax = Math.round(max * confMultiplier);
+                          const weightedRange = `$${weightedMin.toLocaleString()} - $${weightedMax.toLocaleString()}`;
+
+                          return (
+                            <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl text-xs space-y-2">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Service Type</span>
+                                  <strong className="text-slate-800 text-sm">{rec.serviceName}</strong>
+                                </div>
+                                <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded uppercase">
+                                  Conf: {rec.confidence}%
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-2 rounded border border-slate-100">
+                                <div>
+                                  <span className="text-slate-400 block uppercase font-bold text-[8px]">Estimated Range</span>
+                                  <span className="text-slate-700 font-bold">{rec.estimatedFee}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block uppercase font-bold text-[8px]">Weighted Range</span>
+                                  <span className="text-emerald-700 font-bold">{weightedRange}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex justify-between items-center">
+                                <button
+                                  onClick={() => setShowCalcIndex(showCalcIndex === idx ? null : idx)}
+                                  className="text-[9px] font-bold text-sky-600 hover:text-sky-700"
+                                >
+                                  {showCalcIndex === idx ? '✕ Hide Calculation' : '➕ Show Calculation'}
+                                </button>
+                              </div>
+
+                              {showCalcIndex === idx && (
+                                <div className="p-2.5 bg-slate-50 border border-slate-150 rounded text-[10px] text-slate-500 font-sans space-y-1">
+                                  <p><strong>Pricing Formula:</strong> {rec.calculation}</p>
+                                  <p><strong>Opportunity Priority score:</strong> {rec.priority} ({rec.priorityScore || 80}%)</p>
+                                  <p className="text-[9px] text-slate-400"><strong>Calculated Weight:</strong> Raw Range * {confMultiplier} confidence multiplier = {weightedRange}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
 
-                      {/* Right: Disclaimer and assumptions logs */}
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-3 max-h-[220px] overflow-y-auto">
+                      {/* Right: Pricing Assumptions & Safe Valuation Disclaimer */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-4 max-h-[220px] overflow-y-auto">
                         <div>
-                          <span className="font-bold text-slate-900 block text-[9px] uppercase tracking-wider">Financial Disclaimer</span>
-                          <p className="text-[10px] text-slate-400 leading-normal italic mt-1">
-                            {parsePricingAssumptions(activeProspect.revenueAssumptions).disclaimer}
+                          <span className="font-bold text-slate-900 block text-[9px] uppercase tracking-wider">Valuation Disclaimer</span>
+                          <p className="text-[10px] text-slate-500 leading-relaxed italic mt-1 bg-amber-50/50 p-2.5 border border-amber-200/65 rounded-lg text-amber-900">
+                            Opportunity values are illustrative estimates based on detected issues and predefined service pricing models. They are not guarantees of revenue, project awards, or business outcomes.
                           </p>
                         </div>
                         <div>
                           <span className="font-bold text-slate-900 block text-[9px] uppercase tracking-wider">Model Assumptions</span>
-                          <ul className="list-disc pl-4 mt-1.5 text-[10px] text-slate-600 space-y-1">
+                          <ul className="list-disc pl-4 mt-1.5 text-[10px] text-slate-600 space-y-1.5">
                             {parsePricingAssumptions(activeProspect.revenueAssumptions).assumptions.map((asm, idx) => (
                               <li key={idx}>{asm}</li>
                             ))}
                           </ul>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-900 block text-[9px] uppercase tracking-wider">Pricing Model</span>
+                          <p className="text-[10px] text-slate-600 leading-normal mt-1">
+                            {parsePricingAssumptions(activeProspect.revenueAssumptions).pricingModel}
+                          </p>
                         </div>
                       </div>
                     </div>
