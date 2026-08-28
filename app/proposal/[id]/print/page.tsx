@@ -31,6 +31,9 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
   let recommendations = [];
   try { recommendations = JSON.parse(prospect.recommendations) || []; } catch (e) {}
 
+  let competitorGaps = [];
+  try { competitorGaps = JSON.parse(prospect.competitorGaps || "[]") || []; } catch (e) {}
+
   let pricingAssumptions = { assumptions: [], pricingModel: '', disclaimer: '' };
   try {
     pricingAssumptions = JSON.parse(prospect.revenueAssumptions) || { assumptions: [], pricingModel: '', disclaimer: '' };
@@ -128,21 +131,76 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </div>
       </section>
 
-      {/* SECTION 3: BUSINESS OPPORTUNITIES */}
+      {/* SECTION 3: COMPETITOR GAP SNAPSHOT */}
       <section className="mb-8 page-break-before">
         <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
-          3. Business Opportunities
+          3. Competitor Gap Snapshot
+        </h2>
+        <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+          The following benchmark snapshot details observable web features audited on the prospect website versus 2 to 5 standard competitors in their industry.
+        </p>
+        <table className="w-full text-left text-xs border-collapse border border-slate-200">
+          <thead>
+            <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
+              <th className="p-2.5">Observable Web Feature</th>
+              <th className="p-2.5">Prospect ({prospect.companyName})</th>
+              <th className="p-2.5">Competitors Status</th>
+              <th className="p-2.5 text-right">Confidence</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-250 bg-white">
+            {competitorGaps.length > 0 ? (
+              competitorGaps.map((gap: any, idx: number) => (
+                <tr key={idx} className="hover:bg-slate-50/50">
+                  <td className="p-2.5 font-bold text-slate-800">{gap.featureName}</td>
+                  <td className="p-2.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      gap.prospectStatus === 'Detected' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                    }`}>
+                      {gap.prospectStatus}
+                    </span>
+                  </td>
+                  <td className="p-2.5 text-slate-600 font-medium">{gap.competitorStatus}</td>
+                  <td className="p-2.5 text-right font-mono text-slate-400">{gap.confidence || 100}%</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="p-4 text-center text-slate-400 italic">
+                  No competitor benchmarks compiled for this client profile.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      {/* SECTION 4: BUSINESS OPPORTUNITIES */}
+      <section className="mb-8 page-break-before">
+        <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
+          4. Business Opportunities
         </h2>
         <div className="space-y-4">
           {recommendations.map((rec: any, idx: number) => (
             <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
               <div className="flex justify-between items-start">
                 <h3 className="font-bold text-slate-900 text-sm">Opportunity {idx + 1}: {rec.serviceName}</h3>
-                <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
-                  rec.status === 'Verified' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  {rec.status}
-                </span>
+                <div className="flex gap-1.5 items-center">
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
+                    rec.priority === 'Very High Priority' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                    rec.priority === 'High Priority' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                    rec.priority === 'Strong' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                    rec.priority === 'Moderate' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}>
+                    {rec.priority || 'Strong'}
+                  </span>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                    rec.status === 'Verified' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {rec.status}
+                  </span>
+                </div>
               </div>
               <p className="text-slate-600"><strong>Issue:</strong> {rec.issue}</p>
               {rec.evidenceList && rec.evidenceList.length > 0 && (
@@ -152,8 +210,13 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
               )}
               <p className="text-slate-600"><strong>Impact:</strong> {rec.impact}</p>
               {rec.calculation && (
-                <p className="text-[11px] text-emerald-800 bg-emerald-50/50 p-2 rounded border border-emerald-100 mt-1.5">
+                <p className="text-[11px] text-emerald-800 bg-emerald-50/50 p-2 rounded border border-emerald-100 mt-1.5 font-sans">
                   <strong>Calculation Formula:</strong> {rec.calculation}
+                </p>
+              )}
+              {rec.calculationDetails && (
+                <p className="text-[10px] text-slate-400 bg-slate-100/50 p-2 rounded border border-slate-200 mt-1.5">
+                  <strong>Opportunity Prioritization Calculation Details:</strong> {rec.calculationDetails}
                 </p>
               )}
               <div className="flex gap-4 text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
@@ -165,10 +228,10 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </div>
       </section>
 
-      {/* SECTION 4: RECOMMENDED SERVICES & SOLUTIONS */}
+      {/* SECTION 5: RECOMMENDED SERVICES & SOLUTIONS */}
       <section className="mb-8">
         <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
-          4. Recommended Solutions
+          5. Recommended Solutions
         </h2>
         <table className="w-full text-left text-xs border-collapse">
           <thead>
@@ -206,20 +269,20 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </table>
       </section>
 
-      {/* SECTION 5: COST ESTIMATE */}
+      {/* SECTION 6: COST ESTIMATE */}
       <section className="mb-8">
         <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
-          5. Pricing & Cost Estimate
+          6. Pricing & Cost Estimate
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-4 rounded-xl border border-slate-200">
           {prospect.pricingRecommendation}
         </p>
       </section>
 
-      {/* SECTION 6: EXPECTED OUTCOMES & ROI */}
+      {/* SECTION 7: EXPECTED OUTCOMES & ROI */}
       <section className="mb-8 page-break-before">
         <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
-          6. Expected Outcomes & Estimated ROI
+          7. Expected Outcomes & Estimated ROI
         </h2>
         <div className="grid md:grid-cols-2 gap-4">
           <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
@@ -233,10 +296,10 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </div>
       </section>
 
-      {/* SECTION 7: PROJECT ROADMAP TIMELINES */}
+      {/* SECTION 8: PROJECT ROADMAP TIMELINES */}
       <section className="mb-8">
         <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
-          7. Action Timelines
+          8. Action Timelines
         </h2>
         <div className="space-y-4">
           <div>
@@ -258,10 +321,28 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </div>
       </section>
 
-      {/* SECTION 8: SAFE REVENUE ESTIMATES & FINANCIAL DISCLAIMER */}
+      {/* SECTION 9: NEXT STEPS */}
+      <section className="mb-8">
+        <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
+          9. Next Steps
+        </h2>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-600 leading-relaxed space-y-2">
+          <p>
+            1. **Alignment Discovery Call**: Schedule a consultative 30-minute discovery call to present these findings and confirm the website audit details.
+          </p>
+          <p>
+            2. **Evidence Validation**: Review the client's internal performance metrics, forms flow, and target customer profiles to match AI inferences against real-time pipeline indicators.
+          </p>
+          <p>
+            3. **Custom Solution Tailoring**: Adjust scope of services, set final retainers, and customize the 30/90-day onboarding project timeline.
+          </p>
+        </div>
+      </section>
+
+      {/* SECTION 10: SAFE REVENUE ESTIMATES & FINANCIAL DISCLAIMER */}
       <section className="mb-8 page-break-before">
         <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
-          8. Safe Project Value Valuation Range
+          10. Safe Project Value Valuation Range
         </h2>
         
         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-xs space-y-4">
@@ -289,7 +370,8 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       </section>
 
       <footer className="mt-12 text-center text-xs text-slate-400 border-t border-slate-200 pt-6">
-        <p>Generated by LeadPilot AI Safe Verification Platform • Confidential</p>
+        <p className="mb-1 font-semibold">Findings are based on publicly observable website information and AI-assisted analysis. Recommendations should be independently reviewed.</p>
+        <p className="text-[10px] text-slate-400/80">Generated by LeadPilot AI Safe Verification Platform • Confidential</p>
       </footer>
 
       <script

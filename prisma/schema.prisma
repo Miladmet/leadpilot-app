@@ -37,7 +37,8 @@ model Prospect {
   verifiedFacts       String   // Array of { fact, sourceUrl, confidence, status }
   aiInferences        String   // Array of { finding, evidence, reasoning, confidence, status }
   buyingSignals       String   // Array of { signal, sourceUrl, sourceText, dateDiscovered, status }
-  recommendations     String   // Array of { serviceName, issue, impact, estimatedFee, estimatedValue, confidence, expectedOutcome, estimatedRoi, status, explanation, evidenceList }
+  recommendations     String   // Array of { serviceName, issue, impact, estimatedFee, estimatedValue, calculation, confidence, expectedOutcome, estimatedRoi, status, explanation, evidenceList, priority, priorityScore, calculationDetails }
+  competitorGaps      String   @default("[]") // Array of { featureName, prospectStatus, competitorStatus, confidence }
   
   // 2. Metrics & Scores
   opportunityScore    Int
@@ -47,9 +48,9 @@ model Prospect {
   closingProbability  Int
   problemSeverity     String   // High, Medium, Low
   leadQuality         String   // Hot, Warm, Cold
-  proposalStatus      String   @default("Ready") // Ready, Blocked
+  proposalStatus      String   @default("Ready") // Ready, Speculative
 
-  // 3. NEW: Trust & Verification Metrics
+  // 3. Trust & Verification Metrics
   evidenceQuality      Int      @default(100)
   verificationPassRate Int      @default(100)
   findingReliability   Int      @default(100)

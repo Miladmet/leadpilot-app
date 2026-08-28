@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
         aiInferences: JSON.stringify(aiAnalysis.aiInferences),
         buyingSignals: JSON.stringify(syntheticSignals),
         recommendations: JSON.stringify(aiAnalysis.recommendations),
+        competitorGaps: JSON.stringify(aiAnalysis.competitorGaps),
         scoreExplanations: JSON.stringify(aiAnalysis.scoreExplanations),
 
         opportunityScore: aiAnalysis.opportunityScore,

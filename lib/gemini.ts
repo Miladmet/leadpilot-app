@@ -22,13 +22,25 @@ export interface RecommendedService {
   impact: string;
   estimatedFee: string;
   estimatedValue: number;
-  calculation: string; // pricing calculation formula explanation
+  calculation: string; // The mathematical calculation formula explanation
   confidence: number;
   expectedOutcome: string;
   estimatedRoi: string;
   status: 'Verified' | 'Likely' | 'Uncertain' | 'Suppressed';
   explanation: string;
   evidenceList: string[];
+  
+  // NEW: Prioritization Scoring
+  priority: 'Weak' | 'Moderate' | 'Strong' | 'High Priority' | 'Very High Priority';
+  priorityScore: number;
+  calculationDetails: string; // Detail math formula check e.g. "(95 EQ * 0.4) + (90 Conf * 0.4) + (20 Impact * 0.2) = 78"
+}
+
+export interface CompetitorGap {
+  featureName: string;
+  prospectStatus: 'Detected' | 'Not Detected' | 'Not Visible' | 'No Blog Found';
+  competitorStatus: string; // e.g. "Detected on 4 of 5 sites"
+  confidence: number;
 }
 
 export interface ScorePoint {
@@ -59,6 +71,7 @@ export interface ClientAcquisitionResponse {
   verifiedFacts: VerifiedFact[];
   aiInferences: AIInsight[];
   recommendations: RecommendedService[];
+  competitorGaps: CompetitorGap[];
   scoreExplanations: ScoreExplanations;
   
   opportunityScore: number;
@@ -129,9 +142,9 @@ You are an expert sales intelligence auditor that builds Evidence-Based Proposal
 Analyze the crawled XML web content of the company homepage/subpages.
 
 ${isFallback ? `
-⚠️ CRITICAL FIREWALL FALLBACK CONFIGURATION:
-The direct website crawler was blocked. You MUST build this proposal and audit based on your pre-trained public knowledge archive of company "${fallbackCompany}" (Domain: ${fallbackDomain}).
-For verified facts, set "sourceUrl" to "https://${fallbackDomain}" and "evidenceText" to "Cited from public domain records".
+⚠️ CRITICAL FIREWALL FALLBACK:
+The direct website crawler was blocked. You MUST build this proposal, gaps snapshot, and audit based on your pre-trained public knowledge archive of company "${fallbackCompany}" (Domain: ${fallbackDomain}).
+For verified facts, set "sourceUrl" to "https://${fallbackDomain}" and "evidenceText" to "Cited from public domain archives".
 ` : `
 Analyze the XML-formatted company crawled website text. Every claim you make must be traceable back to specific quotes and source URLs in the text.
 `}
@@ -142,19 +155,31 @@ Your output must be self-corrected. Follow these Self-Auditing rules:
    - If evidence is weak: reduce the confidence score, set status to "Uncertain".
    - If evidence is missing or conflicts: set status "Suppressed".
    - If evidence is strong: set status "Likely" or "Verified".
-3. Recommendations & Service Packages:
+3. What Would You Sell? Service Recommendation Engine:
+   - Recommend the most appropriate service offering.
+   - Limit recommendations to exactly the 3 highest-confidence opportunities. Rank by Evidence Strength, Business Impact, and Confidence.
    - For every recommended service, explain the exact pricing calculation formula in the "calculation" field (e.g. Setup Fee ($15,000) + 4 months retainer ($5,000/mo) = $35,000).
    - For every recommendation, list the supporting text quotes in "evidenceList". If no quotes are present, change status to "Suppressed".
    - If confidence is < 70%, change status to "Suppressed".
-   - If recommendation exceeds the verified evidence, mark it "Uncertain" and flag explanation as "Speculative".
-4. Calculate Trust Scores:
+   - Compute an Opportunity Prioritization score ("priorityScore") mathematically using the formula: (Evidence Quality * 0.4) + (Confidence Score * 0.4) + (Business Impact Score [Low=10, Medium=20, High=30] * 0.2). Map this score to a priority label:
+     - < 50: "Weak"
+     - 50 - 69: "Moderate"
+     - 70 - 79: "Strong"
+     - 80 - 89: "High Priority"
+     - >= 90: "Very High Priority"
+   - Output the priority label in "priority", score in "priorityScore", and formula in "calculationDetails".
+4. Competitor Gap Snapshot:
+   - Identify 2 to 5 relevant competitors for this prospect domain/industry.
+   - Compare publicly observable website features (e.g., Lead Capture Forms, Blog, Online Scheduling, Mobile Responsiveness, SSL, Chatbot) prospect vs competitors.
+   - Output a JSON array under "competitorGaps" containing the gap analysis with featureName, prospectStatus ("Detected" | "Not Detected" | "Not Visible" | "No Blog Found"), competitorStatus (e.g. "Present on 3 of 5 sites"), and confidence (100%).
+5. Calculate Trust Scores:
    - "evidenceQuality": 0 to 100 percentage. Rate how clear the supporting quotes are.
    - "verificationPassRate": 0 to 100 percentage. Count of (Verified + Likely items) divided by total initial items generated.
    - "findingReliability": 0 to 100 percentage. Combined score of quality and verification success.
-5. Safe Financial Estimates:
-   - NEVER claim future revenue. Calculate a safe "opportunityRange" (e.g. "$15,000 - $35,000") representing the total project contract sizes.
+6. Safe Financial Estimates:
+   - NEVER claim future revenue. Calculate a safe "opportunityRange" (e.g. "$15,000 - $35,000") representing the total project contract sizes of the recommended services.
    - Construct "revenueAssumptions" containing: "assumptions" (list), "pricingModel" (explanation), and "disclaimer" (standard caveat stating no future revenues are guaranteed).
-6. Recalculate mathematical score explanations:
+7. Recalculate mathematical score explanations:
    - Ensure the breakdowns (+20 Active hiring, etc.) sum up exactly to the opportunityScore and buyingSignalScore.
 
 Return a JSON object conforming exactly to this schema:
@@ -182,7 +207,19 @@ Return a JSON object conforming exactly to this schema:
       "estimatedRoi": "string",
       "status": "Verified" | "Likely" | "Uncertain" | "Suppressed",
       "explanation": "string",
-      "evidenceList": ["string"]
+      "evidenceList": ["string"],
+      "priority": "Weak" | "Moderate" | "Strong" | "High Priority" | "Very High Priority",
+      "priorityScore": number,
+      "calculationDetails": "string"
+    }
+  ],
+  
+  "competitorGaps": [
+    {
+      "featureName": "string",
+      "prospectStatus": "Detected" | "Not Detected" | "Not Visible" | "No Blog Found",
+      "competitorStatus": "string",
+      "confidence": number
     }
   ],
   
@@ -257,9 +294,11 @@ ${combinedText}
       (r: any) => typeof r.confidence === 'number' && r.confidence >= 70 && r.status !== 'Suppressed'
     );
 
-    const activePipelineValue = verifiedRecommendations.reduce((acc: number, r: any) => acc + (r.estimatedValue || 0), 0);
+    // Strictly limit recommendations to top 3 opportunities
+    const top3Recommendations = verifiedRecommendations.slice(0, 3);
 
-    // Never block completely. If pass rate < 60% or verified facts is 0, classify as "Speculative" proposal status
+    const activePipelineValue = top3Recommendations.reduce((acc: number, r: any) => acc + (r.estimatedValue || 0), 0);
+
     const isSpeculative = (auditedData.verificationPassRate < 60 || (auditedData.verifiedFacts || []).filter((f: any) => f.status === 'Verified').length === 0);
     const proposalStatus = isSpeculative ? 'Speculative' : 'Ready';
 
@@ -267,7 +306,8 @@ ${combinedText}
       companyName: auditedData.companyName || companyName,
       verifiedFacts: auditedData.verifiedFacts || [],
       aiInferences: auditedData.aiInferences || [],
-      recommendations: verifiedRecommendations,
+      recommendations: top3Recommendations,
+      competitorGaps: auditedData.competitorGaps || [],
       scoreExplanations: auditedData.scoreExplanations || {
         opportunityScore: { score: 50, explanation: 'Default.', breakdown: [], evidence: [] },
         buyingSignalScore: { score: 50, explanation: 'Default.', breakdown: [], evidence: [] }
@@ -317,6 +357,7 @@ ${combinedText}
       verifiedFacts: [],
       aiInferences: [],
       recommendations: [],
+      competitorGaps: [],
       scoreExplanations: {
         opportunityScore: { score: 40, explanation: 'Scoring locked due to verification limits.', breakdown: [], evidence: [] },
         buyingSignalScore: { score: 40, explanation: 'Scoring locked due to verification limits.', breakdown: [], evidence: [] }

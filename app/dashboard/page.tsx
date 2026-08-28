@@ -361,6 +361,11 @@ export default function Dashboard() {
     try { return JSON.parse(jsonStr) || []; } catch { return []; }
   };
 
+  const parseCompetitorGaps = (jsonStr: string | undefined): CompetitorGap[] => {
+    if (!jsonStr) return [];
+    try { return JSON.parse(jsonStr) || []; } catch { return []; }
+  };
+
   // Trigger modal drawer
   const openShowWhy = (title: string, explanation: string, breakdown: ScorePoint[], evidence: string[], status?: string) => {
     setModalContent({ title, explanation, breakdown, evidence, status });
@@ -381,6 +386,22 @@ export default function Dashboard() {
   const proposalsReadyCount = prospects.filter(p => p.proposalStatus === 'Ready').length;
   const verifiedOpportunitiesCount = prospects.reduce((acc, p) => acc + parseRecommendations(p.recommendations).length, 0);
   const meetingsGeneratedCount = activities.filter(a => a.action === 'DELETED_PROSPECT' || a.action === 'SUBSCRIBED').length + prospects.length;
+
+  // New global dashboard metrics calculations
+  const parsedRanges = prospects.map(p => {
+    const range = p.opportunityRange || "$0 - $0";
+    const parts = range.replace(/\$/g, '').replace(/,/g, '').split('-');
+    const min = parseInt(parts[0]?.trim() || '0') || 0;
+    const max = parseInt(parts[1]?.trim() || parts[0]?.trim() || '0') || 0;
+    return { min, max };
+  });
+  const totalMin = parsedRanges.reduce((acc, r) => acc + r.min, 0);
+  const totalMax = parsedRanges.reduce((acc, r) => acc + r.max, 0);
+  const totalOpportunityValueRange = totalMin === 0 && totalMax === 0 ? "$0" : `$${totalMin.toLocaleString()} - $${totalMax.toLocaleString()}`;
+
+  const avgEvidenceConfidence = prospects.length > 0 
+    ? Math.round(prospects.reduce((acc, p) => acc + p.findingReliability, 0) / prospects.length) 
+    : 100;
 
   const getSeverityBadgeColor = (severity: string) => {
     const s = severity?.toLowerCase();
@@ -533,27 +554,27 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Companies Analyzed</span>
-              <p className="text-2xl font-black text-slate-900 mt-1">{stats.prospectsCount}</p>
+              <p className="text-2xl font-black text-slate-900 mt-1">{prospects.length}</p>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Verified Opps</span>
-              <p className="text-2xl font-black text-indigo-600 mt-1">{verifiedOpportunitiesCount}</p>
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Verified Opportunities</span>
+              <p className="text-2xl font-black text-indigo-600 mt-1">{totalVerifiedOpps}</p>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Proposal Ready</span>
-              <p className="text-2xl font-black text-sky-600 mt-1">{proposalsReadyCount}</p>
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Reports Generated</span>
+              <p className="text-2xl font-black text-sky-600 mt-1">{prospects.length}</p>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Revenue Pipeline</span>
-              <p className="text-2xl font-black text-emerald-600 mt-1">${totalRevenuePipeline.toLocaleString()}</p>
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Opportunity Value Range</span>
+              <p className="text-sm font-black text-emerald-600 mt-2 truncate" title={totalOpportunityValueRange}>{totalOpportunityValueRange}</p>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between col-span-2 md:col-span-1">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Meetings Generated</span>
-              <p className="text-2xl font-black text-amber-600 mt-1">{meetingsGeneratedCount}</p>
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Evidence Confidence</span>
+              <p className="text-2xl font-black text-amber-600 mt-1">{avgEvidenceConfidence}%</p>
             </div>
           </div>
 
@@ -753,6 +774,14 @@ export default function Dashboard() {
                       >
                         Solution Builder
                       </button>
+                      <button
+                        onClick={() => setAuditSubTab('competitors')}
+                        className={`text-xs px-3 py-1.5 rounded-full font-bold transition-all ${
+                          auditSubTab === 'competitors' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Competitor Gaps
+                      </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto max-h-[300px] pr-1">
@@ -810,9 +839,20 @@ export default function Dashboard() {
                             <div key={idx} className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs space-y-2">
                               <div className="flex justify-between items-start">
                                 <h4 className="font-bold text-slate-900 text-sm">Opportunity: {rec.serviceName}</h4>
-                                <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${getStatusBadgeClass(rec.status)}`}>
-                                  {rec.status}
-                                </span>
+                                <div className="flex gap-1.5 items-center">
+                                  <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${
+                                    rec.priority === 'Very High Priority' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                    rec.priority === 'High Priority' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                                    rec.priority === 'Strong' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                                    rec.priority === 'Moderate' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                    'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}>
+                                    {rec.priority || 'Strong'}
+                                  </span>
+                                  <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${getStatusBadgeClass(rec.status)}`}>
+                                    {rec.status}
+                                  </span>
+                                </div>
                               </div>
                               <p className="text-slate-600"><strong>Issue Found:</strong> {rec.issue}</p>
                               {rec.evidenceList && rec.evidenceList.length > 0 && (
@@ -824,6 +864,11 @@ export default function Dashboard() {
                               {rec.calculation && (
                                 <div className="mt-1.5 p-2 bg-emerald-50/50 border border-emerald-100 rounded text-[11px] text-emerald-800 leading-normal">
                                   <strong>Pricing Calculation Formula:</strong> {rec.calculation}
+                                </div>
+                              )}
+                              {rec.calculationDetails && (
+                                <div className="p-2 bg-slate-50 border border-slate-150 rounded text-[10px] text-slate-400 leading-normal">
+                                  <strong>Opportunity Score Math:</strong> {rec.calculationDetails}
                                 </div>
                               )}
                               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
@@ -842,9 +887,20 @@ export default function Dashboard() {
                             <div key={idx} className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs space-y-2">
                               <div className="flex justify-between items-start">
                                 <h4 className="font-bold text-slate-900 text-sm">Solution: {rec.serviceName}</h4>
-                                <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${getStatusBadgeClass(rec.status)}`}>
-                                  {rec.status}
-                                </span>
+                                <div className="flex gap-1.5 items-center">
+                                  <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${
+                                    rec.priority === 'Very High Priority' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                    rec.priority === 'High Priority' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                                    rec.priority === 'Strong' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                                    rec.priority === 'Moderate' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                    'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}>
+                                    {rec.priority || 'Strong'}
+                                  </span>
+                                  <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${getStatusBadgeClass(rec.status)}`}>
+                                    {rec.status}
+                                  </span>
+                                </div>
                               </div>
                               <p className="text-slate-600"><strong>Problem Found:</strong> {rec.issue}</p>
                               {rec.evidenceList && rec.evidenceList.length > 0 && (
@@ -859,12 +915,63 @@ export default function Dashboard() {
                                   <strong>Pricing Calculation Formula:</strong> {rec.calculation}
                                 </div>
                               )}
+                              {rec.calculationDetails && (
+                                <div className="p-2 bg-slate-50 border border-slate-150 rounded text-[10px] text-slate-400 leading-normal">
+                                  <strong>Opportunity Score Math:</strong> {rec.calculationDetails}
+                                </div>
+                              )}
                               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
                                 <span className="font-bold text-slate-500 uppercase text-[9px]">Estimated Project Value</span>
                                 <span className="font-mono font-black text-emerald-600">${(rec.estimatedValue || 0).toLocaleString()}</span>
                               </div>
                             </div>
                           ))}
+                        </div>
+                      )}
+
+                      {/* Competitor Gap Snapshot */}
+                      {auditSubTab === 'competitors' && (
+                        <div className="space-y-4">
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] text-slate-500 leading-normal">
+                            👉 <strong>Feature Benchmark Snapshot:</strong> Comparing observable features on <strong>{activeProspect.companyName}</strong> against 2 to 5 standard competitors in their industry.
+                          </div>
+                          
+                          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                                  <th className="p-3">Observable Web Feature</th>
+                                  <th className="p-3">Prospect Status</th>
+                                  <th className="p-3">Competitors Status</th>
+                                  <th className="p-3 text-right">Confidence</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-150 bg-white">
+                                {parseCompetitorGaps(activeProspect.competitorGaps).length > 0 ? (
+                                  parseCompetitorGaps(activeProspect.competitorGaps).map((gap: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-slate-50/50">
+                                      <td className="p-3 font-bold text-slate-800">{gap.featureName}</td>
+                                      <td className="p-3">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                          gap.prospectStatus === 'Detected' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                                        }`}>
+                                          {gap.prospectStatus}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-slate-600 font-medium">{gap.competitorStatus}</td>
+                                      <td className="p-3 text-right font-mono text-slate-400">{gap.confidence || 100}%</td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td colSpan={4} className="p-6 text-center text-slate-400 italic">
+                                      No competitor benchmarks recorded for this prospect. Please run a new audit scan to compile competitor parameters.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       )}
 
