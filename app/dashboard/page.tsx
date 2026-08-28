@@ -814,8 +814,18 @@ export default function Dashboard() {
                                   {rec.status}
                                 </span>
                               </div>
-                              <p className="text-slate-600"><strong>Issue:</strong> {rec.issue}</p>
+                              <p className="text-slate-600"><strong>Issue Found:</strong> {rec.issue}</p>
+                              {rec.evidenceList && rec.evidenceList.length > 0 && (
+                                <blockquote className="mt-1 bg-slate-50 p-2 rounded border border-slate-150 italic text-[11px] text-slate-500 leading-relaxed">
+                                  <strong>Verifiable Evidence Quote:</strong> "{rec.evidenceList[0]}"
+                                </blockquote>
+                              )}
                               <p className="text-slate-600"><strong>Impact:</strong> {rec.impact}</p>
+                              {rec.calculation && (
+                                <div className="mt-1.5 p-2 bg-emerald-50/50 border border-emerald-100 rounded text-[11px] text-emerald-800 leading-normal">
+                                  <strong>Pricing Calculation Formula:</strong> {rec.calculation}
+                                </div>
+                              )}
                               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
                                 <span className="font-bold text-slate-500 uppercase text-[9px]">Revenue Potential</span>
                                 <span className="font-mono font-black text-emerald-600">{rec.estimatedFee}</span>
@@ -837,8 +847,18 @@ export default function Dashboard() {
                                 </span>
                               </div>
                               <p className="text-slate-600"><strong>Problem Found:</strong> {rec.issue}</p>
+                              {rec.evidenceList && rec.evidenceList.length > 0 && (
+                                <blockquote className="mt-1 bg-slate-50 p-2 rounded border border-slate-150 italic text-[11px] text-slate-500 leading-relaxed">
+                                  <strong>Verifiable Evidence Quote:</strong> "{rec.evidenceList[0]}"
+                                </blockquote>
+                              )}
                               <p className="text-slate-600"><strong>Expected Outcome:</strong> {rec.expectedOutcome}</p>
                               <p className="text-slate-600"><strong>Estimated ROI:</strong> {rec.estimatedRoi}</p>
+                              {rec.calculation && (
+                                <div className="mt-1.5 p-2 bg-emerald-50/50 border border-emerald-100 rounded text-[11px] text-emerald-800 leading-normal">
+                                  <strong>Pricing Calculation Formula:</strong> {rec.calculation}
+                                </div>
+                              )}
                               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
                                 <span className="font-bold text-slate-500 uppercase text-[9px]">Estimated Project Value</span>
                                 <span className="font-mono font-black text-emerald-600">${(rec.estimatedValue || 0).toLocaleString()}</span>
@@ -1058,7 +1078,14 @@ export default function Dashboard() {
                           <tbody className="divide-y divide-slate-150">
                             {parseRecommendations(activeProspect.recommendations).map((rec, idx) => (
                               <tr key={idx} className="hover:bg-slate-50/50">
-                                <td className="p-2.5 font-bold text-slate-900">{rec.serviceName}</td>
+                                <td className="p-2.5">
+                                  <div className="font-bold text-slate-900">{rec.serviceName}</div>
+                                  {rec.calculation && (
+                                    <div className="text-[10px] text-slate-500 italic mt-0.5 font-sans leading-normal">
+                                      Calc: {rec.calculation}
+                                    </div>
+                                  )}
+                                </td>
                                 <td className="p-2.5">
                                   <span className={`px-1.5 py-0.5 rounded font-semibold text-[9px] border ${getStatusBadgeClass(rec.status)}`}>
                                     {rec.status} ({rec.confidence}%)

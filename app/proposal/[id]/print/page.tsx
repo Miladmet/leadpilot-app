@@ -138,7 +138,17 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
                 </span>
               </div>
               <p className="text-slate-600"><strong>Issue:</strong> {rec.issue}</p>
+              {rec.evidenceList && rec.evidenceList.length > 0 && (
+                <blockquote className="mt-1.5 bg-white p-2 rounded border border-slate-200/80 italic text-[11px] text-slate-500 leading-relaxed">
+                  <strong>Verifiable Evidence Quote:</strong> "{rec.evidenceList[0]}"
+                </blockquote>
+              )}
               <p className="text-slate-600"><strong>Impact:</strong> {rec.impact}</p>
+              {rec.calculation && (
+                <p className="text-[11px] text-emerald-800 bg-emerald-50/50 p-2 rounded border border-emerald-100 mt-1.5">
+                  <strong>Calculation Formula:</strong> {rec.calculation}
+                </p>
+              )}
               <div className="flex gap-4 text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
                 <span><strong>Revenue Potential:</strong> {rec.estimatedFee}</span>
                 <span><strong>Confidence:</strong> {rec.confidence}%</span>
@@ -156,19 +166,33 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
-              <th className="p-3">Problem Found</th>
+              <th className="p-3 w-1/3">Problem Found</th>
               <th className="p-3">Solution / Recommended Service</th>
               <th className="p-3">Expected Outcome</th>
-              <th className="p-3 text-right">Value Estimate</th>
+              <th className="p-3 text-right w-1/4">Value Estimate</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {recommendations.map((rec: any, idx: number) => (
               <tr key={idx}>
-                <td className="p-3 font-semibold text-rose-700">{rec.issue}</td>
+                <td className="p-3">
+                  <span className="font-semibold text-rose-700 block">{rec.issue}</span>
+                  {rec.evidenceList && rec.evidenceList.length > 0 && (
+                    <span className="block text-[10px] text-slate-400 italic mt-1 bg-slate-50 p-2 rounded border border-slate-100 leading-normal">
+                      Quote: "{rec.evidenceList[0]}"
+                    </span>
+                  )}
+                </td>
                 <td className="p-3 font-bold text-slate-900">{rec.serviceName}</td>
                 <td className="p-3 text-slate-600">{rec.expectedOutcome}</td>
-                <td className="p-3 text-right font-mono font-bold text-emerald-600">${(rec.estimatedValue || 0).toLocaleString()}</td>
+                <td className="p-3 text-right">
+                  <span className="font-mono font-bold text-emerald-600 block text-sm">${(rec.estimatedValue || 0).toLocaleString()}</span>
+                  {rec.calculation && (
+                    <span className="text-[9px] text-slate-500 block mt-1 italic leading-tight">
+                      {rec.calculation}
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

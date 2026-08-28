@@ -22,6 +22,7 @@ export interface RecommendedService {
   impact: string;
   estimatedFee: string;
   estimatedValue: number;
+  calculation: string; // The mathematical formula calculation for the fee (e.g. "Setup ($15k) + 4 months retainer ($5k/mo) = $35k")
   confidence: number;
   expectedOutcome: string;
   estimatedRoi: string;
@@ -80,7 +81,7 @@ export interface ClientAcquisitionResponse {
   suppressedRecsCount: number;
   
   // Safe Financial Range
-  opportunityRange: string; // e.g. "$25,000 - $75,000"
+  opportunityRange: string;
   revenueAssumptions: string; // JSON string
 
   // Proposal Contents
@@ -152,12 +153,13 @@ Generate the initial findings. Return JSON conforming exactly to this structure:
       "issue": "Identified issue",
       "impact": "Business impact",
       "estimatedFee": "Pricing e.g. $1,500 monthly",
-      "estimatedValue": number,
+      "estimatedValue": number, // total calculated project price
+      "calculation": "Clear math formula (e.g. Setup Fee ($15,000) + 4 months of Retainer ($5,000/mo) = $35,000)",
       "confidence": number,
       "expectedOutcome": "Outcome description",
       "estimatedRoi": "ROI description",
       "explanation": "Why recommend",
-      "evidenceList": ["Exact text quotes supporting this"]
+      "evidenceList": ["Exact text quotes supporting this problem/issue"]
     }
   ],
   "opportunityScore": number,
@@ -208,6 +210,8 @@ Verification Rules:
    - If evidence is weak or absent: change status to "Uncertain" or "Suppressed", and DECREASE the confidence score. Never increase confidence.
    - If evidence is strong: set status to "Likely" or "Verified".
 3. Recommendations & Solutions:
+   - Every recommended service must show the exact math formula in the "calculation" field, verifying how estimatedValue is summed.
+   - Every recommendation must include exact quotes in "evidenceList". If no evidence quote is present, change status to "Suppressed".
    - If confidence < 70%, change status to "Suppressed".
    - If the recommendation exceeds the verified evidence, mark it "Uncertain" and flag the explanation as "Speculative".
    - Otherwise, set status to "Verified" or "Likely".
@@ -250,6 +254,7 @@ Return a JSON object conforming exactly to this schema:
       "impact": "string",
       "estimatedFee": "string",
       "estimatedValue": number,
+      "calculation": "string",
       "confidence": number,
       "expectedOutcome": "string",
       "estimatedRoi": "string",
@@ -321,15 +326,12 @@ Return a JSON object conforming exactly to this schema:
     const text2 = result2.response.text();
     const auditedData = JSON.parse(text2);
 
-    // Suppress recommendations under 70% confidence or with 'Suppressed' status
     const verifiedRecommendations = (auditedData.recommendations || []).filter(
       (r: any) => typeof r.confidence === 'number' && r.confidence >= 70 && r.status !== 'Suppressed'
     );
 
-    // Recompute safe pipeline revenue based on verified solutions
     const activePipelineValue = verifiedRecommendations.reduce((acc: number, r: any) => acc + (r.estimatedValue || 0), 0);
 
-    // Apply strict block rules: If pass rate < 50% or verified facts is 0, proposal is blocked
     const blockCheck = (auditedData.verificationPassRate < 50 || (auditedData.verifiedFacts || []).filter((f: any) => f.status === 'Verified').length === 0);
     const proposalStatus = blockCheck ? 'Blocked' : 'Ready';
 
@@ -351,23 +353,20 @@ Return a JSON object conforming exactly to this schema:
       leadQuality: auditedData.leadQuality || 'Warm',
       proposalStatus,
 
-      // Trust scores
       evidenceQuality: auditedData.evidenceQuality || 90,
       verificationPassRate: auditedData.verificationPassRate || 95,
       findingReliability: auditedData.findingReliability || 92,
 
-      // Counters
       factsVerifiedCount: auditedData.factsVerifiedCount || 0,
       claimsRejectedCount: auditedData.claimsRejectedCount || 0,
       lowConfidenceCount: auditedData.lowConfidenceCount || 0,
       suppressedRecsCount: auditedData.suppressedRecsCount || 0,
 
-      // Safe financial estimates
       opportunityRange: auditedData.opportunityRange || '$10,000 - $25,000',
       revenueAssumptions: JSON.stringify(auditedData.revenueAssumptions || {
         assumptions: ['Standard local service prices'],
-        pricingModel: 'Fixed agency retainer pricing model.',
-        disclaimer: 'Revenue estimates represent potential contract valuations and do not guarantee future sales.'
+        pricingModel: 'Fixed retainer pricing.',
+        disclaimer: 'Revenue estimates represent potential contract values.'
       }),
 
       executiveSummary: auditedData.executiveSummary || '',
@@ -384,8 +383,7 @@ Return a JSON object conforming exactly to this schema:
       meetingAgenda: auditedData.meetingAgenda || ''
     };
   } catch (error: any) {
-    console.error('Independent Auditor Verification Crash:', error);
-    // Return a safe fallback if Auditor agent fails parsing
+    console.error('Auditor Audit Verification Crash:', error);
     return {
       companyName,
       verifiedFacts: [],
