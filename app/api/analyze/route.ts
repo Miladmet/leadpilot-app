@@ -127,6 +127,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, prospect });
   } catch (error: any) {
     console.error('Analyze API Error:', error);
+    const errorMsg = error?.message || '';
+    
+    if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('Requests')) {
+      return NextResponse.json(
+        { error: 'Gemini API Rate Limit/Quota Exceeded. Please retry in 30-60 seconds or verify your Google AI Studio billing plan.' },
+        { status: 429 }
+      );
+    }
+    
+    if (errorMsg.includes('key') || errorMsg.includes('API_KEY') || errorMsg.includes('API key') || errorMsg.includes('403')) {
+      return NextResponse.json(
+        { error: 'Invalid Google Gemini API key. Please check the GEMINI_API_KEY value inside your environment setup.' },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'Opportunity analysis failed. The website may have strong scraping protections or rate limits.' },
       { status: 500 }
