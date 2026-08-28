@@ -37,9 +37,9 @@ export async function POST(req: NextRequest) {
     console.log(`Starting WebMCP crawling workflow for client opportunities: ${url}`);
     const crawlData = await crawlWebsite(url);
 
-    if (!crawlData.combinedContent || crawlData.combinedContent.length < 50) {
+    if (!crawlData.combinedContent || crawlData.combinedContent.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Failed to crawl website content. Please verify the URL and try again.' },
+        { error: 'Failed to retrieve website data. Please verify the URL.' },
         { status: 400 }
       );
     }

@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export interface VerifiedFact {
   fact: string;
   sourceUrl: string;
-  confidence: number; // Always 100% for verified facts
+  confidence: number;
 }
 
 export interface AIInsight {
@@ -17,8 +17,8 @@ export interface RecommendedService {
   serviceName: string;
   issue: string;
   impact: string;
-  estimatedFee: string; // e.g. "$1,500 monthly"
-  estimatedValue: number; // e.g. 1500 (integer)
+  estimatedFee: string;
+  estimatedValue: number;
   confidence: number;
   expectedOutcome: string;
   estimatedRoi: string;
@@ -33,7 +33,7 @@ export interface ScoreDetail {
   score: number;
   explanation: string;
   breakdown: ScorePoint[];
-  evidence: string[]; // Quotes from pages supporting score
+  evidence: string[];
 }
 
 export interface ScoreExplanations {
@@ -44,8 +44,8 @@ export interface ScoreExplanations {
 export interface ClientAcquisitionResponse {
   companyName: string;
   verifiedFacts: VerifiedFact[];
-  aiInferences: AIInsight[]; // Mapped to AI Insights
-  recommendations: RecommendedService[]; // Mapped to Service Matches
+  aiInferences: AIInsight[];
+  recommendations: RecommendedService[];
   scoreExplanations: ScoreExplanations;
   
   opportunityScore: number;
@@ -55,7 +55,6 @@ export interface ClientAcquisitionResponse {
   problemSeverity: 'High' | 'Medium' | 'Low';
   leadQuality: 'Hot' | 'Warm' | 'Cold';
   
-  // Proposal Contents
   executiveSummary: string;
   expectedResults: string;
   estimatedRoi: string;
@@ -63,12 +62,11 @@ export interface ClientAcquisitionResponse {
   ninetyDayPlan: string;
   pricingRecommendation: string;
 
-  // Outreach Center
   coldEmail: string;
   linkedInMessage: string;
-  discoveryScript: string; // Discovery Call Questions
-  followUpSequence: string; // Follow-up Email
-  meetingAgenda: string; // Sales Angle
+  discoveryScript: string;
+  followUpSequence: string;
+  meetingAgenda: string;
 }
 
 export async function analyzeCompany(combinedText: string, companyName: string): Promise<ClientAcquisitionResponse> {
@@ -85,13 +83,35 @@ export async function analyzeCompany(combinedText: string, companyName: string):
     },
   });
 
+  const isFallback = combinedText.includes('crawling_failed');
+  let fallbackDomain = '';
+  let fallbackCompany = '';
+  if (isFallback) {
+    const domMatch = combinedText.match(/domain="([^"]+)"/);
+    const compMatch = combinedText.match(/companyName="([^"]+)"/);
+    fallbackDomain = domMatch ? domMatch[1] : 'the company';
+    fallbackCompany = compMatch ? compMatch[1] : companyName;
+  }
+
   const prompt = `
 You are an expert sales intelligence auditor that builds Evidence-Based Proposals.
+
+${isFallback ? `
+⚠️ CRITICAL FIREWALL FALLBACK DETECTED:
+The direct website crawler was blocked by ${fallbackDomain}'s bot firewall / Cloudflare CDN.
+Because of this, you MUST generate the proposal, facts, opportunities, and outreach copy based on your pre-trained public knowledge archive of company "${fallbackCompany}" (Domain: ${fallbackDomain}).
+For "Verified Facts":
+- Render objective facts that you know are 100% true about ${fallbackCompany}.
+- Set "sourceUrl" to "https://${fallbackDomain}".
+- Set "evidenceText" / fact description itself as the "evidenceText" (or state "Cited from public domain records").
+- Confidence must be 100% for these verified facts.
+` : `
 Analyze the XML-formatted company crawled website text. Every claim you make must be traceable back to specific quotes and source URLs in the text.
+`}
 
 Rules:
 1. NEVER present assumptions as facts. Keep facts, insights, and recommendations strictly separated.
-2. Verified Facts: Display only objective observations explicitly present in the crawled text (e.g. Website has no blog, Careers page detected). Never infer. Confidence must be 100%.
+2. Verified Facts: Display only objective observations explicitly present in the crawled text or public knowledge archive. Never infer. Confidence must be 100%.
 3. AI Insights: Logical deductions based on evidence (e.g. Potential Growth Phase based on active job openings, explanation, confidence).
 4. Business Opportunities & Solution Builder: Translate issues into recommended services. Output the specific issue, business impact, recommended service, estimated fee, estimated project value (integer), expected outcome, estimated ROI, and confidence.
 5. Proposal Generator: Create a complete, client-ready proposal with executive summary, verified findings, business opportunities, recommended services, cost estimate, outcomes, and 30-day and 90-day action plans.
@@ -165,8 +185,8 @@ Return a JSON object conforming exactly to this schema:
   "ninetyDayPlan": "string",
   "pricingRecommendation": "string",
   
-  "coldEmail": "string", // Reference evidence explicitly
-  "linkedInMessage": "string", // Under 300 characters, referencing evidence
+  "coldEmail": "string",
+  "linkedInMessage": "string",
   "discoveryScript": "Discovery Call Questions listing 3-5 high-value questions",
   "followUpSequence": "Follow-Up Email pitch with evidence",
   "meetingAgenda": "Sales Angle hook"
@@ -183,12 +203,10 @@ ${combinedText}
     const textResponse = result.response.text();
     const parsedData = JSON.parse(textResponse) as ClientAcquisitionResponse;
 
-    // RULE: Suppress recommendations with confidence below 70%
     const filteredRecommendations = (parsedData.recommendations || []).filter(
       r => typeof r.confidence === 'number' && r.confidence >= 70
     );
 
-    // Sum estimated project values of filtered recommendations to calculate revenue pipeline
     let adjustedRevenue = filteredRecommendations.reduce((acc, r) => acc + (r.estimatedValue || 0), 0);
     if (adjustedRevenue === 0 && parsedData.potentialRevenue) {
       adjustedRevenue = parsedData.potentialRevenue;

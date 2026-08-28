@@ -5,32 +5,33 @@ interface ScrapeResult {
   url: string;
   title: string;
   text: string;
+  html: string; // Keep original HTML to extract links without re-fetching
 }
 
 export interface CrawlData {
   companyName: string;
   websiteUrl: string;
-  pages: ScrapeResult[];
+  pages: Omit<ScrapeResult, 'html'>[];
   combinedContent: string;
 }
 
-// Set a browser-like User Agent to avoid basic scrapers blocks
 const AXIOS_CONFIG = {
   headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache'
   },
-  timeout: 8000,
-  validateStatus: () => true // Do not throw on 4xx/5xx responses
+  timeout: 10000,
+  validateStatus: () => true
 };
 
 function cleanText(html: string): string {
   const $ = cheerio.load(html);
-  // Remove script, style, head, nav, footer, iframe, and noscript elements to keep only content-rich text
   $('script, style, head, nav, footer, iframe, noscript, svg, img, header').remove();
   
-  // Replace spacing elements with spaces
   $('br, hr, p, div, li, h1, h2, h3, h4, h5, h6').each(function() {
     $(this).append(' ');
   });
@@ -38,7 +39,7 @@ function cleanText(html: string): string {
   return $.text()
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 3000); // Limit to 3000 chars per page to avoid token waste
+    .slice(0, 3500); // Limit to keep token size in check
 }
 
 function normalizeUrl(inputUrl: string): string {
@@ -58,10 +59,13 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
       return null;
     }
     const html = response.data;
+    if (typeof html !== 'string') {
+      return null;
+    }
     const $ = cheerio.load(html);
     const title = $('title').text().trim() || new URL(normalized).hostname;
     const text = cleanText(html);
-    return { url: normalized, title, text };
+    return { url: normalized, title, text, html };
   } catch (error: any) {
     console.error(`Error scraping URL ${normalized}:`, error.message);
     return null;
@@ -71,49 +75,39 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
 export async function crawlWebsite(targetUrl: string): Promise<CrawlData> {
   const normalizedBase = normalizeUrl(targetUrl);
   const baseDomain = new URL(normalizedBase).hostname.replace('www.', '');
-  
+  const fallbackName = baseDomain.split('.')[0].toUpperCase() || 'Target Company';
+
   // 1. Scrape Homepage
   const homepageResult = await scrapeUrl(normalizedBase);
-  if (!homepageResult) {
-    // If homepage fails, return minimal stub
-    const fallbackName = baseDomain.split('.')[0] || 'Target Company';
+  if (!homepageResult || homepageResult.text.length < 150) {
+    // If homepage fails or gets blocked (returning empty or error page), trigger AI public archive fallback
     return {
       companyName: fallbackName,
       websiteUrl: normalizedBase,
       pages: [],
-      combinedContent: `Homepage Scrape Failed. URL: ${normalizedBase}`
+      combinedContent: `<crawling_failed domain="${baseDomain}" companyName="${fallbackName}" url="${normalizedBase}" />`
     };
   }
 
-  const pages: ScrapeResult[] = [homepageResult];
+  const pages: Omit<ScrapeResult, 'html'>[] = [
+    { url: homepageResult.url, title: homepageResult.title, text: homepageResult.text }
+  ];
   
-  // 2. Discover Internal Links
-  const $ = cheerio.load(homepageResult.text); // Note: homepageResult.text is stripped text, we need the original HTML for links!
-  // Wait, let's fetch homepage html again or parse links from the response. Let's do it right.
-  let homepageHtml = '';
-  try {
-    const res = await axios.get(normalizedBase, AXIOS_CONFIG);
-    homepageHtml = res.data;
-  } catch {
-    homepageHtml = '';
-  }
-
+  // 2. Discover Internal Links using the already-fetched homepage HTML
   const internalLinks = new Set<string>();
-  if (homepageHtml) {
-    const $html = cheerio.load(homepageHtml);
+  if (homepageResult.html) {
+    const $html = cheerio.load(homepageResult.html);
     $html('a').each((_, element) => {
       const href = $html(element).attr('href');
       if (!href) return;
 
       try {
         let absoluteUrl = new URL(href, normalizedBase).toString();
-        // Remove hash fragments
-        absoluteUrl = absoluteUrl.split('#')[0];
+        absoluteUrl = absoluteUrl.split('#')[0]; // strip hash
         
         const urlObj = new URL(absoluteUrl);
         const linkDomain = urlObj.hostname.replace('www.', '');
 
-        // Match base domain and check if it is a relevant subpage
         if (linkDomain === baseDomain) {
           const path = urlObj.pathname.toLowerCase();
           const matchKeywords = ['about', 'service', 'career', 'hiring', 'jobs', 'contact', 'solution', 'product', 'team'];
@@ -127,8 +121,8 @@ export async function crawlWebsite(targetUrl: string): Promise<CrawlData> {
     });
   }
 
-  // 3. Select top 4 secondary pages
-  const urlsToScrape = Array.from(internalLinks).slice(0, 4);
+  // 3. Select top 3 internal pages to reduce scrap hits
+  const urlsToScrape = Array.from(internalLinks).slice(0, 3);
   
   // 4. Scrape concurrently
   const scrapePromises = urlsToScrape.map(url => scrapeUrl(url));
@@ -136,11 +130,11 @@ export async function crawlWebsite(targetUrl: string): Promise<CrawlData> {
   
   for (const res of results) {
     if (res && res.text.length > 50) {
-      pages.push(res);
+      pages.push({ url: res.url, title: res.title, text: res.text });
     }
   }
 
-  // 5. Build Combined Context
+  // 5. Build Combined Context inside XML tags
   let combinedContent = `<website url="${normalizedBase}">\n\n`;
   pages.forEach(p => {
     combinedContent += `<page url="${p.url}" title="${p.title}">\n`;
@@ -149,8 +143,7 @@ export async function crawlWebsite(targetUrl: string): Promise<CrawlData> {
   });
   combinedContent += `</website>`;
 
-  // Extract company name candidate
-  const companyNameCandidate = homepageResult.title.split('|')[0].split('-')[0].trim() || baseDomain.split('.')[0];
+  const companyNameCandidate = homepageResult.title.split('|')[0].split('-')[0].trim() || fallbackName;
 
   return {
     companyName: companyNameCandidate,
