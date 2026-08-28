@@ -71,11 +71,6 @@ export async function POST(req: NextRequest) {
         buyingSignals: JSON.stringify(syntheticSignals),
         recommendations: JSON.stringify(aiAnalysis.recommendations),
         scoreExplanations: JSON.stringify(aiAnalysis.scoreExplanations),
-
-        // Text summary stubs
-        problem: aiAnalysis.verifiedFacts.map(f => f.fact).slice(0, 3).join(', ') || 'Opportunities audited.',
-        opportunity: aiAnalysis.aiInferences.map(i => i.finding).slice(0, 3).join(', ') || 'Inferences mapped.',
-        proposedSolution: aiAnalysis.recommendations.map(r => r.serviceName).slice(0, 3).join(', ') || 'Services matched.',
         
         opportunityScore: aiAnalysis.opportunityScore,
         buyingSignalScore: aiAnalysis.buyingSignalScore,
@@ -123,7 +118,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Analyze API Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error during client acquisition generation' },
+      { error: 'Opportunity analysis failed. The website may have strong scraping protections (e.g. Cloudflare, Akamai) or rate limits.' },
       { status: 500 }
     );
   }

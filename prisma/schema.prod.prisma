@@ -39,11 +39,6 @@ model Prospect {
   buyingSignals       String   // Array of { signal, sourceUrl, sourceText, dateDiscovered }
   recommendations     String   // Array of { serviceName, issue, estimatedFee, confidence, explanation, evidenceList: string[] }
   
-  // Stubs for rendering / references
-  problem             String
-  opportunity         String
-  proposedSolution     String
-
   // 2. Metrics & Scores
   opportunityScore    Int
   buyingSignalScore   Int
