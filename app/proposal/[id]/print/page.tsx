@@ -31,14 +31,19 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
   let recommendations = [];
   try { recommendations = JSON.parse(prospect.recommendations) || []; } catch (e) {}
 
+  let pricingAssumptions = { assumptions: [], pricingModel: '', disclaimer: '' };
+  try {
+    pricingAssumptions = JSON.parse(prospect.revenueAssumptions) || { assumptions: [], pricingModel: '', disclaimer: '' };
+  } catch (e) {}
+
   return (
     <div className="min-h-screen bg-white text-slate-800 p-8 max-w-4xl mx-auto print:p-0">
       
       {/* Top action bar - hidden on print */}
       <div className="mb-6 flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200 print:hidden">
         <div>
-          <h2 className="text-sm font-bold text-slate-900">Client-Ready Proposal</h2>
-          <p className="text-xs text-slate-500">Press Export PDF to open the printer window and save as PDF.</p>
+          <h2 className="text-sm font-bold text-slate-900">Evidence-Based & Verified Proposal</h2>
+          <p className="text-xs text-slate-500">Press Export PDF to save as a verified client-ready PDF document.</p>
         </div>
         <button
           id="print-btn"
@@ -49,10 +54,10 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       </div>
 
       {/* PROPOSAL HEADER */}
-      <header className="border-b-4 border-slate-900 pb-6 mb-8 flex justify-between items-end">
+      <header className="border-b-4 border-slate-900 pb-6 mb-6 flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-black text-slate-900 leading-tight uppercase tracking-wider">
-            Service proposal
+            Verified proposal
           </h1>
           <p className="text-sky-600 font-bold mt-1 text-sm">PREPARED FOR: {prospect.companyName}</p>
           <a href={prospect.websiteUrl} target="_blank" rel="noreferrer" className="text-xs text-slate-500 hover:underline">
@@ -60,10 +65,26 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
           </a>
         </div>
         <div className="text-right">
-          <p className="text-sm font-bold text-slate-900">LeadPilot AI Auditor</p>
-          <p className="text-xs text-slate-400">Date: {new Date(prospect.createdAt).toLocaleDateString()}</p>
+          <p className="text-sm font-bold text-slate-900">LeadPilot AI Verification Suite</p>
+          <p className="text-xs text-slate-400">Date Audited: {new Date(prospect.createdAt).toLocaleDateString()}</p>
         </div>
       </header>
+
+      {/* Trust & Self-Correction Banner */}
+      <div className="grid grid-cols-3 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="text-center">
+          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Evidence Quality</span>
+          <span className="text-base font-black text-emerald-600">{prospect.evidenceQuality}%</span>
+        </div>
+        <div className="text-center border-x border-slate-200">
+          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Verification Pass Rate</span>
+          <span className="text-base font-black text-sky-600">{prospect.verificationPassRate}%</span>
+        </div>
+        <div className="text-center">
+          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Finding Reliability</span>
+          <span className="text-base font-black text-indigo-600">{prospect.findingReliability}%</span>
+        </div>
+      </div>
 
       {/* SECTION 1: EXECUTIVE SUMMARY */}
       <section className="mb-8">
@@ -82,12 +103,19 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </h2>
         <div className="space-y-3">
           {verifiedFacts.map((fact: any, idx: number) => (
-            <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-              <span className="font-bold text-slate-800">✅ {fact.fact}</span>
-              <div className="mt-2 flex gap-4 text-[10px] text-slate-500">
-                <span><strong>Source:</strong> {fact.sourceUrl}</span>
-                <span><strong>Confidence:</strong> {fact.confidence}%</span>
+            <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs flex justify-between items-start">
+              <div>
+                <span className="font-bold text-slate-800">✅ {fact.fact}</span>
+                {fact.evidenceText && (
+                  <blockquote className="mt-1.5 border-l-2 border-slate-350 pl-2 text-slate-500 italic">
+                    "{fact.evidenceText}"
+                  </blockquote>
+                )}
+                <span className="block text-[10px] text-slate-400 mt-2"><strong>Source:</strong> {fact.sourceUrl}</span>
               </div>
+              <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded uppercase ml-4">
+                {fact.status || 'Verified'}
+              </span>
             </div>
           ))}
         </div>
@@ -101,7 +129,14 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         <div className="space-y-4">
           {recommendations.map((rec: any, idx: number) => (
             <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
-              <h3 className="font-bold text-slate-900 text-sm">Opportunity {idx + 1}: {rec.serviceName}</h3>
+              <div className="flex justify-between items-start">
+                <h3 className="font-bold text-slate-900 text-sm">Opportunity {idx + 1}: {rec.serviceName}</h3>
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                  rec.status === 'Verified' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {rec.status}
+                </span>
+              </div>
               <p className="text-slate-600"><strong>Issue:</strong> {rec.issue}</p>
               <p className="text-slate-600"><strong>Impact:</strong> {rec.impact}</p>
               <div className="flex gap-4 text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
@@ -192,11 +227,40 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </div>
       </section>
 
+      {/* SECTION 8: SAFE REVENUE ESTIMATES & FINANCIAL DISCLAIMER */}
+      <section className="mb-8 page-break-before">
+        <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
+          8. Safe Project Value Valuation Range
+        </h2>
+        
+        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-xs space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+            <span className="font-bold text-slate-700">Estimated Opportunity Range:</span>
+            <span className="text-lg font-black text-emerald-600 font-mono">{prospect.opportunityRange}</span>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider">Pricing Model Assumptions</h4>
+            <ul className="list-disc pl-4 mt-1.5 text-slate-600 space-y-1.5">
+              {pricingAssumptions.assumptions.map((asm: string, index: number) => (
+                <li key={index}>{asm}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider">Financial Disclaimer</h4>
+            <p className="mt-1.5 text-[10px] text-slate-400 italic leading-relaxed">
+              {pricingAssumptions.disclaimer}
+            </p>
+          </div>
+        </div>
+      </section>
+
       <footer className="mt-12 text-center text-xs text-slate-400 border-t border-slate-200 pt-6">
-        <p>Generated by LeadPilot AI Client Acquisition Platform • Confidential</p>
+        <p>Generated by LeadPilot AI Safe Verification Platform • Confidential</p>
       </footer>
 
-      {/* Bind print */}
       <script
         dangerouslySetInnerHTML={{
           __html: `

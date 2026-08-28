@@ -34,22 +34,33 @@ model Prospect {
   updatedAt            DateTime @updatedAt
 
   // 1. Evidence-Based Audit Data (Stored as JSON arrays of objects)
-  verifiedFacts       String   // Array of { fact, sourceUrl, evidenceText }
-  aiInferences        String   // Array of { inference, supportedByFacts: string[], confidence }
-  buyingSignals       String   // Array of { signal, sourceUrl, sourceText, dateDiscovered }
-  recommendations     String   // Array of { serviceName, issue, estimatedFee, confidence, explanation, evidenceList: string[] }
+  verifiedFacts       String   // Array of { fact, sourceUrl, confidence, status }
+  aiInferences        String   // Array of { finding, evidence, reasoning, confidence, status }
+  buyingSignals       String   // Array of { signal, sourceUrl, sourceText, dateDiscovered, status }
+  recommendations     String   // Array of { serviceName, issue, impact, estimatedFee, estimatedValue, confidence, expectedOutcome, estimatedRoi, status, explanation, evidenceList }
   
   // 2. Metrics & Scores
   opportunityScore    Int
   buyingSignalScore   Int
-  scoreExplanations   String   // JSON of { opportunityScore: { explanation, evidence: string[] }, buyingSignalScore: { explanation, evidence: string[] } }
+  scoreExplanations   String   // JSON of { opportunityScore: { explanation, evidence, breakdown }, buyingSignalScore: { explanation, evidence, breakdown } }
   potentialRevenue    Int
   closingProbability  Int
   problemSeverity     String   // High, Medium, Low
   leadQuality         String   // Hot, Warm, Cold
-  proposalStatus      String   @default("Ready")
+  proposalStatus      String   @default("Ready") // Ready, Blocked
 
-  // 3. Proposal Builder
+  // 3. NEW: Trust & Verification Metrics
+  evidenceQuality      Int      @default(100)
+  verificationPassRate Int      @default(100)
+  findingReliability   Int      @default(100)
+  factsVerifiedCount   Int      @default(0)
+  claimsRejectedCount  Int      @default(0)
+  lowConfidenceCount   Int      @default(0)
+  suppressedRecsCount  Int      @default(0)
+  opportunityRange     String   @default("")
+  revenueAssumptions   String   @default("") // JSON string
+
+  // 4. Proposal Builder
   executiveSummary    String
   expectedResults     String
   estimatedRoi        String
@@ -57,7 +68,7 @@ model Prospect {
   ninetyDayPlan       String
   pricingRecommendation String
 
-  // 4. One-Click Deliverables (Outreach Center)
+  // 5. One-Click Deliverables (Outreach Center)
   coldEmail           String
   linkedInMessage     String
   discoveryScript     String

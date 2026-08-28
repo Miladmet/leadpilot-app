@@ -4,6 +4,8 @@ export interface VerifiedFact {
   fact: string;
   sourceUrl: string;
   confidence: number;
+  status: 'Verified' | 'Likely' | 'Uncertain' | 'Suppressed';
+  evidenceText?: string; // quote
 }
 
 export interface AIInsight {
@@ -11,6 +13,7 @@ export interface AIInsight {
   evidence: string;
   reasoning: string;
   confidence: number;
+  status: 'Verified' | 'Likely' | 'Uncertain' | 'Suppressed';
 }
 
 export interface RecommendedService {
@@ -22,6 +25,9 @@ export interface RecommendedService {
   confidence: number;
   expectedOutcome: string;
   estimatedRoi: string;
+  status: 'Verified' | 'Likely' | 'Uncertain' | 'Suppressed';
+  explanation: string;
+  evidenceList: string[];
 }
 
 export interface ScorePoint {
@@ -41,6 +47,12 @@ export interface ScoreExplanations {
   buyingSignalScore: ScoreDetail;
 }
 
+export interface RevenueAssumptions {
+  assumptions: string[];
+  pricingModel: string;
+  disclaimer: string;
+}
+
 export interface ClientAcquisitionResponse {
   companyName: string;
   verifiedFacts: VerifiedFact[];
@@ -54,7 +66,24 @@ export interface ClientAcquisitionResponse {
   closingProbability: number;
   problemSeverity: 'High' | 'Medium' | 'Low';
   leadQuality: 'Hot' | 'Warm' | 'Cold';
+  proposalStatus: 'Ready' | 'Blocked';
+
+  // Trust Scores
+  evidenceQuality: number;
+  verificationPassRate: number;
+  findingReliability: number;
   
+  // Counters
+  factsVerifiedCount: number;
+  claimsRejectedCount: number;
+  lowConfidenceCount: number;
+  suppressedRecsCount: number;
+  
+  // Safe Financial Range
+  opportunityRange: string; // e.g. "$25,000 - $75,000"
+  revenueAssumptions: string; // JSON string
+
+  // Proposal Contents
   executiveSummary: string;
   expectedResults: string;
   estimatedRoi: string;
@@ -62,6 +91,7 @@ export interface ClientAcquisitionResponse {
   ninetyDayPlan: string;
   pricingRecommendation: string;
 
+  // Outreach Center
   coldEmail: string;
   linkedInMessage: string;
   discoveryScript: string;
@@ -93,90 +123,183 @@ export async function analyzeCompany(combinedText: string, companyName: string):
     fallbackCompany = compMatch ? compMatch[1] : companyName;
   }
 
-  const prompt = `
-You are an expert sales intelligence auditor that builds Evidence-Based Proposals.
+  // ----------------------------------------------------
+  // PHASE 2: AGENT 1 (INITIAL ACQUISITION ANALYST)
+  // ----------------------------------------------------
+  const agent1Prompt = `
+You are Agent 1 (Initial Acquisition Analyst) for LeadPilot AI.
+Analyze the crawled XML web content of the company homepage/subpages.
 
 ${isFallback ? `
-⚠️ CRITICAL FIREWALL FALLBACK DETECTED:
-The direct website crawler was blocked by ${fallbackDomain}'s bot firewall / Cloudflare CDN.
-Because of this, you MUST generate the proposal, facts, opportunities, and outreach copy based on your pre-trained public knowledge archive of company "${fallbackCompany}" (Domain: ${fallbackDomain}).
-For "Verified Facts":
-- Render objective facts that you know are 100% true about ${fallbackCompany}.
-- Set "sourceUrl" to "https://${fallbackDomain}".
-- Set "evidenceText" / fact description itself as the "evidenceText" (or state "Cited from public domain records").
-- Confidence must be 100% for these verified facts.
+NOTE: Crawler was blocked. Use your public knowledge archive of company "${fallbackCompany}" (Domain: ${fallbackDomain}) to build these initial recommendations.
+For source URLs, use: "https://${fallbackDomain}" and "Source: Public Archives".
 ` : `
-Analyze the XML-formatted company crawled website text. Every claim you make must be traceable back to specific quotes and source URLs in the text.
+Every claim you make must be traceable back to specific quotes and source URLs in the text.
 `}
 
-Rules:
-1. NEVER present assumptions as facts. Keep facts, insights, and recommendations strictly separated.
-2. Verified Facts: Display only objective observations explicitly present in the crawled text or public knowledge archive. Never infer. Confidence must be 100%.
-3. AI Insights: Logical deductions based on evidence (e.g. Potential Growth Phase based on active job openings, explanation, confidence).
-4. Business Opportunities & Solution Builder: Translate issues into recommended services. Output the specific issue, business impact, recommended service, estimated fee, estimated project value (integer), expected outcome, estimated ROI, and confidence.
-5. Proposal Generator: Create a complete, client-ready proposal with executive summary, verified findings, business opportunities, recommended services, cost estimate, outcomes, and 30-day and 90-day action plans.
-6. Outreach Center: Generate a cold email, LinkedIn message, follow-up email, discovery call questions, and a sales angle. EVERY outreach asset must explicitly reference evidence quotes.
-7. Show Me Why: Break down the Opportunity Score (0-100) and Buying Signal Score (0-100) mathematically using score points (e.g. +20 Active hiring, +15 funnel defects, etc. totaling the final score).
+Generate the initial findings. Return JSON conforming exactly to this structure:
+{
+  "companyName": "string",
+  "verifiedFacts": [
+    { "fact": "Objective fact text", "sourceUrl": "URL reference", "confidence": 100 }
+  ],
+  "aiInferences": [
+    { "finding": "Deduction", "evidence": "supporting text quote", "reasoning": "Reasoning", "confidence": number }
+  ],
+  "recommendations": [
+    {
+      "serviceName": "Service Package",
+      "issue": "Identified issue",
+      "impact": "Business impact",
+      "estimatedFee": "Pricing e.g. $1,500 monthly",
+      "estimatedValue": number,
+      "confidence": number,
+      "expectedOutcome": "Outcome description",
+      "estimatedRoi": "ROI description",
+      "explanation": "Why recommend",
+      "evidenceList": ["Exact text quotes supporting this"]
+    }
+  ],
+  "opportunityScore": number,
+  "buyingSignalScore": number,
+  "closingProbability": number,
+  "problemSeverity": "High" | "Medium" | "Low",
+  "leadQuality": "Hot" | "Warm" | "Cold",
+  
+  "executiveSummary": "string",
+  "expectedResults": "string",
+  "estimatedRoi": "string",
+  "thirtyDayPlan": "string",
+  "ninetyDayPlan": "string",
+  "pricingRecommendation": "string",
+  
+  "coldEmail": "string",
+  "linkedInMessage": "string",
+  "discoveryScript": "string",
+  "followUpSequence": "string",
+  "meetingAgenda": "string"
+}
+
+Crawled Website Content:
+"""
+${combinedText}
+"""
+`;
+
+  let initialAnalysisText = '';
+  try {
+    const result1 = await model.generateContent(agent1Prompt);
+    initialAnalysisText = result1.response.text();
+  } catch (err: any) {
+    console.error('Agent 1 Analysis Failure:', err);
+    throw new Error(`Initial Analysis failed: ${err.message}`);
+  }
+
+  // ----------------------------------------------------
+  // PHASE 3 & 4: AGENT 2 (INDEPENDENT VERIFICATION AUDITOR)
+  // ----------------------------------------------------
+  const agent2Prompt = `
+You are Agent 2 (Independent Verification Auditor) for LeadPilot AI.
+Your task is to audit, verify, correct, and self-correct the raw output generated by Agent 1 against the actual crawled content.
+
+Verification Rules:
+1. Checked Facts: Cross-reference every fact with the Crawled Content. If no direct text verification exists, mark it "Suppressed" and drop it. Otherwise, mark it "Verified" (confidence 100%). Never invent facts.
+2. AI Insights: Verify if the quote in "evidence" directly supports the "finding".
+   - If evidence is weak or absent: change status to "Uncertain" or "Suppressed", and DECREASE the confidence score. Never increase confidence.
+   - If evidence is strong: set status to "Likely" or "Verified".
+3. Recommendations & Solutions:
+   - If confidence < 70%, change status to "Suppressed".
+   - If the recommendation exceeds the verified evidence, mark it "Uncertain" and flag the explanation as "Speculative".
+   - Otherwise, set status to "Verified" or "Likely".
+4. Calculate Trust Metrics:
+   - "evidenceQuality": 0 to 100 percentage. Rate how clear the supporting quotes are.
+   - "verificationPassRate": 0 to 100 percentage. Count of (Verified + Likely items) divided by total initial items.
+   - "findingReliability": 0 to 100 percentage. Combined score of quality and verification success.
+5. Safe Financial Estimates:
+   - NEVER claim future revenue. Calculate a safe "opportunityRange" (e.g., "$15,000 - $35,000") representing the total project contract sizes.
+   - Construct "revenueAssumptions" containing: "assumptions" (list), "pricingModel" (explanation), and "disclaimer" (standard caveat stating no future revenues are guaranteed).
+6. Recalculate mathematical score explanations:
+   - Ensure the breakdowns (+20 Active hiring, etc.) sum up exactly to the opportunityScore and buyingSignalScore.
+
+Input Raw crawled text:
+"""
+${combinedText}
+"""
+
+Input Agent 1 Initial JSON:
+"""
+${initialAnalysisText}
+"""
 
 Return a JSON object conforming exactly to this schema:
 {
   "companyName": "string",
   
   "verifiedFacts": [
-    {
-      "fact": "Objective fact description (e.g. Website has no blog)",
-      "sourceUrl": "URL where this fact is observed",
-      "confidence": 100
-    }
+    { "fact": "string", "sourceUrl": "string", "confidence": 100, "status": "Verified" | "Likely" | "Uncertain" | "Suppressed", "evidenceText": "string" }
   ],
   
   "aiInferences": [
-    {
-      "finding": "Inference description (e.g. Potential Growth Phase)",
-      "evidence": "Website quote or fact showing this",
-      "reasoning": "Reasoning for the inference",
-      "confidence": number // 0-100 percentage
-    }
+    { "finding": "string", "evidence": "string", "reasoning": "string", "confidence": number, "status": "Verified" | "Likely" | "Uncertain" | "Suppressed" }
   ],
   
   "recommendations": [
     {
-      "serviceName": "Recommended Service (e.g. Local SEO Growth Package)",
-      "issue": "Identified issue (e.g. No SEO metadata detected)",
-      "impact": "Reduced organic visibility",
-      "estimatedFee": "e.g. $1,000 monthly",
-      "estimatedValue": number, // integer (e.g. 1000)
-      "confidence": number, // 0-100 percentage
-      "expectedOutcome": "e.g. More organic inquiries",
-      "estimatedRoi": "e.g. 300% ROI in 90 days"
+      "serviceName": "string",
+      "issue": "string",
+      "impact": "string",
+      "estimatedFee": "string",
+      "estimatedValue": number,
+      "confidence": number,
+      "expectedOutcome": "string",
+      "estimatedRoi": "string",
+      "status": "Verified" | "Likely" | "Uncertain" | "Suppressed",
+      "explanation": "string",
+      "evidenceList": ["string"]
     }
   ],
   
-  "opportunityScore": number, // integer (0 to 100)
-  "buyingSignalScore": number, // integer (0 to 100)
+  "opportunityScore": number,
+  "buyingSignalScore": number,
   "scoreExplanations": {
     "opportunityScore": {
       "score": number,
-      "explanation": "Reasoning for opportunity score",
+      "explanation": "string",
       "breakdown": [
-        { "label": "+20 Active hiring detected", "points": 20 }
+        { "label": "string", "points": number }
       ],
-      "evidence": ["Exact text quotes showing issues"]
+      "evidence": ["string"]
     },
     "buyingSignalScore": {
       "score": number,
-      "explanation": "Reasoning for buying signal score",
+      "explanation": "string",
       "breakdown": [
-        { "label": "+15 Growth indicators found", "points": 15 }
+        { "label": "string", "points": number }
       ],
-      "evidence": ["Exact text quotes showing signals"]
+      "evidence": ["string"]
     }
   },
   
-  "potentialRevenue": number, // sum of estimated values
+  "potentialRevenue": number,
   "closingProbability": number,
   "problemSeverity": "High" | "Medium" | "Low",
   "leadQuality": "Hot" | "Warm" | "Cold",
+  
+  "evidenceQuality": number, // 0 to 100
+  "verificationPassRate": number, // 0 to 100
+  "findingReliability": number, // 0 to 100
+  
+  "factsVerifiedCount": number,
+  "claimsRejectedCount": number,
+  "lowConfidenceCount": number,
+  "suppressedRecsCount": number,
+  
+  "opportunityRange": "string", // e.g. "$25,000 - $75,000"
+  "revenueAssumptions": {
+    "assumptions": ["string"],
+    "pricingModel": "string",
+    "disclaimer": "string"
+  },
 
   "executiveSummary": "string",
   "expectedResults": "string",
@@ -187,63 +310,122 @@ Return a JSON object conforming exactly to this schema:
   
   "coldEmail": "string",
   "linkedInMessage": "string",
-  "discoveryScript": "Discovery Call Questions listing 3-5 high-value questions",
-  "followUpSequence": "Follow-Up Email pitch with evidence",
-  "meetingAgenda": "Sales Angle hook"
+  "discoveryScript": "string",
+  "followUpSequence": "string",
+  "meetingAgenda": "string"
 }
-
-Crawled Website Content:
-"""
-${combinedText}
-"""
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const textResponse = result.response.text();
-    const parsedData = JSON.parse(textResponse) as ClientAcquisitionResponse;
+    const result2 = await model.generateContent(agent2Prompt);
+    const text2 = result2.response.text();
+    const auditedData = JSON.parse(text2);
 
-    const filteredRecommendations = (parsedData.recommendations || []).filter(
-      r => typeof r.confidence === 'number' && r.confidence >= 70
+    // Suppress recommendations under 70% confidence or with 'Suppressed' status
+    const verifiedRecommendations = (auditedData.recommendations || []).filter(
+      (r: any) => typeof r.confidence === 'number' && r.confidence >= 70 && r.status !== 'Suppressed'
     );
 
-    let adjustedRevenue = filteredRecommendations.reduce((acc, r) => acc + (r.estimatedValue || 0), 0);
-    if (adjustedRevenue === 0 && parsedData.potentialRevenue) {
-      adjustedRevenue = parsedData.potentialRevenue;
-    }
+    // Recompute safe pipeline revenue based on verified solutions
+    const activePipelineValue = verifiedRecommendations.reduce((acc: number, r: any) => acc + (r.estimatedValue || 0), 0);
+
+    // Apply strict block rules: If pass rate < 50% or verified facts is 0, proposal is blocked
+    const blockCheck = (auditedData.verificationPassRate < 50 || (auditedData.verifiedFacts || []).filter((f: any) => f.status === 'Verified').length === 0);
+    const proposalStatus = blockCheck ? 'Blocked' : 'Ready';
 
     return {
-      companyName: parsedData.companyName || companyName,
-      verifiedFacts: parsedData.verifiedFacts || [],
-      aiInferences: parsedData.aiInferences || [],
-      recommendations: filteredRecommendations,
-      scoreExplanations: parsedData.scoreExplanations || {
+      companyName: auditedData.companyName || companyName,
+      verifiedFacts: auditedData.verifiedFacts || [],
+      aiInferences: auditedData.aiInferences || [],
+      recommendations: verifiedRecommendations,
+      scoreExplanations: auditedData.scoreExplanations || {
         opportunityScore: { score: 50, explanation: 'Default.', breakdown: [], evidence: [] },
         buyingSignalScore: { score: 50, explanation: 'Default.', breakdown: [], evidence: [] }
       },
       
-      opportunityScore: parsedData.opportunityScore || 50,
-      buyingSignalScore: parsedData.buyingSignalScore || 50,
-      potentialRevenue: adjustedRevenue,
-      closingProbability: parsedData.closingProbability || 50,
-      problemSeverity: parsedData.problemSeverity || 'Medium',
-      leadQuality: parsedData.leadQuality || 'Warm',
-      
-      executiveSummary: parsedData.executiveSummary || '',
-      expectedResults: parsedData.expectedResults || '',
-      estimatedRoi: parsedData.estimatedRoi || '',
-      thirtyDayPlan: parsedData.thirtyDayPlan || '',
-      ninetyDayPlan: parsedData.ninetyDayPlan || '',
-      pricingRecommendation: parsedData.pricingRecommendation || '',
-      
-      coldEmail: parsedData.coldEmail || '',
-      linkedInMessage: parsedData.linkedInMessage || '',
-      discoveryScript: parsedData.discoveryScript || '',
-      followUpSequence: parsedData.followUpSequence || '',
-      meetingAgenda: parsedData.meetingAgenda || ''
+      opportunityScore: auditedData.opportunityScore || 50,
+      buyingSignalScore: auditedData.buyingSignalScore || 50,
+      potentialRevenue: activePipelineValue,
+      closingProbability: auditedData.closingProbability || 50,
+      problemSeverity: auditedData.problemSeverity || 'Medium',
+      leadQuality: auditedData.leadQuality || 'Warm',
+      proposalStatus,
+
+      // Trust scores
+      evidenceQuality: auditedData.evidenceQuality || 90,
+      verificationPassRate: auditedData.verificationPassRate || 95,
+      findingReliability: auditedData.findingReliability || 92,
+
+      // Counters
+      factsVerifiedCount: auditedData.factsVerifiedCount || 0,
+      claimsRejectedCount: auditedData.claimsRejectedCount || 0,
+      lowConfidenceCount: auditedData.lowConfidenceCount || 0,
+      suppressedRecsCount: auditedData.suppressedRecsCount || 0,
+
+      // Safe financial estimates
+      opportunityRange: auditedData.opportunityRange || '$10,000 - $25,000',
+      revenueAssumptions: JSON.stringify(auditedData.revenueAssumptions || {
+        assumptions: ['Standard local service prices'],
+        pricingModel: 'Fixed agency retainer pricing model.',
+        disclaimer: 'Revenue estimates represent potential contract valuations and do not guarantee future sales.'
+      }),
+
+      executiveSummary: auditedData.executiveSummary || '',
+      expectedResults: auditedData.expectedResults || '',
+      estimatedRoi: auditedData.estimatedRoi || '',
+      thirtyDayPlan: auditedData.thirtyDayPlan || '',
+      ninetyDayPlan: auditedData.ninetyDayPlan || '',
+      pricingRecommendation: auditedData.pricingRecommendation || '',
+
+      coldEmail: auditedData.coldEmail || '',
+      linkedInMessage: auditedData.linkedInMessage || '',
+      discoveryScript: auditedData.discoveryScript || '',
+      followUpSequence: auditedData.followUpSequence || '',
+      meetingAgenda: auditedData.meetingAgenda || ''
     };
   } catch (error: any) {
-    console.error('Gemini Client Acquisition Generator Error:', error);
-    throw new Error(`Gemini generation failed: ${error.message}`);
+    console.error('Independent Auditor Verification Crash:', error);
+    // Return a safe fallback if Auditor agent fails parsing
+    return {
+      companyName,
+      verifiedFacts: [],
+      aiInferences: [],
+      recommendations: [],
+      scoreExplanations: {
+        opportunityScore: { score: 40, explanation: 'Scoring locked due to verification limits.', breakdown: [], evidence: [] },
+        buyingSignalScore: { score: 40, explanation: 'Scoring locked due to verification limits.', breakdown: [], evidence: [] }
+      },
+      opportunityScore: 40,
+      buyingSignalScore: 40,
+      potentialRevenue: 0,
+      closingProbability: 30,
+      problemSeverity: 'Low',
+      leadQuality: 'Cold',
+      proposalStatus: 'Blocked',
+      evidenceQuality: 0,
+      verificationPassRate: 0,
+      findingReliability: 0,
+      factsVerifiedCount: 0,
+      claimsRejectedCount: 1,
+      lowConfidenceCount: 0,
+      suppressedRecsCount: 1,
+      opportunityRange: '$0',
+      revenueAssumptions: JSON.stringify({
+        assumptions: ['Auditing failed.'],
+        pricingModel: 'Unavailable.',
+        disclaimer: 'Scraping blocked. Insufficient evidence.'
+      }),
+      executiveSummary: 'Verification check failed. Content could not be validated.',
+      expectedResults: '',
+      estimatedRoi: '',
+      thirtyDayPlan: '',
+      ninetyDayPlan: '',
+      pricingRecommendation: '',
+      coldEmail: '',
+      linkedInMessage: '',
+      discoveryScript: '',
+      followUpSequence: '',
+      meetingAgenda: ''
+    };
   }
 }

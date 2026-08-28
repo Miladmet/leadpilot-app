@@ -29,13 +29,18 @@ import {
   X,
   Plus,
   AlertTriangle,
-  Briefcase
+  Briefcase,
+  AlertCircle,
+  ThumbsDown,
+  ThumbsUp
 } from 'lucide-react';
 
 interface VerifiedFact {
   fact: string;
   sourceUrl: string;
   confidence: number;
+  status: 'Verified' | 'Likely' | 'Uncertain' | 'Suppressed';
+  evidenceText?: string;
 }
 
 interface AIInsight {
@@ -43,6 +48,7 @@ interface AIInsight {
   evidence: string;
   reasoning: string;
   confidence: number;
+  status: 'Verified' | 'Likely' | 'Uncertain' | 'Suppressed';
 }
 
 interface RecommendedService {
@@ -54,6 +60,9 @@ interface RecommendedService {
   confidence: number;
   expectedOutcome: string;
   estimatedRoi: string;
+  status: 'Verified' | 'Likely' | 'Uncertain' | 'Suppressed';
+  explanation: string;
+  evidenceList: string[];
 }
 
 interface ScorePoint {
@@ -73,6 +82,12 @@ interface ScoreExplanations {
   buyingSignalScore: ScoreDetail;
 }
 
+interface PricingAssumptions {
+  assumptions: string[];
+  pricingModel: string;
+  disclaimer: string;
+}
+
 interface Prospect {
   id: string;
   companyName: string;
@@ -88,7 +103,16 @@ interface Prospect {
   closingProbability: number;
   problemSeverity: string;
   leadQuality: string;
-  proposalStatus: string;
+  proposalStatus: string; // Ready, Blocked
+  evidenceQuality: number;
+  verificationPassRate: number;
+  findingReliability: number;
+  factsVerifiedCount: number;
+  claimsRejectedCount: number;
+  lowConfidenceCount: number;
+  suppressedRecsCount: number;
+  opportunityRange: string;
+  revenueAssumptions: string; // JSON
   executiveSummary: string;
   expectedResults: string;
   estimatedRoi: string;
@@ -131,6 +155,7 @@ interface ModalContent {
   explanation: string;
   breakdown: ScorePoint[];
   evidence: string[];
+  status?: string;
 }
 
 export default function Dashboard() {
@@ -145,7 +170,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   
-  // Dashboard navigation tabs: opportunities, proposal, outreach, vault, pipeline
+  // Dashboard navigation tabs
   const [activeTab, setActiveTab] = useState<'opportunities' | 'proposal' | 'outreach' | 'vault' | 'pipeline'>('opportunities');
   
   // Subtabs
@@ -222,7 +247,7 @@ export default function Dashboard() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Acquisition analysis failed. Verify domain.');
+        throw new Error(data.error || 'Verification check failed. Verify domain.');
       }
 
       const newProspect = data.prospect;
@@ -324,27 +349,37 @@ export default function Dashboard() {
     try { return JSON.parse(jsonStr) || null; } catch { return null; }
   };
 
+  const parsePricingAssumptions = (jsonStr: string): PricingAssumptions => {
+    try { 
+      return JSON.parse(jsonStr) || { assumptions: [], pricingModel: '', disclaimer: '' }; 
+    } catch { 
+      return { assumptions: [], pricingModel: '', disclaimer: '' }; 
+    }
+  };
+
   const parseSignals = (jsonStr: string): BuyingSignal[] => {
     try { return JSON.parse(jsonStr) || []; } catch { return []; }
   };
 
   // Trigger modal drawer
-  const openShowWhy = (title: string, explanation: string, breakdown: ScorePoint[], evidence: string[]) => {
-    setModalContent({ title, explanation, breakdown, evidence });
+  const openShowWhy = (title: string, explanation: string, breakdown: ScorePoint[], evidence: string[], status?: string) => {
+    setModalContent({ title, explanation, breakdown, evidence, status });
     setShowWhyModal(true);
   };
 
-  // Metrics Calculations (Agency Revenue Dashboard style)
+  // Status Badge Colors
+  const getStatusBadgeClass = (status: string) => {
+    const s = status?.toUpperCase();
+    if (s === 'VERIFIED') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (s === 'LIKELY') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    if (s === 'UNCERTAIN') return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-rose-50 text-rose-750 border-rose-200'; // SUPPRESSED
+  };
+
+  // Pipeline metrics
   const totalRevenuePipeline = prospects.reduce((acc, p) => acc + p.potentialRevenue, 0);
-  const avgClosingProbability = prospects.length > 0 
-    ? Math.round(prospects.reduce((acc, p) => acc + p.closingProbability, 0) / prospects.length) 
-    : 0;
   const proposalsReadyCount = prospects.filter(p => p.proposalStatus === 'Ready').length;
-  
-  // verified opportunities = sum of all matching recommendations across all prospects
   const verifiedOpportunitiesCount = prospects.reduce((acc, p) => acc + parseRecommendations(p.recommendations).length, 0);
-  
-  // meetings generated = count of activities that log client outreach copy or dashboard downloads
   const meetingsGeneratedCount = activities.filter(a => a.action === 'DELETED_PROSPECT' || a.action === 'SUBSCRIBED').length + prospects.length;
 
   const getSeverityBadgeColor = (severity: string) => {
@@ -352,13 +387,6 @@ export default function Dashboard() {
     if (s === 'high') return 'text-rose-700 bg-rose-50 border-rose-200';
     if (s === 'medium') return 'text-amber-700 bg-amber-50 border-amber-200';
     return 'text-sky-700 bg-sky-50 border-sky-200';
-  };
-
-  const getQualityBadgeColor = (quality: string) => {
-    const q = quality?.toLowerCase();
-    if (q === 'hot') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-    if (q === 'warm') return 'text-indigo-700 bg-indigo-50 border-indigo-200';
-    return 'text-slate-600 bg-slate-50 border-slate-200';
   };
 
   if (!user) {
@@ -383,7 +411,7 @@ export default function Dashboard() {
               <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <h3 className="font-black text-slate-900 flex items-center gap-1.5 text-xs uppercase tracking-wider">
                   <ShieldCheck className="h-5 w-5 text-emerald-600" />
-                  Score audit & breakdown
+                  Evidence Verification audit
                 </h3>
                 <button 
                   onClick={() => setShowWhyModal(false)}
@@ -394,31 +422,41 @@ export default function Dashboard() {
               </div>
 
               <div className="space-y-5">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Metric Target</span>
-                  <p className="text-base font-black text-slate-900 mt-0.5">{modalContent.title}</p>
+                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Verification Target</span>
+                    <p className="text-sm font-black text-slate-900 mt-0.5">{modalContent.title}</p>
+                  </div>
+                  {modalContent.status && (
+                    <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full uppercase ${getStatusBadgeClass(modalContent.status)}`}>
+                      {modalContent.status}
+                    </span>
+                  )}
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Audit Breakdown</span>
-                  <div className="mt-2 space-y-1.5">
-                    {modalContent.breakdown && modalContent.breakdown.length > 0 ? (
-                      modalContent.breakdown.map((pt, idx) => (
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Auditor Logic Reasoning</span>
+                  <p className="text-xs text-slate-600 leading-relaxed mt-1 whitespace-pre-wrap bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    {modalContent.explanation}
+                  </p>
+                </div>
+
+                {modalContent.breakdown && modalContent.breakdown.length > 0 && (
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Mathematical Breakdown</span>
+                    <div className="mt-2 space-y-1.5">
+                      {modalContent.breakdown.map((pt, idx) => (
                         <div key={idx} className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg border border-slate-150 text-xs">
                           <span className="text-slate-700 font-semibold">{pt.label}</span>
                           <span className="font-mono font-bold text-emerald-600">+{pt.points} pts</span>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg">
-                        Base valuation points: +50 pts
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Supporting Evidence Cites</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Verifiable Quotes / Supporting text</span>
                   <ul className="mt-2 space-y-2">
                     {modalContent.evidence && modalContent.evidence.length > 0 ? (
                       modalContent.evidence.map((quote, idx) => (
@@ -427,7 +465,7 @@ export default function Dashboard() {
                         </li>
                       ))
                     ) : (
-                      <li className="text-xs text-slate-400 italic">No explicit evidence quotes tagged.</li>
+                      <li className="text-xs text-slate-400 italic">No quotes or facts verified.</li>
                     )}
                   </ul>
                 </div>
@@ -438,7 +476,7 @@ export default function Dashboard() {
               onClick={() => setShowWhyModal(false)}
               className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 rounded-xl mt-8 transition-colors uppercase tracking-wider"
             >
-              Close Verification Layer
+              Close Verification Audit
             </button>
           </div>
         </div>
@@ -485,13 +523,13 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main SaaS Panel Area */}
+      {/* Main SaaS panel */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid lg:grid-cols-3 gap-6">
         
-        {/* Left Column: Agency Revenue Dashboard stats & Workspace */}
+        {/* Left Column: Stats & Workspace */}
         <div className="lg:col-span-2 space-y-6 flex flex-col">
           
-          {/* SECTION 9: DASHBOARD REDESIGN (Agency Revenue Dashboard Look) */}
+          {/* Agency Revenue Dashboard stats */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Companies Analyzed</span>
@@ -519,14 +557,14 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Proposal Scrape Form */}
+          {/* Proposal Scraper trigger form */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
               <Sparkles className="h-5 w-5 text-sky-500" />
-              Build Client Solution & Proposal Document
+              Build Client Solution & Proposal
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Provide any company domain URL. Our crawler verifies facts, duces AI growth insights, prices recommended packages, and structures cold outreach within 60 seconds.
+              Enter any company URL. The system gathers facts, runs the double-agent verification check, and drafts compliant proposals.
             </p>
 
             <form onSubmit={handleAnalyze} className="mt-4 flex gap-2">
@@ -547,11 +585,11 @@ export default function Dashboard() {
                 {analyzing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing website...
+                    Running auditor checks...
                   </>
                 ) : (
                   <>
-                    Audit Website
+                    Analyze Website
                   </>
                 )}
               </button>
@@ -564,89 +602,70 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Interactive Workspace Panel */}
+          {/* Core proposal workspace */}
           {activeProspect ? (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
               
-              {/* Proposal Header Metadata */}
-              <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-start gap-4">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    {activeProspect.companyName}
-                    <a 
-                      href={activeProspect.websiteUrl} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      className="text-slate-400 hover:text-slate-600 transition-colors inline-block"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">{activeProspect.websiteUrl}</p>
+              {/* Trust Dashboard Header metrics (Evidence Quality, etc.) */}
+              <div className="p-4 bg-slate-900 text-white border-b border-slate-800 grid grid-cols-3 md:grid-cols-6 gap-4 items-center">
+                <div className="col-span-3 md:col-span-2">
+                  <span className="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Audited Client Profile</span>
+                  <h4 className="text-xs font-black truncate">{activeProspect.companyName}</h4>
+                </div>
+                
+                <div className="text-center">
+                  <span className="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Evidence Quality</span>
+                  <span className="text-xs font-black text-emerald-400">{activeProspect.evidenceQuality}%</span>
                 </div>
 
-                {/* Scores & Pricing details */}
-                <div className="flex gap-2 items-center flex-wrap">
-                  
-                  {/* Opportunity Score with Why button */}
-                  <div className="px-2.5 py-1 rounded-lg border bg-slate-100 border-slate-200 text-xs font-semibold flex items-center gap-1.5">
-                    <div className="text-center">
-                      <span className="block text-[8px] text-slate-400 font-bold uppercase">OPP SCORE</span>
-                      <span className="text-xs font-bold text-slate-700">{activeProspect.opportunityScore}</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const expls = parseScoreExplanations(activeProspect.scoreExplanations);
-                        openShowWhy(
-                          'Opportunity Score: ' + activeProspect.opportunityScore + '/100',
-                          expls ? expls.opportunityScore.explanation : 'Mathematical score based on audit severity.',
-                          expls ? expls.opportunityScore.breakdown : [],
-                          expls ? expls.opportunityScore.evidence : []
-                        );
-                      }}
-                      className="text-sky-600 hover:text-sky-700 p-0.5 hover:bg-white rounded"
-                      title="Show Evidence Why"
-                    >
-                      <HelpCircle className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                <div className="text-center border-x border-slate-800">
+                  <span className="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Pass Rate</span>
+                  <span className="text-xs font-black text-sky-400">{activeProspect.verificationPassRate}%</span>
+                </div>
 
-                  {/* Buying Signal Score with Why button */}
-                  <div className="px-2.5 py-1 rounded-lg border bg-slate-100 border-slate-200 text-xs font-semibold flex items-center gap-1.5">
-                    <div className="text-center">
-                      <span className="block text-[8px] text-slate-400 font-bold uppercase">BUY SIGNAL</span>
-                      <span className="text-xs font-bold text-slate-700">{activeProspect.buyingSignalScore}</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const expls = parseScoreExplanations(activeProspect.scoreExplanations);
-                        openShowWhy(
-                          'Buying Signal Score: ' + activeProspect.buyingSignalScore + '/100',
-                          expls ? expls.buyingSignalScore.explanation : 'Verifiable search indicators and hiring posts.',
-                          expls ? expls.buyingSignalScore.breakdown : [],
-                          expls ? expls.buyingSignalScore.evidence : []
-                        );
-                      }}
-                      className="text-sky-600 hover:text-sky-700 p-0.5 hover:bg-white rounded"
-                      title="Show Evidence Why"
-                    >
-                      <HelpCircle className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                <div className="text-center mr-2">
+                  <span className="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Reliability</span>
+                  <span className="text-xs font-black text-indigo-400">{activeProspect.findingReliability}%</span>
+                </div>
 
-                  <div className="px-3 py-1 rounded-lg border bg-emerald-50 border-emerald-200 text-xs font-bold flex flex-col items-center">
-                    <span className="text-[8px] uppercase font-semibold text-slate-500">Pipeline Value</span>
-                    <span className="text-xs text-emerald-700 font-black">${activeProspect.potentialRevenue.toLocaleString()}</span>
-                  </div>
-
-                  <div className={`px-2.5 py-1 rounded-lg border text-xs font-bold ${getSeverityBadgeColor(activeProspect.problemSeverity)}`}>
-                    <span className="block text-[8px] uppercase text-slate-500 font-semibold">Severity</span>
-                    <span>{activeProspect.problemSeverity}</span>
-                  </div>
+                <div className="col-span-3 md:col-span-1 text-center bg-slate-800 py-1.5 rounded-lg border border-slate-700 text-[10px] font-bold">
+                  {activeProspect.proposalStatus === 'Blocked' ? (
+                    <span className="text-rose-400 flex items-center justify-center gap-0.5 uppercase">
+                      ⚠️ BLOCKED
+                    </span>
+                  ) : (
+                    <span className="text-emerald-400 flex items-center justify-center gap-0.5 uppercase">
+                      ✓ READY
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Main Workspace Navigation Tabs */}
+              {/* Suppressed / audit counts sub-header */}
+              <div className="px-6 py-2 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-[10px] text-slate-500 font-semibold">
+                <span>Facts Verified: <strong className="text-emerald-600">{activeProspect.factsVerifiedCount}</strong></span>
+                <span>Claims Rejected: <strong className="text-rose-600">{activeProspect.claimsRejectedCount}</strong></span>
+                <span>Low Confidence suppressed: <strong className="text-amber-600">{activeProspect.suppressedRecsCount}</strong></span>
+                <span>Opportunity Range: <strong className="text-slate-700 font-mono">{activeProspect.opportunityRange}</strong></span>
+              </div>
+
+              {/* BLOCK PROPOSAL BANNER IF VALIDATION FAILS */}
+              {activeProspect.proposalStatus === 'Blocked' && (
+                <div className="m-6 p-4 bg-rose-50 border-2 border-rose-350 rounded-xl text-rose-950 text-xs flex gap-3 items-start shadow-sm animate-pulse">
+                  <AlertTriangle className="h-6 w-6 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-black text-sm uppercase">Proposal Generation Blocked Due To Insufficient Evidence</h4>
+                    <p className="mt-1 leading-relaxed text-rose-800">
+                      Our **Independent Verification Auditor** blocked proposal generation because the crawled domain provided insufficient text facts (Verification Pass Rate: {activeProspect.verificationPassRate}%, {activeProspect.claimsRejectedCount} claims rejected).
+                    </p>
+                    <p className="mt-2 font-bold text-rose-900">
+                      💡 Action Required: Navigate the extension to a content-rich page (e.g. Careers, About, or Services) and audit again to sync verification points.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Navigation Tabs */}
               <div className="flex border-b border-slate-200 bg-white">
                 <button
                   onClick={() => setActiveTab('opportunities')}
@@ -655,7 +674,7 @@ export default function Dashboard() {
                   }`}
                 >
                   <Search className="h-4 w-4" />
-                  Audit Opportunity Center
+                  Audited Solutions
                 </button>
                 <button
                   onClick={() => setActiveTab('proposal')}
@@ -698,10 +717,9 @@ export default function Dashboard() {
               {/* Tab Contents */}
               <div className="p-6 flex-1 flex flex-col bg-white">
                 
-                {/* 1. Opportunity & Audit Center */}
+                {/* 1. Audited Solutions (Opportunity Tabs) */}
                 {activeTab === 'opportunities' && (
                   <div className="space-y-4 flex-1 flex flex-col">
-                    {/* Subtabs for Facts vs Inferences vs Opportunities vs Solution Builder */}
                     <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-2">
                       <button
                         onClick={() => setAuditSubTab('facts')}
@@ -709,7 +727,7 @@ export default function Dashboard() {
                           auditSubTab === 'facts' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
                         }`}
                       >
-                        Section 1: Verified Facts
+                        Verified Facts
                       </button>
                       <button
                         onClick={() => setAuditSubTab('insights')}
@@ -717,7 +735,7 @@ export default function Dashboard() {
                           auditSubTab === 'insights' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
                         }`}
                       >
-                        Section 2: AI Insights
+                        AI Insights
                       </button>
                       <button
                         onClick={() => setAuditSubTab('opportunities')}
@@ -725,7 +743,7 @@ export default function Dashboard() {
                           auditSubTab === 'opportunities' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
                         }`}
                       >
-                        Section 3: Opportunities
+                        Opportunities
                       </button>
                       <button
                         onClick={() => setAuditSubTab('solutions')}
@@ -733,62 +751,67 @@ export default function Dashboard() {
                           auditSubTab === 'solutions' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
                         }`}
                       >
-                        Section 4: Solution Builder
+                        Solution Builder
                       </button>
                     </div>
 
-                    {/* Subtab View panels */}
                     <div className="flex-1 overflow-y-auto max-h-[300px] pr-1">
                       
-                      {/* Section 1: Verified Facts */}
+                      {/* Verified Facts */}
                       {auditSubTab === 'facts' && (
                         <div className="space-y-3">
                           {parseFacts(activeProspect.verifiedFacts).map((fact, idx) => (
                             <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs flex justify-between items-start">
                               <div className="space-y-1">
                                 <p className="font-bold text-slate-800 flex items-center gap-1.5">
-                                  <span className="text-emerald-500">✅</span>
+                                  <span className="text-emerald-500">✓</span>
                                   {fact.fact}
                                 </p>
-                                <a href={fact.sourceUrl} target="_blank" rel="noreferrer" className="block text-[10px] text-sky-600 hover:underline truncate max-w-[300px]">
+                                {fact.evidenceText && (
+                                  <blockquote className="mt-1 border-l-2 border-slate-350 pl-2 text-slate-500 italic">
+                                    "{fact.evidenceText}"
+                                  </blockquote>
+                                )}
+                                <a href={fact.sourceUrl} target="_blank" rel="noreferrer" className="block text-[10px] text-sky-600 hover:underline truncate max-w-[320px]">
                                   Source: {fact.sourceUrl}
                                 </a>
                               </div>
-                              <span className="bg-sky-50 text-sky-700 text-[10px] font-bold px-2 py-0.5 rounded border border-sky-100">
-                                Confidence: {fact.confidence}%
+                              <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${getStatusBadgeClass(fact.status)}`}>
+                                {fact.status}
                               </span>
                             </div>
                           ))}
                         </div>
                       )}
 
-                      {/* Section 2: AI Insights */}
+                      {/* AI Insights */}
                       {auditSubTab === 'insights' && (
                         <div className="space-y-3">
                           {parseInsights(activeProspect.aiInferences).map((inf, idx) => (
                             <div key={idx} className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs space-y-2">
                               <div className="flex justify-between items-start">
                                 <h4 className="font-black text-slate-900 text-sm">Finding: {inf.finding}</h4>
-                                <span className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-100">
-                                  Confidence: {inf.confidence}%
+                                <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${getStatusBadgeClass(inf.status)}`}>
+                                  {inf.status}
                                 </span>
                               </div>
-                              <p className="text-slate-600 leading-normal"><strong>Evidence:</strong> "{inf.evidence}"</p>
-                              <p className="text-slate-600 leading-normal"><strong>Reasoning:</strong> {inf.reasoning}</p>
+                              <p className="text-slate-600"><strong>Evidence:</strong> "{inf.evidence}"</p>
+                              <p className="text-slate-600"><strong>Reasoning:</strong> {inf.reasoning}</p>
+                              <div className="text-[10px] text-slate-400 font-bold">Confidence: {inf.confidence}%</div>
                             </div>
                           ))}
                         </div>
                       )}
 
-                      {/* Section 3: Business Opportunities */}
+                      {/* Opportunities */}
                       {auditSubTab === 'opportunities' && (
                         <div className="space-y-3">
                           {parseRecommendations(activeProspect.recommendations).map((rec, idx) => (
                             <div key={idx} className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs space-y-2">
                               <div className="flex justify-between items-start">
-                                <h4 className="font-bold text-slate-900 text-sm">Opportunity {idx + 1}: {rec.serviceName}</h4>
-                                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-100">
-                                  Confidence: {rec.confidence}%
+                                <h4 className="font-bold text-slate-900 text-sm">Opportunity: {rec.serviceName}</h4>
+                                <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${getStatusBadgeClass(rec.status)}`}>
+                                  {rec.status}
                                 </span>
                               </div>
                               <p className="text-slate-600"><strong>Issue:</strong> {rec.issue}</p>
@@ -802,19 +825,18 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      {/* Section 4: Solution Builder */}
+                      {/* Solution Builder */}
                       {auditSubTab === 'solutions' && (
                         <div className="space-y-3">
                           {parseRecommendations(activeProspect.recommendations).map((rec, idx) => (
                             <div key={idx} className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs space-y-2">
                               <div className="flex justify-between items-start">
-                                <h4 className="font-bold text-slate-900 text-sm">Solution Package: {rec.serviceName}</h4>
-                                <span className="bg-sky-50 text-sky-700 text-[10px] font-bold px-2 py-0.5 rounded border border-sky-100">
-                                  Confidence: {rec.confidence}%
+                                <h4 className="font-bold text-slate-900 text-sm">Solution: {rec.serviceName}</h4>
+                                <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 uppercase ${getStatusBadgeClass(rec.status)}`}>
+                                  {rec.status}
                                 </span>
                               </div>
                               <p className="text-slate-600"><strong>Problem Found:</strong> {rec.issue}</p>
-                              <p className="text-slate-600"><strong>Recommended Service:</strong> {rec.serviceName}</p>
                               <p className="text-slate-600"><strong>Expected Outcome:</strong> {rec.expectedOutcome}</p>
                               <p className="text-slate-600"><strong>Estimated ROI:</strong> {rec.estimatedRoi}</p>
                               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
@@ -835,21 +857,38 @@ export default function Dashboard() {
                   <div className="space-y-4 flex-1 flex flex-col justify-between">
                     <div className="overflow-y-auto max-h-[360px] space-y-4 pr-1">
                       
-                      {/* PDF Print Export Bar */}
-                      <div className="bg-sky-50 border border-sky-100 p-3.5 rounded-xl flex justify-between items-center">
+                      {/* PDF Print Export Bar - disabled if blocked */}
+                      <div className={`p-3.5 rounded-xl border flex justify-between items-center ${
+                        activeProspect.proposalStatus === 'Blocked' 
+                          ? 'bg-rose-50 border-rose-100 opacity-60' 
+                          : 'bg-sky-50 border-sky-100'
+                      }`}>
                         <div>
-                          <h4 className="text-xs font-bold text-sky-900">Proposal Document Ready</h4>
-                          <p className="text-[10px] text-sky-700">Verifiable quotes, ROI metrics, action roadmaps, and cost breakdowns.</p>
+                          <h4 className="text-xs font-bold text-slate-900">Proposal Document Exporter</h4>
+                          <p className="text-[10px] text-slate-500">
+                            {activeProspect.proposalStatus === 'Blocked' 
+                              ? 'Disabled. Insufficient evidence metrics.' 
+                              : 'Print client-ready verified proposals.'}
+                          </p>
                         </div>
-                        <a
-                          href={`/proposal/${activeProspect.id}/print`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
-                        >
-                          📄 Export PDF Proposal
-                          <ArrowUpRight className="h-3.5 w-3.5" />
-                        </a>
+                        {activeProspect.proposalStatus === 'Blocked' ? (
+                          <button
+                            disabled
+                            className="bg-slate-300 text-slate-500 font-bold text-xs px-3.5 py-2 rounded-lg cursor-not-allowed flex items-center gap-1"
+                          >
+                            📄 Proposal Blocked
+                          </button>
+                        ) : (
+                          <a
+                            href={`/proposal/${activeProspect.id}/print`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                          >
+                            📄 Open PDF Proposal
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          </a>
+                        )}
                       </div>
 
                       <div>
@@ -927,7 +966,7 @@ export default function Dashboard() {
 
                       <div className="flex justify-between items-center mb-1.5">
                         <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
-                          Deliverable: {outreachSubTab === 'discovery' ? 'Discovery Call Questions' : outreachSubTab === 'angle' ? 'Sales Angle' : outreachSubTab.replace('_', ' ')}
+                          Deliverable: {outreachSubTab === 'discovery' ? 'Discovery Questions' : outreachSubTab === 'angle' ? 'Sales Angle' : outreachSubTab}
                         </span>
                         
                         <button
@@ -968,17 +1007,17 @@ export default function Dashboard() {
                 {/* 4. Evidence Vault */}
                 {activeTab === 'vault' && (
                   <div className="space-y-4 flex-1 flex flex-col">
-                    <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Verifiable Evidence Vault</h4>
-                    <p className="text-[11px] text-slate-400">Aggregated source logs representing intent, openings, and tech dependencies discovered during crawls.</p>
+                    <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Evidence Citations Vault</h4>
+                    <p className="text-[11px] text-slate-400">Verifiable quotes, job releases, and content signals tracked by the verification checks.</p>
                     
                     <div className="flex-1 overflow-y-auto max-h-[300px] space-y-3 pr-1">
                       {parseSignals(activeProspect.buyingSignals).map((sig, idx) => (
                         <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2">
                           <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
                             <span className="font-bold text-sky-700 uppercase tracking-wide text-[9px] bg-sky-50 px-2 py-0.5 rounded border border-sky-100">
-                              Signal {idx + 1}: {sig.signal}
+                              Signal: {sig.signal}
                             </span>
-                            <span className="text-[9px] text-slate-400">Discovery Date: {sig.dateDiscovered}</span>
+                            <span className="text-[9px] text-slate-400">Audited: {sig.dateDiscovered}</span>
                           </div>
                           
                           <blockquote className="border-l-2 border-slate-400 pl-2 text-slate-600 italic">
@@ -995,49 +1034,60 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* SECTION 8: REVENUE PIPELINE TABLE */}
+                {/* 5. Revenue Pipeline & Pricing Model Disclaimers */}
                 {activeTab === 'pipeline' && (
                   <div className="space-y-4 flex-1 flex flex-col">
                     <div className="flex justify-between items-center border-b border-slate-150 pb-2">
-                      <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Current Solution Revenue pipeline</h4>
+                      <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Section 8: Opportunity Valuation Range</h4>
                       <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">
-                        Total Value: ${activeProspect.potentialRevenue.toLocaleString()}
+                        Range: {activeProspect.opportunityRange}
                       </span>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto max-h-[290px] border border-slate-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-                            <th className="p-2.5">Target Problem</th>
-                            <th className="p-2.5">Suggested Service</th>
-                            <th className="p-2.5">Confidence</th>
-                            <th className="p-2.5">Project Value</th>
-                            <th className="p-2.5">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-150">
-                          {parseRecommendations(activeProspect.recommendations).map((rec, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50/50">
-                              <td className="p-2.5 text-slate-600 font-medium max-w-[120px] truncate" title={rec.issue}>{rec.issue}</td>
-                              <td className="p-2.5 font-bold text-slate-900">{rec.serviceName}</td>
-                              <td className="p-2.5">
-                                <span className={`px-1.5 py-0.5 rounded font-semibold ${
-                                  rec.confidence >= 80 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                                }`}>
-                                  {rec.confidence}%
-                                </span>
-                              </td>
-                              <td className="p-2.5 font-mono font-bold text-emerald-600">${(rec.estimatedValue || 0).toLocaleString()}</td>
-                              <td className="p-2.5">
-                                <span className="bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                  {activeProspect.proposalStatus}
-                                </span>
-                              </td>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Left: Pipeline solutions list */}
+                      <div className="border border-slate-200 rounded-xl overflow-hidden overflow-y-auto max-h-[220px]">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                              <th className="p-2.5">Suggested Service</th>
+                              <th className="p-2.5">Confidence</th>
+                              <th className="p-2.5 text-right">Value</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-slate-150">
+                            {parseRecommendations(activeProspect.recommendations).map((rec, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/50">
+                                <td className="p-2.5 font-bold text-slate-900">{rec.serviceName}</td>
+                                <td className="p-2.5">
+                                  <span className={`px-1.5 py-0.5 rounded font-semibold text-[9px] border ${getStatusBadgeClass(rec.status)}`}>
+                                    {rec.status} ({rec.confidence}%)
+                                  </span>
+                                </td>
+                                <td className="p-2.5 font-mono font-bold text-emerald-600 text-right">${(rec.estimatedValue || 0).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Right: Disclaimer and assumptions logs */}
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-3 max-h-[220px] overflow-y-auto">
+                        <div>
+                          <span className="font-bold text-slate-900 block text-[9px] uppercase tracking-wider">Financial Disclaimer</span>
+                          <p className="text-[10px] text-slate-400 leading-normal italic mt-1">
+                            {parsePricingAssumptions(activeProspect.revenueAssumptions).disclaimer}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-900 block text-[9px] uppercase tracking-wider">Model Assumptions</span>
+                          <ul className="list-disc pl-4 mt-1.5 text-[10px] text-slate-600 space-y-1">
+                            {parsePricingAssumptions(activeProspect.revenueAssumptions).assumptions.map((asm, idx) => (
+                              <li key={idx}>{asm}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

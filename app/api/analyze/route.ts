@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Bypass check for AGENCY tier
     if (user.subscriptionTier !== 'AGENCY' && user.analysesUsed >= user.analysesLimit) {
       return NextResponse.json(
         { error: 'Monthly analysis limit reached. Please upgrade your plan.' },
@@ -33,7 +32,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Execute WebMCP crawler workflow
+    // 2. Execute WebMCP crawler
     console.log(`Starting WebMCP crawling workflow for client opportunities: ${url}`);
     const crawlData = await crawlWebsite(url);
 
@@ -44,13 +43,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Perform AI Analysis with Gemini (Client Acquisition Engine)
-    console.log(`Running Gemini Client Acquisition Engine for: ${crawlData.companyName}`);
+    // 3. Perform AI Analysis with Gemini (Double-Agent Auditor Pipeline)
+    console.log(`Running Gemini Verification Pipeline for: ${crawlData.companyName}`);
     const aiAnalysis = await analyzeCompany(crawlData.combinedContent, crawlData.companyName);
 
     // Create synthetic buying signals from high-confidence insights to populate schema
     const syntheticSignals = aiAnalysis.aiInferences
-      .filter(i => i.confidence >= 70)
+      .filter(i => i.confidence >= 70 && i.status !== 'Suppressed')
       .map(i => ({
         signal: i.finding,
         sourceUrl: aiAnalysis.verifiedFacts[0]?.sourceUrl || crawlData.websiteUrl,
@@ -71,14 +70,25 @@ export async function POST(req: NextRequest) {
         buyingSignals: JSON.stringify(syntheticSignals),
         recommendations: JSON.stringify(aiAnalysis.recommendations),
         scoreExplanations: JSON.stringify(aiAnalysis.scoreExplanations),
-        
+
         opportunityScore: aiAnalysis.opportunityScore,
         buyingSignalScore: aiAnalysis.buyingSignalScore,
         potentialRevenue: aiAnalysis.potentialRevenue,
         closingProbability: aiAnalysis.closingProbability,
         problemSeverity: aiAnalysis.problemSeverity,
         leadQuality: aiAnalysis.leadQuality,
-        proposalStatus: 'Ready',
+        proposalStatus: aiAnalysis.proposalStatus,
+
+        // NEW: Trust Metrics
+        evidenceQuality: aiAnalysis.evidenceQuality,
+        verificationPassRate: aiAnalysis.verificationPassRate,
+        findingReliability: aiAnalysis.findingReliability,
+        factsVerifiedCount: aiAnalysis.factsVerifiedCount,
+        claimsRejectedCount: aiAnalysis.claimsRejectedCount,
+        lowConfidenceCount: aiAnalysis.lowConfidenceCount,
+        suppressedRecsCount: aiAnalysis.suppressedRecsCount,
+        opportunityRange: aiAnalysis.opportunityRange,
+        revenueAssumptions: aiAnalysis.revenueAssumptions,
 
         executiveSummary: aiAnalysis.executiveSummary,
         expectedResults: aiAnalysis.expectedResults,
@@ -110,7 +120,7 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         action: 'ANALYZED_COMPANY',
-        details: `Generated proposal for ${aiAnalysis.companyName} (Est. Revenue: $${aiAnalysis.potentialRevenue})`,
+        details: `Generated proposal for ${aiAnalysis.companyName} (Pass Rate: ${aiAnalysis.verificationPassRate}%)`,
       },
     });
 
@@ -118,7 +128,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Analyze API Error:', error);
     return NextResponse.json(
-      { error: 'Opportunity analysis failed. The website may have strong scraping protections (e.g. Cloudflare, Akamai) or rate limits.' },
+      { error: 'Opportunity analysis failed. The website may have strong scraping protections or rate limits.' },
       { status: 500 }
     );
   }
