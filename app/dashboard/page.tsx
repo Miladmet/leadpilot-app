@@ -1554,11 +1554,11 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* High-Value Pipelines History list */}
+          {/* Client Opportunity Ranges History list */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col max-h-[350px]">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 border-b border-slate-100 pb-3">
               <History className="h-4.5 w-4.5 text-slate-400" />
-              High-Value Pipelines
+              Client Opportunity Ranges
             </h3>
 
             <div className="mt-2 divide-y divide-slate-100 overflow-y-auto flex-1 pr-1 space-y-1">
@@ -1579,8 +1579,8 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-xs font-black text-emerald-600 font-mono">
-                        ${p.potentialRevenue.toLocaleString()}
+                      <span className="text-[9px] font-bold text-emerald-700 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                        {p.opportunityRange || 'N/A'}
                       </span>
                       <button
                         onClick={(e) => handleDeleteProspect(p.id, e)}
