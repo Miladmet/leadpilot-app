@@ -33,33 +33,36 @@ model Prospect {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  // 1. Audit & Solutions (What is wrong? What can I sell?)
-  problem             String   // Detailed text
-  opportunity         String   // Detailed text
-  proposedSolution    String   // Detailed text
-  servicesSuggested   String   // JSON string of array: { name, issue, estimatedFee, confidence }
+  // 1. Evidence-Based Audit Data (Stored as JSON arrays of objects)
+  verifiedFacts       String   // Array of { fact, sourceUrl, evidenceText }
+  aiInferences        String   // Array of { inference, supportedByFacts: string[], confidence }
+  buyingSignals       String   // Array of { signal, sourceUrl, sourceText, dateDiscovered }
+  recommendations     String   // Array of { serviceName, issue, estimatedFee, confidence, explanation, evidenceList: string[] }
   
-  // 2. Metrics & Revenue Estimator
-  potentialRevenue    Int      // Total estimated contract value (e.g. 4700)
-  closingProbability  Int      // 0 to 100 percentage
+  // 2. Metrics & Scores
+  opportunityScore    Int
+  buyingSignalScore   Int
+  scoreExplanations   String   // JSON of { opportunityScore: { explanation, evidence: string[] }, buyingSignalScore: { explanation, evidence: string[] } }
+  potentialRevenue    Int
+  closingProbability  Int
   problemSeverity     String   // High, Medium, Low
   leadQuality         String   // Hot, Warm, Cold
-  proposalStatus      String   @default("Ready") // Ready, Draft
+  proposalStatus      String   @default("Ready")
 
   // 3. Proposal Builder
-  executiveSummary    String   // Detailed executive summary
-  expectedResults     String   // Detailed expected results
-  estimatedRoi        String   // Estimated return on investment
-  thirtyDayPlan       String   // 30 Day Plan checklist/timeline
-  ninetyDayPlan       String   // 90 Day Plan timeline
-  pricingRecommendation String // Suggested billing models & packages
+  executiveSummary    String
+  expectedResults     String
+  estimatedRoi        String
+  thirtyDayPlan       String
+  ninetyDayPlan       String
+  pricingRecommendation String
 
   // 4. One-Click Deliverables (Outreach Center)
-  coldEmail           String   // Cold email pitch
-  linkedInMessage     String   // LinkedIn message (under 300 chars)
-  discoveryScript     String   // Discovery call script
-  followUpSequence    String   // JSON string or text block of email follow-ups
-  meetingAgenda       String   // Meeting agenda for first call
+  coldEmail           String
+  linkedInMessage     String
+  discoveryScript     String
+  followUpSequence    String
+  meetingAgenda       String
 }
 
 model ActivityLog {

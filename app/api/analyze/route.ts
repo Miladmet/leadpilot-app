@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Execute WebMCP crawler workflow
-    console.log(`Starting WebMCP crawling workflow for client opportunities: ${url}`);
+    console.log(`Starting WebMCP crawling workflow for evidence-based opportunities: ${url}`);
     const crawlData = await crawlWebsite(url);
 
     if (!crawlData.combinedContent || crawlData.combinedContent.length < 50) {
@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Perform AI Analysis with Gemini (Client Acquisition Engine)
-    console.log(`Running Gemini Client Acquisition Engine for: ${crawlData.companyName}`);
+    // 3. Perform AI Analysis with Gemini (Evidence Acquisition Engine)
+    console.log(`Running Gemini Evidence Engine for: ${crawlData.companyName}`);
     const aiAnalysis = await analyzeCompany(crawlData.combinedContent, crawlData.companyName);
 
     // 4. Save to Database with new client acquisition layout
@@ -55,11 +55,20 @@ export async function POST(req: NextRequest) {
         companyName: aiAnalysis.companyName,
         websiteUrl: crawlData.websiteUrl,
         
-        problem: aiAnalysis.problem,
-        opportunity: aiAnalysis.opportunity,
-        proposedSolution: aiAnalysis.proposedSolution,
-        servicesSuggested: JSON.stringify(aiAnalysis.servicesSuggested),
+        // Evidence Vault Serialization
+        verifiedFacts: JSON.stringify(aiAnalysis.verifiedFacts),
+        aiInferences: JSON.stringify(aiAnalysis.aiInferences),
+        buyingSignals: JSON.stringify(aiAnalysis.buyingSignals),
+        recommendations: JSON.stringify(aiAnalysis.recommendations),
+        scoreExplanations: JSON.stringify(aiAnalysis.scoreExplanations),
+
+        // Default solution stubs (not used directly, but populated to prevent schema validation failures)
+        problem: aiAnalysis.verifiedFacts.map(f => f.fact).slice(0, 3).join(', ') || 'See facts audit.',
+        opportunity: aiAnalysis.aiInferences.map(i => i.inference).slice(0, 3).join(', ') || 'See inferences audit.',
+        proposedSolution: aiAnalysis.recommendations.map(r => r.serviceName).slice(0, 3).join(', ') || 'See recommendations.',
         
+        opportunityScore: aiAnalysis.opportunityScore,
+        buyingSignalScore: aiAnalysis.buyingSignalScore,
         potentialRevenue: aiAnalysis.potentialRevenue,
         closingProbability: aiAnalysis.closingProbability,
         problemSeverity: aiAnalysis.problemSeverity,
@@ -96,7 +105,7 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         action: 'ANALYZED_COMPANY',
-        details: `Generated proposal for ${aiAnalysis.companyName} (Est. Revenue: $${aiAnalysis.potentialRevenue})`,
+        details: `Generated evidence audit for ${aiAnalysis.companyName} (Value: $${aiAnalysis.potentialRevenue})`,
       },
     });
 
@@ -104,7 +113,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Analyze API Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error during client acquisition generation' },
+      { error: error.message || 'Internal Server Error during evidence analysis' },
       { status: 500 }
     );
   }

@@ -24,24 +24,63 @@ import {
   PhoneCall,
   Calendar,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  ShieldCheck,
+  HelpCircle,
+  Link as LinkIcon,
+  X
 } from 'lucide-react';
 
-interface SuggestedService {
-  name: string;
+interface VerifiedFact {
+  fact: string;
+  sourceUrl: string;
+  evidenceText: string;
+}
+
+interface AIInference {
+  inference: string;
+  supportedByFacts: string[];
+  confidence: number;
+}
+
+interface BuyingSignal {
+  signal: string;
+  sourceUrl: string;
+  sourceText: string;
+  dateDiscovered: string;
+}
+
+interface EvidenceRecommendation {
+  serviceName: string;
   issue: string;
   estimatedFee: string;
   confidence: number;
+  explanation: string;
+  evidenceList: string[];
+}
+
+interface ScoreDetail {
+  score: number;
+  explanation: string;
+  evidence: string[];
+}
+
+interface ScoreExplanations {
+  opportunityScore: ScoreDetail;
+  buyingSignalScore: ScoreDetail;
 }
 
 interface Prospect {
   id: string;
   companyName: string;
   websiteUrl: string;
-  problem: string;
-  opportunity: string;
-  proposedSolution: string;
-  servicesSuggested: string; // JSON string
+  verifiedFacts: string; // JSON
+  aiInferences: string; // JSON
+  buyingSignals: string; // JSON
+  recommendations: string; // JSON
+  scoreExplanations: string; // JSON
+  opportunityScore: number;
+  buyingSignalScore: number;
   potentialRevenue: number;
   closingProbability: number;
   problemSeverity: string;
@@ -84,6 +123,12 @@ interface User {
   analysesUsed: number;
 }
 
+interface ModalContent {
+  title: string;
+  explanation: string;
+  evidence: string[];
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -95,9 +140,18 @@ export default function Dashboard() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [copiedText, setCopiedText] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'opportunities' | 'proposal' | 'outreach'>('opportunities');
+  
+  // Dashboard navigation tabs
+  const [activeTab, setActiveTab] = useState<'opportunities' | 'proposal' | 'outreach' | 'vault'>('opportunities');
+  
+  // Subtabs
+  const [auditSubTab, setAuditSubTab] = useState<'facts' | 'inferences' | 'services'>('facts');
   const [outreachSubTab, setOutreachSubTab] = useState<'email' | 'linkedin' | 'discovery' | 'followup' | 'agenda'>('email');
   const [billingLoading, setBillingLoading] = useState(false);
+
+  // Evidence Modals
+  const [showWhyModal, setShowWhyModal] = useState(false);
+  const [modalContent, setModalContent] = useState<ModalContent | null>(null);
 
   const router = useRouter();
 
@@ -164,7 +218,7 @@ export default function Dashboard() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Acquisition analysis failed. Verify domain.');
+        throw new Error(data.error || 'Evidence audit failed. Verify domain.');
       }
 
       const newProspect = data.prospect;
@@ -249,22 +303,39 @@ export default function Dashboard() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  // Helper Calculations
+  // Helper JSON Parsers
+  const parseFacts = (jsonStr: string): VerifiedFact[] => {
+    try { return JSON.parse(jsonStr) || []; } catch { return []; }
+  };
+
+  const parseInferences = (jsonStr: string): AIInference[] => {
+    try { return JSON.parse(jsonStr) || []; } catch { return []; }
+  };
+
+  const parseSignals = (jsonStr: string): BuyingSignal[] => {
+    try { return JSON.parse(jsonStr) || []; } catch { return []; }
+  };
+
+  const parseRecommendations = (jsonStr: string): EvidenceRecommendation[] => {
+    try { return JSON.parse(jsonStr) || []; } catch { return []; }
+  };
+
+  const parseScoreExplanations = (jsonStr: string): ScoreExplanations | null => {
+    try { return JSON.parse(jsonStr) || null; } catch { return null; }
+  };
+
+  // Trigger modal drawer
+  const openShowWhy = (title: string, explanation: string, evidence: string[]) => {
+    setModalContent({ title, explanation, evidence });
+    setShowWhyModal(true);
+  };
+
+  // Pipeline calculations
   const totalRevenuePipeline = prospects.reduce((acc, p) => acc + p.potentialRevenue, 0);
-  
   const avgClosingProbability = prospects.length > 0 
     ? Math.round(prospects.reduce((acc, p) => acc + p.closingProbability, 0) / prospects.length) 
     : 0;
-
   const proposalsReadyCount = prospects.filter(p => p.proposalStatus === 'Ready').length;
-
-  const parseSuggestedServices = (jsonStr: string): SuggestedService[] => {
-    try {
-      return JSON.parse(jsonStr) || [];
-    } catch {
-      return [];
-    }
-  };
 
   const getSeverityBadgeColor = (severity: string) => {
     const s = severity?.toLowerCase();
@@ -292,7 +363,66 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-slate-50 relative">
+      
+      {/* ---------------- SHOW ME WHY MODAL DRAWER ---------------- */}
+      {showWhyModal && modalContent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-slide-in">
+            <div>
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                <h3 className="font-black text-slate-900 flex items-center gap-1 text-sm uppercase">
+                  <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                  Evidence Verification Layer
+                </h3>
+                <button 
+                  onClick={() => setShowWhyModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-xs text-slate-400 font-bold uppercase tracking-wider">Metric / Target</h4>
+                  <p className="text-base font-bold text-slate-900 mt-0.5">{modalContent.title}</p>
+                </div>
+
+                <div>
+                  <h4 className="text-xs text-slate-400 font-bold uppercase tracking-wider">AI Analytical Reasoning</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed mt-1 whitespace-pre-wrap bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    {modalContent.explanation}
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="text-xs text-slate-400 font-bold uppercase tracking-wider">Verifiable Evidence Cites</h4>
+                  <ul className="mt-2 space-y-2.5">
+                    {modalContent.evidence && modalContent.evidence.length > 0 ? (
+                      modalContent.evidence.map((quote, idx) => (
+                        <li key={idx} className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded border-l-2 border-emerald-500 italic">
+                          "{quote}"
+                        </li>
+                      ))
+                    ) : (
+                      <li className="text-xs text-slate-400 italic">No explicit textual quotes linked.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowWhyModal(false)}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-lg mt-8"
+            >
+              Close Audit Layer
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-4">
@@ -334,7 +464,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main SaaS panel layout */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid lg:grid-cols-3 gap-6">
         
         {/* Left Column: Metrics & Redesigned Workspaces */}
@@ -387,10 +517,10 @@ export default function Dashboard() {
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
               <Sparkles className="h-5 w-5 text-sky-500" />
-              Build Client Proposal & Audit Report
+              Scan Website for Evidence-Based Proposal
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Enter any company homepage URL. The WebMCP crawling engine scans for design vulnerabilities, marketing deficiencies, missing chatbot widgets, and operations bottlenecks.
+              Enter any company homepage URL. The WebMCP crawling engine collects explicit quotes and source pages to build a traceable service proposal.
             </p>
 
             <form onSubmit={handleAnalyze} className="mt-4 flex gap-2">
@@ -406,16 +536,16 @@ export default function Dashboard() {
               <button
                 type="submit"
                 disabled={analyzing}
-                className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {analyzing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating Proposal...
+                    Auditing Website...
                   </>
                 ) : (
                   <>
-                    Generate Proposal
+                    Auditing Proposal
                   </>
                 )}
               </button>
@@ -449,122 +579,224 @@ export default function Dashboard() {
                   <p className="text-xs text-slate-500 mt-0.5">{activeProspect.websiteUrl}</p>
                 </div>
 
-                {/* Revenue & Probability Badges */}
+                {/* Revenue, Probability & Verified Score Badges */}
                 <div className="flex gap-2 items-center flex-wrap">
-                  <div className="px-3 py-1.5 rounded-lg border bg-emerald-50 border-emerald-200 text-xs font-bold flex flex-col items-center min-w-[85px]">
-                    <span className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">Est. Revenue</span>
-                    <span className="text-sm mt-0.5 text-emerald-700 font-black">${activeProspect.potentialRevenue.toLocaleString()}</span>
+                  
+                  {/* Opportunity Score with Show Me Why button */}
+                  <div className="px-2.5 py-1 rounded-lg border bg-slate-100 border-slate-200 text-xs font-semibold flex items-center gap-1.5">
+                    <div className="text-center">
+                      <span className="block text-[8px] text-slate-400 font-bold uppercase">OPP SCORE</span>
+                      <span className="text-xs font-bold text-slate-700">{activeProspect.opportunityScore}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const expls = parseScoreExplanations(activeProspect.scoreExplanations);
+                        openShowWhy(
+                          'Opportunity Score: ' + activeProspect.opportunityScore + '/100',
+                          expls ? expls.opportunityScore.explanation : 'Derived from general design complexity and traffic signals.',
+                          expls ? expls.opportunityScore.evidence : []
+                        );
+                      }}
+                      className="text-sky-600 hover:text-sky-700 p-0.5 hover:bg-white rounded"
+                      title="Show Evidence Why"
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <div className="px-3 py-1.5 rounded-lg border bg-amber-50 border-amber-200 text-xs font-bold flex flex-col items-center min-w-[70px]">
-                    <span className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">Close Prob</span>
-                    <span className="text-sm mt-0.5 text-amber-700 font-bold">{activeProspect.closingProbability}%</span>
+
+                  {/* Buying Signal Score with Show Me Why button */}
+                  <div className="px-2.5 py-1 rounded-lg border bg-slate-100 border-slate-200 text-xs font-semibold flex items-center gap-1.5">
+                    <div className="text-center">
+                      <span className="block text-[8px] text-slate-400 font-bold uppercase">BUY SIGNAL</span>
+                      <span className="text-xs font-bold text-slate-700">{activeProspect.buyingSignalScore}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const expls = parseScoreExplanations(activeProspect.scoreExplanations);
+                        openShowWhy(
+                          'Buying Signal Score: ' + activeProspect.buyingSignalScore + '/100',
+                          expls ? expls.buyingSignalScore.explanation : 'Derived from hiring posts and active content listings.',
+                          expls ? expls.buyingSignalScore.evidence : []
+                        );
+                      }}
+                      className="text-sky-600 hover:text-sky-700 p-0.5 hover:bg-white rounded"
+                      title="Show Evidence Why"
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <div className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold ${getSeverityBadgeColor(activeProspect.problemSeverity)}`}>
+
+                  <div className="px-3 py-1 rounded-lg border bg-emerald-50 border-emerald-200 text-xs font-bold flex flex-col items-center">
+                    <span className="text-[8px] uppercase font-semibold text-slate-500">Revenue Value</span>
+                    <span className="text-xs text-emerald-700 font-black">${activeProspect.potentialRevenue.toLocaleString()}</span>
+                  </div>
+
+                  <div className={`px-2.5 py-1 rounded-lg border text-xs font-bold ${getSeverityBadgeColor(activeProspect.problemSeverity)}`}>
                     <span className="block text-[8px] uppercase text-slate-500 font-semibold">Severity</span>
                     <span>{activeProspect.problemSeverity}</span>
-                  </div>
-                  <div className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold ${getQualityBadgeColor(activeProspect.leadQuality)}`}>
-                    <span className="block text-[8px] uppercase text-slate-500 font-semibold">Quality</span>
-                    <span>{activeProspect.leadQuality}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Main Workspace Tabs */}
+              {/* Main Workspace Navigation Tabs */}
               <div className="flex border-b border-slate-200 bg-white">
                 <button
                   onClick={() => setActiveTab('opportunities')}
                   className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
-                    activeTab === 'opportunities'
-                      ? 'border-sky-600 text-sky-600 bg-sky-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    activeTab === 'opportunities' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Search className="h-4 w-4" />
-                  Opportunities (Audit)
+                  Audit Opportunity Center
                 </button>
                 <button
                   onClick={() => setActiveTab('proposal')}
                   className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
-                    activeTab === 'proposal'
-                      ? 'border-sky-600 text-sky-600 bg-sky-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    activeTab === 'proposal' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <FileText className="h-4 w-4" />
-                  Proposal Builder
+                  Evidence-Based Proposal
                 </button>
                 <button
                   onClick={() => setActiveTab('outreach')}
                   className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
-                    activeTab === 'outreach'
-                      ? 'border-sky-600 text-sky-600 bg-sky-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    activeTab === 'outreach' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Mail className="h-4 w-4" />
-                  Outreach Center
+                  Deliverables (Outreach)
+                </button>
+                <button
+                  onClick={() => setActiveTab('vault')}
+                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                    activeTab === 'vault' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Layers className="h-4 w-4" />
+                  Evidence Vault
                 </button>
               </div>
 
               {/* Tab Contents */}
               <div className="p-6 flex-1 flex flex-col bg-white">
                 
-                {/* 1. Audit & Opportunities Tab */}
+                {/* 1. Opportunity & Audit Center */}
                 {activeTab === 'opportunities' && (
-                  <div className="space-y-6 flex-1 flex flex-col">
-                    {/* Problem / Opportunity detail blocks */}
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Identified Problems</h4>
-                        <p className="mt-1.5 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed max-h-[140px] overflow-y-auto">
-                          {activeProspect.problem}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Growth Opportunities</h4>
-                        <p className="mt-1.5 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed max-h-[140px] overflow-y-auto">
-                          {activeProspect.opportunity}
-                        </p>
-                      </div>
+                  <div className="space-y-4 flex-1 flex flex-col">
+                    {/* Subtabs for Facts vs Inferences vs Services */}
+                    <div className="flex gap-2 border-b border-slate-100 pb-2">
+                      <button
+                        onClick={() => setAuditSubTab('facts')}
+                        className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${
+                          auditSubTab === 'facts' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Verified Facts
+                      </button>
+                      <button
+                        onClick={() => setAuditSubTab('inferences')}
+                        className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${
+                          auditSubTab === 'inferences' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        AI Inferences
+                      </button>
+                      <button
+                        onClick={() => setAuditSubTab('services')}
+                        className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${
+                          auditSubTab === 'services' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Matched Services (>=70% Conf.)
+                      </button>
                     </div>
 
-                    {/* Service Match Engine Results */}
-                    <div className="flex-1 flex flex-col">
-                      <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Service Match Recommendations</h4>
-                      <div className="border border-slate-200 rounded-xl overflow-hidden flex-1 overflow-y-auto max-h-[220px]">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-                              <th className="p-2.5">Recommended Service</th>
-                              <th className="p-2.5">Target Defect</th>
-                              <th className="p-2.5">Est. Retainer / Fee</th>
-                              <th className="p-2.5 text-right">Confidence</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {parseSuggestedServices(activeProspect.servicesSuggested).map((service, index) => (
-                              <tr key={index} className="hover:bg-slate-50/50">
-                                <td className="p-2.5 font-bold text-slate-900">{service.name}</td>
-                                <td className="p-2.5 text-slate-500 truncate max-w-[150px]">{service.issue}</td>
-                                <td className="p-2.5 font-mono font-semibold text-sky-600">{service.estimatedFee}</td>
-                                <td className="p-2.5 text-right">
-                                  <span className={`px-1.5 py-0.5 rounded font-bold ${
-                                    service.confidence >= 80 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                                  }`}>
-                                    {service.confidence}%
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                    {/* Subtab View panels */}
+                    <div className="flex-1 overflow-y-auto max-h-[300px] pr-1">
+                      
+                      {/* Facts View */}
+                      {auditSubTab === 'facts' && (
+                        <div className="space-y-2.5">
+                          {parseFacts(activeProspect.verifiedFacts).map((fact, idx) => (
+                            <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                              <p className="font-bold text-slate-800 flex items-center gap-1">
+                                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                                {fact.fact}
+                              </p>
+                              <blockquote className="mt-1.5 border-l-2 border-slate-300 pl-2 text-slate-500 italic">
+                                "{fact.evidenceText}"
+                              </blockquote>
+                              <a href={fact.sourceUrl} target="_blank" rel="noreferrer" className="block text-[10px] text-sky-600 mt-1 hover:underline truncate">
+                                Source page: {fact.sourceUrl}
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Inferences View */}
+                      {auditSubTab === 'inferences' && (
+                        <div className="space-y-2.5">
+                          {parseInferences(activeProspect.aiInferences).map((inf, idx) => (
+                            <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                              <div className="flex justify-between items-start">
+                                <p className="font-bold text-slate-800">{inf.inference}</p>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                                  inf.confidence >= 80 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {inf.confidence}% confidence
+                                </span>
+                              </div>
+                              <div className="mt-2">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Supported by:</span>
+                                <ul className="list-disc pl-4 mt-0.5 text-slate-500 text-[10px] space-y-0.5">
+                                  {inf.supportedByFacts.map((factName, fIdx) => (
+                                    <li key={fIdx}>{factName}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Services Matched (only showing confidence >= 70%) */}
+                      {auditSubTab === 'services' && (
+                        <div className="space-y-2.5">
+                          {parseRecommendations(activeProspect.recommendations).map((rec, idx) => (
+                            <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs flex justify-between items-start gap-4">
+                              <div className="space-y-1">
+                                <p className="font-bold text-slate-800">{rec.serviceName}</p>
+                                <p className="text-[10px] text-slate-500 leading-normal">{rec.issue}</p>
+                                <span className="inline-block font-mono font-bold text-sky-600 mt-1">{rec.estimatedFee}</span>
+                              </div>
+                              
+                              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                  {rec.confidence}% fit
+                                </span>
+                                <button
+                                  onClick={() => openShowWhy(
+                                    rec.serviceName,
+                                    rec.explanation,
+                                    rec.evidenceList
+                                  )}
+                                  className="text-sky-600 hover:text-sky-700 text-[10px] font-bold hover:underline flex items-center gap-0.5"
+                                >
+                                  Show Me Why ➔
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 )}
 
-                {/* 2. Proposal Builder Tab */}
+                {/* 2. Proposal Builder */}
                 {activeTab === 'proposal' && (
                   <div className="space-y-4 flex-1 flex flex-col justify-between">
                     <div className="overflow-y-auto max-h-[360px] space-y-4 pr-1">
@@ -572,8 +804,8 @@ export default function Dashboard() {
                       {/* PDF Print Export Bar */}
                       <div className="bg-sky-50 border border-sky-100 p-3.5 rounded-xl flex justify-between items-center">
                         <div>
-                          <h4 className="text-xs font-bold text-sky-900">Proposal Document Ready</h4>
-                          <p className="text-[10px] text-sky-700">Fully structured with Executive Summary, expected results, timelines, and costs.</p>
+                          <h4 className="text-xs font-bold text-sky-900">Proposal Document Compiled</h4>
+                          <p className="text-[10px] text-sky-700">Verifiable quotes, ROI metrics, execution roadmaps, and pricing logs.</p>
                         </div>
                         <a
                           href={`/proposal/${activeProspect.id}/print`}
@@ -581,7 +813,7 @@ export default function Dashboard() {
                           rel="noreferrer"
                           className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                         >
-                          📄 Export PDF
+                          📄 View Printable PDF
                           <ArrowUpRight className="h-3.5 w-3.5" />
                         </a>
                       </div>
@@ -604,78 +836,75 @@ export default function Dashboard() {
 
                       <div className="grid md:grid-cols-2 gap-4">
                         <div>
-                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">30-Day roadmap</h4>
+                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">30-Day Launch Phase</h4>
                           <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-2.5 rounded border border-slate-100">{activeProspect.thirtyDayPlan}</p>
                         </div>
                         <div>
-                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">90-Day expansion</h4>
+                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">90-Day Expansion Phase</h4>
                           <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-2.5 rounded border border-slate-100">{activeProspect.ninetyDayPlan}</p>
                         </div>
                       </div>
 
                       <div>
-                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Pricing Package Recommendations</h4>
+                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Pricing Recommendation</h4>
                         <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-3 rounded border border-slate-100">{activeProspect.pricingRecommendation}</p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* 3. Outreach Center Tab */}
+                {/* 3. Deliverables / Outreach */}
                 {activeTab === 'outreach' && (
                   <div className="space-y-4 flex-1 flex flex-col justify-between">
                     <div>
-                      {/* Outreach Subtabs */}
+                      {/* Subtabs selection */}
                       <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold text-slate-600 mb-3">
                         <button
                           onClick={() => setOutreachSubTab('email')}
-                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'email' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                          className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'email' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
                         >
                           Cold Email
                         </button>
                         <button
                           onClick={() => setOutreachSubTab('linkedin')}
-                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'linkedin' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                          className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'linkedin' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
                         >
                           LinkedIn
                         </button>
                         <button
                           onClick={() => setOutreachSubTab('discovery')}
-                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'discovery' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                          className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'discovery' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
                         >
-                          Call Script
+                          Discovery Script
                         </button>
                         <button
                           onClick={() => setOutreachSubTab('followup')}
-                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'followup' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                          className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'followup' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
                         >
                           Follow-Ups
                         </button>
                         <button
                           onClick={() => setOutreachSubTab('agenda')}
-                          className={`flex-1 py-1 px-2.5 rounded transition-all ${outreachSubTab === 'agenda' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                          className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'agenda' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
                         >
                           Meeting Agenda
                         </button>
                       </div>
 
-                      {/* Content panel based on subtab */}
                       <div className="flex justify-between items-center mb-1.5">
                         <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
-                          Generated Deliverable ({outreachSubTab})
+                          Deliverable: {outreachSubTab.replace('_', ' ')}
                         </span>
                         
-                        {/* Copy button */}
                         <button
                           onClick={() => {
-                            let textToCopy = '';
-                            if (outreachSubTab === 'email') textToCopy = activeProspect.coldEmail;
-                            else if (outreachSubTab === 'linkedin') textToCopy = activeProspect.linkedInMessage;
-                            else if (outreachSubTab === 'discovery') textToCopy = activeProspect.discoveryScript;
-                            else if (outreachSubTab === 'followup') textToCopy = activeProspect.followUpSequence;
-                            else if (outreachSubTab === 'agenda') textToCopy = activeProspect.meetingAgenda;
-                            
-                            copyToClipboard(textToCopy, outreachSubTab);
+                            let text = '';
+                            if (outreachSubTab === 'email') text = activeProspect.coldEmail;
+                            else if (outreachSubTab === 'linkedin') text = activeProspect.linkedInMessage;
+                            else if (outreachSubTab === 'discovery') text = activeProspect.discoveryScript;
+                            else if (outreachSubTab === 'followup') text = activeProspect.followUpSequence;
+                            else if (outreachSubTab === 'agenda') text = activeProspect.meetingAgenda;
+                            copyToClipboard(text, outreachSubTab);
                           }}
                           className="text-sky-600 hover:text-sky-700 text-xs font-bold flex items-center gap-1 bg-sky-50 px-2.5 py-1 rounded"
                         >
@@ -685,13 +914,12 @@ export default function Dashboard() {
                             </>
                           ) : (
                             <>
-                              <Copy className="h-3 w-3" /> Copy Script
+                              <Copy className="h-3 w-3" /> Copy deliverable
                             </>
                           )}
                         </button>
                       </div>
 
-                      {/* Text display panel */}
                       <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-mono whitespace-pre-wrap leading-relaxed overflow-y-auto h-[260px]">
                         {outreachSubTab === 'email' && activeProspect.coldEmail}
                         {outreachSubTab === 'linkedin' && activeProspect.linkedInMessage}
@@ -699,7 +927,36 @@ export default function Dashboard() {
                         {outreachSubTab === 'followup' && activeProspect.followUpSequence}
                         {outreachSubTab === 'agenda' && activeProspect.meetingAgenda}
                       </pre>
+                    </div>
+                  </div>
+                )}
 
+                {/* 4. Evidence Vault Tab */}
+                {activeTab === 'vault' && (
+                  <div className="space-y-4 flex-1 flex flex-col">
+                    <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Verifiable Signal Vault</h4>
+                    <p className="text-[11px] text-slate-400">Below are the raw text segments and open jobs extracted by the WebMCP crawler.</p>
+                    
+                    <div className="flex-1 overflow-y-auto max-h-[300px] space-y-3 pr-1">
+                      {parseSignals(activeProspect.buyingSignals).map((sig, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2">
+                          <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
+                            <span className="font-bold text-sky-700 uppercase tracking-wide text-[9px] bg-sky-50 px-2 py-0.5 rounded border border-sky-100">
+                              Signal {idx + 1}: {sig.signal}
+                            </span>
+                            <span className="text-[9px] text-slate-400">Scanned: {sig.dateDiscovered}</span>
+                          </div>
+                          
+                          <blockquote className="border-l-2 border-slate-400 pl-2 text-slate-600 italic">
+                            "{sig.sourceText}"
+                          </blockquote>
+
+                          <a href={sig.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-600 flex items-center gap-0.5 hover:underline pt-1">
+                            <LinkIcon className="h-3 w-3" />
+                            Source page: {sig.sourceUrl}
+                          </a>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -718,7 +975,7 @@ export default function Dashboard() {
 
         </div>
 
-        {/* Right Column: History List, Billing, Logs */}
+        {/* Right Column: History, Billing, Logs */}
         <div className="space-y-6">
           
           {/* Billing Plan Manager */}
@@ -768,7 +1025,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* High-Value Prospects History list */}
+          {/* High-Value Pipelines history list */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col max-h-[350px]">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 border-b border-slate-100 pb-3">
               <History className="h-4.5 w-4.5 text-slate-400" />

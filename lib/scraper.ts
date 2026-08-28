@@ -141,11 +141,13 @@ export async function crawlWebsite(targetUrl: string): Promise<CrawlData> {
   }
 
   // 5. Build Combined Context
-  let combinedContent = `WEBSITE CRAWLED: ${normalizedBase}\n\n`;
+  let combinedContent = `<website url="${normalizedBase}">\n\n`;
   pages.forEach(p => {
-    combinedContent += `--- PAGE: ${p.title} (${p.url}) ---\n`;
-    combinedContent += `${p.text}\n\n`;
+    combinedContent += `<page url="${p.url}" title="${p.title}">\n`;
+    combinedContent += `${p.text}\n`;
+    combinedContent += `</page>\n\n`;
   });
+  combinedContent += `</website>`;
 
   // Extract company name candidate
   const companyNameCandidate = homepageResult.title.split('|')[0].split('-')[0].trim() || baseDomain.split('.')[0];

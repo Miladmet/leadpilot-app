@@ -24,18 +24,24 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
   // Safely parse suggested services
   let services = [];
   try {
-    services = JSON.parse(prospect.servicesSuggested) || [];
+    services = JSON.parse(prospect.recommendations) || [];
   } catch (e) {
     services = [];
   }
 
-  // Parse pain points
-  let painPoints = [];
+  // Parse evidence details
+  let verifiedFacts = [];
   try {
-    painPoints = JSON.parse(prospect.painPoints) || [];
+    verifiedFacts = JSON.parse(prospect.verifiedFacts) || [];
   } catch (e) {
-    // If not valid JSON, check if it is comma separated
-    painPoints = prospect.painPoints ? prospect.painPoints.split(',') : [];
+    verifiedFacts = [];
+  }
+
+  let buyingSignals = [];
+  try {
+    buyingSignals = JSON.parse(prospect.buyingSignals) || [];
+  } catch (e) {
+    buyingSignals = [];
   }
 
   return (
@@ -43,25 +49,10 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       {/* Top Print action bar - hidden on print */}
       <div className="mb-6 flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200 print:hidden">
         <div>
-          <h2 className="text-sm font-bold text-slate-900">Proposal Ready for Export</h2>
-          <p className="text-xs text-slate-500">Save as PDF by selecting "Save as PDF" in the printer destination options.</p>
+          <h2 className="text-sm font-bold text-slate-900">Evidence-Based Proposal</h2>
+          <p className="text-xs text-slate-500">Every finding in this proposal is traceable back to audited website quotes.</p>
         </div>
         <button
-          onClick="window.print()"
-          // Since this is a server component, we can inline a small javascript event handler
-          // Wait! In Server Components, inline event handlers like onClick="window.print()" are supported if written as raw HTML, or we can use a client button or a simple script tag.
-          // A simple HTML button with an inline onclick attribute is 100% compliant with RSCs if written as:
-          // <button onclick="window.print()" ...>
-          // Let's write standard HTML tag so it parses correctly without client wrapper!
-          // Wait, Next.js JSX compiler requires camelCase event handlers, which throws error if we write onClick={window.print} on RSC.
-          // To make it easy, we can include a tiny client component, or just write a script tag that hooks up the button, or render standard HTML button with an inline string template!
-          // Let's write a standard JSX button and include a tiny client script tag at the bottom to bind the button click, or make the whole page a Client Component!
-          // Actually, making the print page a Client Component ('use client') is extremely easy and lets us use normal React hooks and handlers!
-          // Let's make it a Client Component by adding 'use client' at the top, fetching the data via an API or just passing it? No, wait! If we keep it Server Component, we fetch the DB directly (highly efficient).
-          // How do we bind the print button in a Server Component?
-          // We can use a standard button with id="print-btn", and at the bottom add:
-          // <script dangerouslySetInnerHTML={{ __html: "document.getElementById('print-btn').onclick = function() { window.print(); }" }} />
-          // This is incredibly elegant and keeps it as a fast Server Component!
           id="print-btn"
           className="bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow transition-colors flex items-center gap-1.5"
         >
@@ -73,7 +64,7 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       <header className="border-b-4 border-sky-600 pb-6 mb-8 flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-black text-slate-900 leading-tight uppercase tracking-tight">
-            Client Acquisition Proposal
+            Evidence-Based Proposal
           </h1>
           <p className="text-sky-600 font-bold mt-1 text-sm">PREPARED FOR: {prospect.companyName}</p>
           <a href={prospect.websiteUrl} target="_blank" rel="noreferrer" className="text-xs text-slate-500 hover:underline">
@@ -81,7 +72,7 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
           </a>
         </div>
         <div className="text-right">
-          <p className="text-sm font-bold text-slate-900">LeadPilot AI Platform</p>
+          <p className="text-sm font-bold text-slate-900">LeadPilot AI Auditor</p>
           <p className="text-xs text-slate-400">Date: {new Date(prospect.createdAt).toLocaleDateString()}</p>
         </div>
       </header>
@@ -96,31 +87,20 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </p>
       </section>
 
-      {/* SECTION 2: AUDITED PROBLEMS */}
+      {/* SECTION 2: AUDITED SOLUTIONS */}
       <section className="mb-8">
         <h2 className="text-lg font-bold text-slate-900 uppercase border-b border-slate-200 pb-2 mb-3">
-          2. Problems Found & Opportunity Audit
+          2. Problems Audited
         </h2>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Technical & Content Issues</h3>
-            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-4 rounded-xl border border-slate-100">
-              {prospect.problem}
-            </p>
-          </div>
-          <div>
-            <h3 className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Growth & Operational Opportunities</h3>
-            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-4 rounded-xl border border-slate-100">
-              {prospect.opportunity}
-            </p>
-          </div>
-        </div>
+        <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-4 rounded-xl border border-slate-200">
+          {prospect.problem}
+        </p>
       </section>
 
       {/* SECTION 3: RECOMMENDED SOLUTION */}
       <section className="mb-8">
         <h2 className="text-lg font-bold text-slate-900 uppercase border-b border-slate-200 pb-2 mb-3">
-          3. Recommended Solutions
+          3. Proposed Strategies
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
           {prospect.proposedSolution}
@@ -130,21 +110,23 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       {/* SECTION 4: SERVICE BREAKDOWN & ESTIMATED ROI */}
       <section className="mb-8 page-break-before">
         <h2 className="text-lg font-bold text-slate-900 uppercase border-b border-slate-200 pb-2 mb-3">
-          4. Recommended Service Packages
+          4. Service Recommendations
         </h2>
         <table className="w-full text-left text-sm border-collapse mb-6">
           <thead>
             <tr className="bg-slate-100 border-b border-slate-200 text-slate-700">
               <th className="p-3 font-semibold">Service Package</th>
-              <th className="p-3 font-semibold">Matched Problem</th>
+              <th className="p-3 font-semibold">Target Issue</th>
+              <th className="p-3 font-semibold">Confidence</th>
               <th className="p-3 font-semibold text-right">Investment Fee</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {services.map((service: any, index: number) => (
               <tr key={index}>
-                <td className="p-3 font-bold text-slate-900">{service.name}</td>
+                <td className="p-3 font-bold text-slate-900">{service.serviceName}</td>
                 <td className="p-3 text-slate-600">{service.issue}</td>
+                <td className="p-3 font-semibold text-emerald-600">{service.confidence}%</td>
                 <td className="p-3 text-right font-mono font-bold text-sky-600">{service.estimatedFee}</td>
               </tr>
             ))}
@@ -166,7 +148,7 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       {/* SECTION 5: ROADMAP TIMELINE */}
       <section className="mb-8">
         <h2 className="text-lg font-bold text-slate-900 uppercase border-b border-slate-200 pb-2 mb-3">
-          5. Project Roadmap Timelines
+          5. 30/90 Day Timelines
         </h2>
         <div className="space-y-4">
           <div>
@@ -191,18 +173,65 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       {/* SECTION 6: PRICING RECOMMENDATION */}
       <section className="mb-8">
         <h2 className="text-lg font-bold text-slate-900 uppercase border-b border-slate-200 pb-2 mb-3">
-          6. Pricing & Options Recommendation
+          6. Pricing Options
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-4 rounded-xl border border-slate-200">
           {prospect.pricingRecommendation}
         </p>
       </section>
 
+      {/* SECTION 7: APPENDIX - CITATIONS & EVIDENCE AUDIT */}
+      <section className="mb-8 page-break-before">
+        <h2 className="text-lg font-bold text-slate-900 uppercase border-b border-sky-600 pb-2 mb-3">
+          Appendix: Verifiable Website Evidence
+        </h2>
+        <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+          The following facts and quotes were audited and verified from the company's public domain. Recommendations are mathematically matched to these findings.
+        </p>
+
+        <h3 className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Verified Content Facts</h3>
+        <div className="space-y-3 mb-6">
+          {verifiedFacts.map((fact: any, index: number) => (
+            <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+              <p className="font-bold text-slate-800">Fact {index + 1}: {fact.fact}</p>
+              <blockquote className="mt-1.5 border-l-2 border-slate-400 pl-2 text-slate-500 italic">
+                "{fact.evidenceText}"
+              </blockquote>
+              <a href={fact.sourceUrl} target="_blank" rel="noreferrer" className="block text-[10px] text-sky-600 mt-1 hover:underline">
+                Source: {fact.sourceUrl}
+              </a>
+            </div>
+          ))}
+        </div>
+
+        {buyingSignals.length > 0 && (
+          <>
+            <h3 className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Verifiable Intent & Hiring Signals</h3>
+            <div className="space-y-3">
+              {buyingSignals.map((sig: any, index: number) => (
+                <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                  <p className="font-bold text-slate-800">Signal {index + 1}: {sig.signal}</p>
+                  <blockquote className="mt-1.5 border-l-2 border-slate-400 pl-2 text-slate-500 italic">
+                    "{sig.sourceText}"
+                  </blockquote>
+                  <div className="flex justify-between items-center mt-1">
+                    <a href={sig.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-600 hover:underline">
+                      Source: {sig.sourceUrl}
+                    </a>
+                    <span className="text-[9px] text-slate-400">Audited: {sig.dateDiscovered}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
       <footer className="mt-12 text-center text-xs text-slate-400 border-t border-slate-200 pt-6">
         <p>Generated by LeadPilot AI Client Acquisition Platform • Confidential</p>
       </footer>
 
-      {/* Bind the PDF print command dynamically */}
+      {/* Bind print command */}
       <script
         dangerouslySetInnerHTML={{
           __html: `

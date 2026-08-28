@@ -1,40 +1,77 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-export interface SuggestedService {
-  name: string;
-  issue: string;
-  estimatedFee: string; // e.g. "$3,500 setup" or "$750/mo retainer"
+export interface VerifiedFact {
+  fact: string;
+  sourceUrl: string;
+  evidenceText: string; // The exact quote or text snippet verifying the fact
+}
+
+export interface AIInference {
+  inference: string;
+  supportedByFacts: string[]; // Reference facts by description/index
   confidence: number; // 0 to 100 percentage
 }
 
-export interface ClientAcquisitionResponse {
+export interface BuyingSignal {
+  signal: string;
+  sourceUrl: string;
+  sourceText: string; // Exact text quote representing the signal
+  dateDiscovered: string; // ISO or date string
+}
+
+export interface EvidenceRecommendation {
+  serviceName: string;
+  issue: string;
+  estimatedFee: string;
+  confidence: number; // 0 to 100 percentage
+  explanation: string; // Why it was generated
+  evidenceList: string[]; // Quotes/facts from the text supporting it
+}
+
+export interface ScoreDetails {
+  score: number;
+  explanation: string;
+  evidence: string[]; // Citing specific facts/urls
+}
+
+export interface ScoreExplanations {
+  opportunityScore: ScoreDetails;
+  buyingSignalScore: ScoreDetails;
+}
+
+export interface EvidenceAcquisitionResponse {
   companyName: string;
-  problem: string;
-  opportunity: string;
-  proposedSolution: string;
-  servicesSuggested: SuggestedService[];
-  potentialRevenue: number; // Opportunity Total (integer e.g. 4700)
-  closingProbability: number; // 0-100 percentage
+  verifiedFacts: VerifiedFact[];
+  aiInferences: AIInference[];
+  buyingSignals: BuyingSignal[];
+  recommendations: EvidenceRecommendation[];
+  
+  opportunityScore: number;
+  buyingSignalScore: number;
+  scoreExplanations: ScoreExplanations;
+  
+  potentialRevenue: number;
+  closingProbability: number;
   problemSeverity: 'High' | 'Medium' | 'Low';
   leadQuality: 'Hot' | 'Warm' | 'Cold';
   
-  // Proposal Builder Content
+  // Proposal Contents (Traceable to facts)
   executiveSummary: string;
   expectedResults: string;
   estimatedRoi: string;
-  thirtyDayPlan: string;  // Detailed roadmap plan
-  ninetyDayPlan: string;  // Detailed roadmap plan
+  thirtyDayPlan: string;
+  ninetyDayPlan: string;
   pricingRecommendation: string;
 
   // Outreach Center
   coldEmail: string;
   linkedInMessage: string;
   discoveryScript: string;
-  followUpSequence: string; // Follow-up emails
+  followUpSequence: string;
   meetingAgenda: string;
 }
 
-export async function analyzeCompany(combinedText: string, companyName: string): Promise<ClientAcquisitionResponse> {
+export async function analyzeCompany(combinedText: string, companyName: string): Promise<EvidenceAcquisitionResponse> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY environment variable is not defined.');
@@ -48,90 +85,158 @@ export async function analyzeCompany(combinedText: string, companyName: string):
     },
   });
 
+  const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
   const prompt = `
-You are an expert client acquisition AI agent. Your task is to analyze the crawled website content of the company "${companyName}" and compile a high-value client acquisition report, service recommendations, and an outreach proposal.
+You are an expert sales intelligence auditor that builds Evidence-Based Proposals.
+Analyze the XML-formatted company crawled website text. Every claim you make must be traceable back to specific quotes and source URLs in the text.
 
-Analyze the crawled text for issues and opportunities in:
-1. Marketing (e.g. Weak SEO, missing content strategy, poor conversion funnels, weak CTAs).
-2. Web Design (e.g. Outdated design, poor mobile experience, slow performance, UX issues).
-3. AI Automation (e.g. Lack of chatbot, repetitive customer service processes, manual operations).
-4. Recruiting (e.g. Open hiring roles, growth indicators, training gaps).
-5. Operations (e.g. Missing online scheduling, poor lead capture).
+Rules:
+1. NEVER present assumptions as facts. Keep facts, inferences, and recommendations strictly separated.
+2. Verified Facts: These must represent statements explicitly written on the crawled pages. Include the exact quote and source URL.
+3. AI Inferences: These are logical deductions about company needs, pain points, or issues. They must reference the supporting verified facts and have a confidence score (0-100%).
+4. Buying Signals: Extract indicators of intent (e.g. open jobs, new releases, contact widgets, expansion notes). Quote the exact text, source page, and use "${currentDate}" for dateDiscovered.
+5. Recommendations: Suggest services. Explain *why* it was generated and list the exact supporting evidence. Provide a confidence score (0-100%).
+6. Score Explanations: Explain why you gave the opportunity and buying signal scores, citing facts.
 
-Based on this analysis, generate a JSON object matching the schema below:
-
-### Output JSON Schema:
+Return a JSON object conforming exactly to this schema:
 {
-  "companyName": "Verified Company Name",
-  "problem": "Clear, detailed breakdown of the main business problems and inefficiencies identified on their website.",
-  "opportunity": "Details on the potential business growth, customer retention, or cost savings they can achieve by fixing these issues.",
-  "proposedSolution": "A high-level summary of the recommended strategies to solve their problems.",
+  "companyName": "string",
   
-  "servicesSuggested": [
+  "verifiedFacts": [
     {
-      "name": "Service Name (e.g. Local SEO Growth Package, AI Chatbot Setup, Website Redesign)",
-      "issue": "Specific issue this service solves",
-      "estimatedFee": "Estimated billing rate (e.g. $1,200 setup, $750/month retainer)",
-      "confidence": 92 (integer percentage representing confidence level of fit)
+      "fact": "Verified fact description (e.g. They have a team of 5 developers)",
+      "sourceUrl": "The exact URL of the <page> this came from",
+      "evidenceText": "Exact quote from page text supporting this"
     }
   ],
   
-  "potentialRevenue": 4700, // Total value of recommended services combined (Sum of setup and monthly fees as an integer)
-  "closingProbability": 65, // Probability of closing this deal (0 to 100 integer based on severity and signal strength)
+  "aiInferences": [
+    {
+      "inference": "Deduction description (e.g. They are likely facing client onboarding backlogs)",
+      "supportedByFacts": ["Fact 1", "Fact 2"], // Reference text of facts
+      "confidence": number
+    }
+  ],
+  
+  "buyingSignals": [
+    {
+      "signal": "Description of signal (e.g. Hiring Senior SEO Specialist)",
+      "sourceUrl": "The page URL where signal is found",
+      "sourceText": "Exact quote text of signal",
+      "dateDiscovered": "string"
+    }
+  ],
+  
+  "recommendations": [
+    {
+      "serviceName": "e.g. Local SEO Expansion Package",
+      "issue": "Specific issue addressed",
+      "estimatedFee": "e.g. $750/month",
+      "confidence": number, // 0 to 100 percentage
+      "explanation": "Why this recommendation was generated",
+      "evidenceList": ["Exact quote or fact supporting this"]
+    }
+  ],
+  
+  "opportunityScore": number,
+  "buyingSignalScore": number,
+  "scoreExplanations": {
+    "opportunityScore": {
+      "score": number,
+      "explanation": "Reasoning citing facts",
+      "evidence": ["Evidence 1", "Evidence 2"]
+    },
+    "buyingSignalScore": {
+      "score": number,
+      "explanation": "Reasoning citing jobs/signals",
+      "evidence": ["Evidence 1"]
+    }
+  },
+  
+  "potentialRevenue": number,
+  "closingProbability": number,
   "problemSeverity": "High" | "Medium" | "Low",
   "leadQuality": "Hot" | "Warm" | "Cold",
 
-  "executiveSummary": "A compelling executive summary pitch explaining why they need to act now.",
-  "expectedResults": "Quantifiable outcomes (e.g., 40% increase in website speed, 2x lead conversion, 15 hours saved weekly).",
-  "estimatedRoi": "Calculated expected return on investment (e.g., $3,000 monthly value from 4 new clients, paying back setup in 30 days).",
+  "executiveSummary": "string",
+  "expectedResults": "string",
+  "estimatedRoi": "string",
+  "thirtyDayPlan": "string",
+  "ninetyDayPlan": "string",
+  "pricingRecommendation": "string",
   
-  "thirtyDayPlan": "A list of action items to complete in the first 30 days (e.g. technical SEO audit, mockups creation, initial script triggers).",
-  "ninetyDayPlan": "A list of expansion plans, dashboard analytics, and performance reviews to conduct within 90 days.",
-  "pricingRecommendation": "Pricing tier recommendation (e.g., Standard Package: $1,500/mo, Enterprise: $3,500/mo).",
-  
-  "coldEmail": "A short, highly personalized cold outreach email presenting the findings, referencing the scraped data, and ending with a clear CTA.",
-  "linkedInMessage": "A short, friendly LinkedIn connection request pitch under 300 characters.",
-  "discoveryScript": "A structured discovery call script for a 15-minute meeting, including questions to ask and responses.",
-  "followUpSequence": "A sequence of two short follow-up emails to send if they do not reply to the first email.",
-  "meetingAgenda": "A bulleted meeting agenda for the initial discovery call."
+  "coldEmail": "string",
+  "linkedInMessage": "string",
+  "discoveryScript": "string",
+  "followUpSequence": "string",
+  "meetingAgenda": "string"
 }
 
 Crawled Website Content:
-\"\"\"
+"""
 ${combinedText}
-\"\"\"
+"""
 `;
 
   try {
     const result = await model.generateContent(prompt);
     const textResponse = result.response.text();
-    const parsedData = JSON.parse(textResponse) as ClientAcquisitionResponse;
+    const parsedData = JSON.parse(textResponse) as EvidenceAcquisitionResponse;
 
-    // Return parsed data with fallbacks
+    // RULE 9: Suppress recommendations with confidence below 70%
+    const filteredRecommendations = (parsedData.recommendations || []).filter(
+      r => typeof r.confidence === 'number' && r.confidence >= 70
+    );
+
+    // Re-calculate potential revenue based ONLY on suppressed/filtered recommendations
+    let adjustedRevenue = 0;
+    filteredRecommendations.forEach(r => {
+      // Try to parse fee number (e.g. $1,200 setup -> 1200, $750/mo -> 750)
+      const numMatch = r.estimatedFee.replace(/,/g, '').match(/\d+/);
+      if (numMatch) {
+        adjustedRevenue += parseInt(numMatch[0]);
+      }
+    });
+
+    if (adjustedRevenue === 0) {
+      adjustedRevenue = parsedData.potentialRevenue;
+    }
+
     return {
       companyName: parsedData.companyName || companyName,
-      problem: parsedData.problem || 'Outdated online presence.',
-      opportunity: parsedData.opportunity || 'Capture high-value local search traffic.',
-      proposedSolution: parsedData.proposedSolution || 'Deploy SEO and automated chat hooks.',
-      servicesSuggested: Array.isArray(parsedData.servicesSuggested) ? parsedData.servicesSuggested : [],
-      potentialRevenue: typeof parsedData.potentialRevenue === 'number' ? parsedData.potentialRevenue : 1500,
-      closingProbability: typeof parsedData.closingProbability === 'number' ? parsedData.closingProbability : 50,
+      verifiedFacts: parsedData.verifiedFacts || [],
+      aiInferences: parsedData.aiInferences || [],
+      buyingSignals: parsedData.buyingSignals || [],
+      recommendations: filteredRecommendations, // Strictly filtered (>= 70%)
+      
+      opportunityScore: parsedData.opportunityScore || 50,
+      buyingSignalScore: parsedData.buyingSignalScore || 50,
+      scoreExplanations: parsedData.scoreExplanations || {
+        opportunityScore: { score: 50, explanation: 'Default score.', evidence: [] },
+        buyingSignalScore: { score: 50, explanation: 'Default score.', evidence: [] }
+      },
+      
+      potentialRevenue: adjustedRevenue,
+      closingProbability: parsedData.closingProbability || 50,
       problemSeverity: parsedData.problemSeverity || 'Medium',
       leadQuality: parsedData.leadQuality || 'Warm',
-      executiveSummary: parsedData.executiveSummary || 'Upgrade digital infrastructure to scale leads.',
-      expectedResults: parsedData.expectedResults || '2x lead pipeline growth.',
-      estimatedRoi: parsedData.estimatedRoi || 'Positive return in 45 days.',
-      thirtyDayPlan: parsedData.thirtyDayPlan || 'Launch optimization campaign.',
-      ninetyDayPlan: parsedData.ninetyDayPlan || 'Optimize retention metrics.',
-      pricingRecommendation: parsedData.pricingRecommendation || '$1,000 retainer.',
-      coldEmail: parsedData.coldEmail || 'Hello, I saw your site...',
-      linkedInMessage: parsedData.linkedInMessage || 'Would love to connect.',
-      discoveryScript: parsedData.discoveryScript || '1. Ask about scaling issues.',
-      followUpSequence: parsedData.followUpSequence || 'Hi, just following up...',
-      meetingAgenda: parsedData.meetingAgenda || '1. Quick intros\n2. Findings\n3. Solutions.'
+      
+      executiveSummary: parsedData.executiveSummary || '',
+      expectedResults: parsedData.expectedResults || '',
+      estimatedRoi: parsedData.estimatedRoi || '',
+      thirtyDayPlan: parsedData.thirtyDayPlan || '',
+      ninetyDayPlan: parsedData.ninetyDayPlan || '',
+      pricingRecommendation: parsedData.pricingRecommendation || '',
+      
+      coldEmail: parsedData.coldEmail || '',
+      linkedInMessage: parsedData.linkedInMessage || '',
+      discoveryScript: parsedData.discoveryScript || '',
+      followUpSequence: parsedData.followUpSequence || '',
+      meetingAgenda: parsedData.meetingAgenda || ''
     };
   } catch (error: any) {
-    console.error('Gemini Client Acquisition Generation Error:', error);
-    throw new Error(`AI Analysis Pivot Failed: ${error.message}`);
+    console.error('Gemini Evidence Analysis Failure:', error);
+    throw new Error(`Evidence AI generation failed: ${error.message}`);
   }
 }
