@@ -4,6 +4,20 @@ import { getUserIdFromRequest } from '@/lib/auth';
 import { crawlWebsite } from '@/lib/scraper';
 import { analyzeCompany } from '@/lib/gemini';
 
+function pruneHtmlContent(content: string): string {
+  if (!content) return '';
+  let pruned = content
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
+  pruned = pruned.replace(/<!--[\s\S]*?-->/g, '');
+  pruned = pruned.replace(/<\/?[^>]+(>|$)/g, ' ');
+  pruned = pruned.replace(/\s+/g, ' ').trim();
+  return pruned;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const userId = getUserIdFromRequest(req);
@@ -45,7 +59,8 @@ export async function POST(req: NextRequest) {
 
     // 3. Perform AI Analysis with Gemini (Double-Agent Auditor Pipeline)
     console.log(`Running Gemini Verification Pipeline for: ${crawlData.companyName}`);
-    const aiAnalysis = await analyzeCompany(crawlData.combinedContent, crawlData.companyName);
+    const prunedContent = pruneHtmlContent(crawlData.combinedContent);
+    const aiAnalysis = await analyzeCompany(prunedContent, crawlData.companyName);
 
     // Create synthetic buying signals from high-confidence insights to populate schema
     const syntheticSignals = aiAnalysis.aiInferences

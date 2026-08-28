@@ -178,6 +178,8 @@ export default function Dashboard() {
   const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions'>('facts');
   const [outreachSubTab, setOutreachSubTab] = useState<'email' | 'linkedin' | 'followup' | 'discovery' | 'angle'>('email');
   const [billingLoading, setBillingLoading] = useState(false);
+  const [syncingCrm, setSyncingCrm] = useState(false);
+  const [crmSuccess, setCrmSuccess] = useState(false);
 
   // Evidence Modals
   const [showWhyModal, setShowWhyModal] = useState(false);
@@ -281,6 +283,30 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error('Error deleting prospect:', err);
+    }
+  };
+
+  const handleCrmSync = async () => {
+    if (!activeProspect) return;
+    setSyncingCrm(true);
+    setCrmSuccess(false);
+    try {
+      const res = await fetch('/api/crm/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospectId: activeProspect.id }),
+      });
+      if (res.ok) {
+        setCrmSuccess(true);
+        setTimeout(() => setCrmSuccess(false), 3000);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to sync to CRM');
+      }
+    } catch (e) {
+      alert('Failed to sync to CRM');
+    } finally {
+      setSyncingCrm(false);
     }
   };
 
@@ -986,32 +1012,46 @@ export default function Dashboard() {
                     <div className="overflow-y-auto max-h-[360px] space-y-4 pr-1">
                       
                       {/* PDF Print Export Bar */}
-                      <div className={`p-3.5 rounded-xl border flex justify-between items-center ${
+                      <div className={`p-3.5 rounded-xl border flex flex-col md:flex-row md:justify-between md:items-center gap-3 ${
                         activeProspect.proposalStatus === 'Speculative' 
                           ? 'bg-amber-50 border-amber-200' 
                           : 'bg-sky-50 border-sky-100'
                       }`}>
                         <div>
-                          <h4 className="text-xs font-bold text-slate-900">Proposal Document Exporter</h4>
+                          <h4 className="text-xs font-bold text-slate-900">Proposal Exporter & Integrations</h4>
                           <p className="text-[10px] text-slate-500">
                             {activeProspect.proposalStatus === 'Speculative' 
                               ? 'Export caution-stamped consultative proposal.' 
-                              : 'Print client-ready verified proposals.'}
+                              : 'Print client-ready verified proposals or sync to CRM.'}
                           </p>
                         </div>
-                        <a
-                          href={`/proposal/${activeProspect.id}/print`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors ${
-                            activeProspect.proposalStatus === 'Speculative'
-                              ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                              : 'bg-sky-600 hover:bg-sky-700 text-white'
-                          }`}
-                        >
-                          📄 Open PDF Proposal
-                          <ArrowUpRight className="h-3.5 w-3.5" />
-                        </a>
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            disabled={syncingCrm}
+                            onClick={handleCrmSync}
+                            className={`font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors border ${
+                              crmSuccess 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {syncingCrm ? '⏳ Syncing...' : crmSuccess ? '✓ Synced to CRM' : '🔗 Sync to CRM'}
+                          </button>
+
+                          <a
+                            href={`/proposal/${activeProspect.id}/print`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors ${
+                              activeProspect.proposalStatus === 'Speculative'
+                                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                : 'bg-sky-600 hover:bg-sky-700 text-white'
+                            }`}
+                          >
+                            📄 Open PDF Proposal
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
                       </div>
 
                       <div>
