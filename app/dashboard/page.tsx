@@ -12,6 +12,16 @@ import {
   TrustComponent,
   TrustDiagnostics
 } from '@/lib/trustEngine';
+import {
+  calculateServiceOpportunity,
+  calculateOpportunityPortfolio,
+  ServiceOpportunityCalculation,
+  OpportunityPortfolioResult,
+  PRICING_MODEL,
+  STANDARD_ASSUMPTIONS,
+  FINANCIAL_DISCLAIMER
+} from '@/lib/opportunityEngine';
+
 
 
 
@@ -244,6 +254,10 @@ export default function Dashboard() {
   const [selectedTrustBreakdown, setSelectedTrustBreakdown] = useState<TrustScoreResult | null>(null);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [diagnosticsData, setDiagnosticsData] = useState<TrustDiagnostics | null>(null);
+  const [showOpportunityCalcModal, setShowOpportunityCalcModal] = useState(false);
+  const [selectedOpportunityCalc, setSelectedOpportunityCalc] = useState<ServiceOpportunityCalculation | null>(null);
+  const [selectedPortfolioCalc, setSelectedPortfolioCalc] = useState<OpportunityPortfolioResult | null>(null);
+
 
 
 
@@ -658,6 +672,17 @@ export default function Dashboard() {
     tenantIsolationPassRate: 100
   }) : null;
 
+  // Transparent Opportunity Portfolio Engine
+  const activeOpportunityPortfolio = activeProspect ? calculateOpportunityPortfolio(
+    parseRecommendations(activeProspect.recommendations),
+    {
+      evidenceQuality: activeProspect.evidenceQuality,
+      findingReliability: activeProspect.findingReliability,
+      competitorGaps: parseCompetitorGaps(activeProspect.competitorGaps)
+    }
+  ) : null;
+
+
 
   if (!user) {
     return (
@@ -1023,6 +1048,260 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ---------------- SECTION: OPPORTUNITY CALCULATION BREAKDOWN MODAL DRAWER ---------------- */}
+      {showOpportunityCalcModal && (selectedOpportunityCalc || selectedPortfolioCalc) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-xl h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-slide-in">
+            <div className="space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-6 w-6 text-emerald-600" />
+                  <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider">
+                    {selectedOpportunityCalc ? 'Opportunity Valuation Breakdown' : 'Portfolio Valuation Breakdown'}
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setShowOpportunityCalcModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* SINGLE SERVICE VALUATION BREAKDOWN */}
+              {selectedOpportunityCalc && (
+                <div className="space-y-4">
+                  {/* Top Value Classification Card */}
+                  <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                          Estimated Opportunity Value
+                        </span>
+                        <h4 className="text-base font-black text-white mt-0.5">{selectedOpportunityCalc.serviceName}</h4>
+                      </div>
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">
+                        {selectedOpportunityCalc.status}
+                      </span>
+                    </div>
+
+                    {/* Value Range Classification */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-center">
+                      <div className="bg-slate-800/80 p-2 rounded-xl">
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Minimum</span>
+                        <strong className="text-sm font-black text-emerald-400">
+                          ${selectedOpportunityCalc.weightedRange?.min.toLocaleString() || '0'}
+                        </strong>
+                      </div>
+                      <div className="bg-slate-800/80 p-2 rounded-xl border border-emerald-500/30">
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Likely Value</span>
+                        <strong className="text-base font-black text-emerald-300">
+                          ${selectedOpportunityCalc.weightedRange?.likely.toLocaleString() || '0'}
+                        </strong>
+                      </div>
+                      <div className="bg-slate-800/80 p-2 rounded-xl">
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Maximum</span>
+                        <strong className="text-sm font-black text-emerald-400">
+                          ${selectedOpportunityCalc.weightedRange?.max.toLocaleString() || '0'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[10px] text-slate-300 pt-1">
+                      <span>Confidence Score: <strong className="text-sky-300">{selectedOpportunityCalc.confidence}%</strong></span>
+                      <span>Adjustment Multiplier: <strong className="text-sky-300">{selectedOpportunityCalc.confidenceAdjustment || (selectedOpportunityCalc.confidence / 100).toFixed(2)}</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Problem & Supporting Evidence */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Problem Detected</span>
+                      <p className="font-semibold text-slate-800 mt-0.5">{selectedOpportunityCalc.detectedProblem}</p>
+                    </div>
+
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Supporting Evidence</span>
+                      <blockquote className="mt-1 border-l-3 border-emerald-500 pl-2.5 text-slate-600 italic bg-white p-2 rounded">
+                        "{selectedOpportunityCalc.supportingEvidence}"
+                      </blockquote>
+                    </div>
+
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Source Pages</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {selectedOpportunityCalc.sourcePages.map((page, i) => (
+                          <span key={i} className="bg-white border border-slate-200 text-slate-600 text-[10px] font-medium px-2 py-0.5 rounded">
+                            {page}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step-by-Step Calculation Breakdown */}
+                  <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Mathematical Calculation Breakdown
+                    </span>
+                    <div className="space-y-1.5 text-xs font-mono">
+                      {selectedOpportunityCalc.calculationBreakdown?.map((step, idx) => (
+                        <div key={idx} className="p-2 bg-slate-50 border border-slate-100 rounded text-slate-700">
+                          {step}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pricing Model Attribution */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Pricing Model Attribution
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-white p-2.5 rounded border border-slate-150">
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase">Pricing Model Name</span>
+                        <strong className="text-slate-800">{selectedOpportunityCalc.pricingModel.name}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase">Version & Currency</span>
+                        <strong className="text-slate-800">{selectedOpportunityCalc.pricingModel.version} ({selectedOpportunityCalc.pricingModel.currency})</strong>
+                      </div>
+                      <div className="col-span-2 pt-1 border-t border-slate-100 flex justify-between text-[10px] text-slate-500">
+                        <span>Last Updated: {selectedOpportunityCalc.pricingModel.lastUpdated}</span>
+                        <span>Standard Agency Benchmark</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Model Assumptions Panel */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Active Model Assumptions
+                    </span>
+                    <ul className="text-[11px] text-slate-600 list-disc list-inside space-y-1 bg-white p-2.5 rounded border border-slate-150">
+                      {selectedOpportunityCalc.assumptions.map((asm, idx) => (
+                        <li key={idx}>{asm}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Financial Disclaimer */}
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-[10px] text-amber-900 leading-relaxed italic">
+                    <strong>Financial Disclaimer:</strong> {selectedOpportunityCalc.disclaimer}
+                  </div>
+                </div>
+              )}
+
+              {/* MULTI-SERVICE PORTFOLIO VALUATION BREAKDOWN */}
+              {!selectedOpportunityCalc && selectedPortfolioCalc && (
+                <div className="space-y-4">
+                  {/* Top Value Classification Card */}
+                  <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3">
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                        Total Opportunity Portfolio
+                      </span>
+                      <h4 className="text-base font-black text-white mt-0.5">Aggregated Multi-Service Valuation</h4>
+                    </div>
+
+                    {/* Value Range Classification */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-center">
+                      <div className="bg-slate-800/80 p-2 rounded-xl">
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Minimum</span>
+                        <strong className="text-sm font-black text-emerald-400">
+                          ${selectedPortfolioCalc.portfolio.min.toLocaleString()}
+                        </strong>
+                      </div>
+                      <div className="bg-slate-800/80 p-2 rounded-xl border border-emerald-500/30">
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Likely Value</span>
+                        <strong className="text-base font-black text-emerald-300">
+                          ${selectedPortfolioCalc.portfolio.likely.toLocaleString()}
+                        </strong>
+                      </div>
+                      <div className="bg-slate-800/80 p-2 rounded-xl">
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Maximum</span>
+                        <strong className="text-sm font-black text-emerald-400">
+                          ${selectedPortfolioCalc.portfolio.max.toLocaleString()}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Multi-Service Itemized Breakdown */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Individual Service Calculations ({selectedPortfolioCalc.services.length})
+                    </span>
+                    <div className="space-y-2">
+                      {selectedPortfolioCalc.services.map((srv, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <strong className="text-slate-900 block">{srv.serviceName}</strong>
+                              <span className="text-[10px] text-slate-500">Confidence: {srv.confidence}% (Adjustment: {srv.confidenceAdjustment})</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-sm font-black text-emerald-600">{srv.weightedRange?.formatted}</span>
+                              <span className="block text-[9px] text-slate-400">Likely: ${srv.weightedRange?.likely.toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-600 bg-white p-2 rounded border border-slate-100">
+                            <strong>Issue:</strong> {srv.detectedProblem}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pricing Model Attribution */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Pricing Model Attribution
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-white p-2.5 rounded border border-slate-150">
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase">Model Name</span>
+                        <strong className="text-slate-800">{selectedPortfolioCalc.pricingModel.name} {selectedPortfolioCalc.pricingModel.version}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase">Currency & Updated</span>
+                        <strong className="text-slate-800">{selectedPortfolioCalc.pricingModel.currency} ({selectedPortfolioCalc.pricingModel.lastUpdated})</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Model Assumptions Panel */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Active Model Assumptions
+                    </span>
+                    <ul className="text-[11px] text-slate-600 list-disc list-inside space-y-1 bg-white p-2.5 rounded border border-slate-150">
+                      {selectedPortfolioCalc.assumptions.map((asm, idx) => (
+                        <li key={idx}>{asm}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Financial Disclaimer */}
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-[10px] text-amber-900 leading-relaxed italic">
+                    <strong>Financial Disclaimer:</strong> {selectedPortfolioCalc.disclaimer}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowOpportunityCalcModal(false)}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 rounded-xl mt-6 transition-colors uppercase tracking-wider"
+            >
+              Close Calculation
+            </button>
+          </div>
+        </div>
+      )}
+
+
 
 
       {/* Top Navbar */}
@@ -1173,9 +1452,25 @@ export default function Dashboard() {
 
             {/* 5. Opportunity Value Range */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Opportunity Value</span>
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Opportunity Value</span>
+                {activeOpportunityPortfolio?.isAvailable && (
+                  <button
+                    onClick={() => {
+                      setSelectedOpportunityCalc(null);
+                      setSelectedPortfolioCalc(activeOpportunityPortfolio);
+                      setShowOpportunityCalcModal(true);
+                    }}
+                    className="text-[9px] font-bold text-sky-600 hover:text-sky-700 underline flex items-center gap-0.5 cursor-pointer"
+                    title="Show mathematical calculation breakdown"
+                  >
+                    Show Calc
+                  </button>
+                )}
+              </div>
               <p className="text-sm font-black text-emerald-600 mt-2 truncate" title={totalOpportunityValueRange}>{totalOpportunityValueRange}</p>
             </div>
+
 
             {/* 6. Evidence Confidence */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between col-span-2 md:col-span-1">
@@ -1309,7 +1604,21 @@ export default function Dashboard() {
                 <span>Facts Verified: <strong className="text-emerald-600">{activeProspect.factsVerifiedCount}</strong></span>
                 <span>Claims Rejected: <strong className="text-rose-600">{activeProspect.claimsRejectedCount}</strong></span>
                 <span>Crawl Coverage: <strong className="text-sky-700">{activeProspect.pagesCrawledCount || 1} / {activeProspect.pagesDiscoveredCount || 1} pages ({activeProspect.crawlCoveragePercent || 100}%)</strong></span>
-                <span>Opportunity Range: <strong className="text-slate-700 font-mono">{activeProspect.opportunityRange}</strong></span>
+                <span>
+                  Opportunity Range: <strong className="text-slate-700 font-mono">{activeProspect.opportunityRange}</strong>
+                  {activeOpportunityPortfolio?.isAvailable && (
+                    <button
+                      onClick={() => {
+                        setSelectedOpportunityCalc(null);
+                        setSelectedPortfolioCalc(activeOpportunityPortfolio);
+                        setShowOpportunityCalcModal(true);
+                      }}
+                      className="ml-1.5 text-sky-600 hover:text-sky-700 underline font-bold cursor-pointer"
+                    >
+                      [Show Calculation]
+                    </button>
+                  )}
+                </span>
               </div>
 
               {/* Tech Stack Row */}
@@ -1321,6 +1630,121 @@ export default function Dashboard() {
                       💻 {tech}
                     </span>
                   ))}
+                </div>
+              )}
+
+              {/* STRATEGIC ASSESSMENT CARDS: "Why This Prospect?" & "Best Service to Sell" */}
+              {activeOpportunityPortfolio?.whyThisProspect && (
+                <div className="mx-6 mt-4 grid md:grid-cols-2 gap-4">
+                  {/* Card 1: Why This Prospect? */}
+                  <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl shadow-sm border border-slate-700 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Strategic Assessment</span>
+                        <h4 className="text-sm font-black text-white flex items-center gap-1.5 mt-0.5">
+                          <Sparkles className="h-4 w-4 text-amber-400" />
+                          Why This Prospect?
+                        </h4>
+                      </div>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                        activeOpportunityPortfolio.whyThisProspect.priority === 'High'
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                      }`}>
+                        Priority: {activeOpportunityPortfolio.whyThisProspect.priority}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 bg-slate-800/80 p-2.5 rounded-xl text-center text-xs">
+                      <div>
+                        <span className="text-[8px] text-slate-400 block uppercase font-bold">Opportunities</span>
+                        <strong className="text-emerald-400 text-sm font-black">{activeOpportunityPortfolio.whyThisProspect.detectedOpportunitiesCount}</strong>
+                      </div>
+                      <div className="border-x border-slate-700">
+                        <span className="text-[8px] text-slate-400 block uppercase font-bold">Competitor Gaps</span>
+                        <strong className="text-sky-400 text-sm font-black">{activeOpportunityPortfolio.whyThisProspect.competitorGapsCount}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[8px] text-slate-400 block uppercase font-bold">Confidence</span>
+                        <strong className="text-amber-400 text-sm font-black">{activeOpportunityPortfolio.whyThisProspect.confidence}%</strong>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[9px] text-slate-400 uppercase font-bold tracking-wider block mb-1">Key Opportunity Drivers:</span>
+                      <ul className="text-xs text-slate-300 space-y-1 list-disc list-inside">
+                        {activeOpportunityPortfolio.whyThisProspect.reasons.map((r, i) => (
+                          <li key={i} className="truncate" title={r}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Best Service to Sell */}
+                  {activeOpportunityPortfolio.bestServiceRecommendation && (
+                    <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-200 space-y-3 flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Top Recommended Pitch</span>
+                            <h4 className="text-sm font-black text-slate-900 flex items-center gap-1.5 mt-0.5">
+                              <Award className="h-4 w-4 text-emerald-600" />
+                              Best Service to Sell
+                            </h4>
+                          </div>
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                            {activeOpportunityPortfolio.bestServiceRecommendation.confidence}% Confidence
+                          </span>
+                        </div>
+
+                        <div className="mt-3 p-2.5 bg-emerald-50/50 border border-emerald-200/60 rounded-xl flex justify-between items-center">
+                          <div>
+                            <span className="text-[9px] text-slate-500 font-bold uppercase block">Recommended Solution</span>
+                            <strong className="text-sm font-black text-slate-900">
+                              {activeOpportunityPortfolio.bestServiceRecommendation.serviceName}
+                            </strong>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[9px] text-slate-500 font-bold uppercase block">Estimated Value</span>
+                            <strong className="text-sm font-black text-emerald-700">
+                              {activeOpportunityPortfolio.bestServiceRecommendation.estimatedValue}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5">
+                          <span className="text-[9px] text-slate-400 uppercase font-bold tracking-wider block mb-1">Strategic Rationale:</span>
+                          <ul className="text-xs text-slate-600 space-y-1">
+                            {activeOpportunityPortfolio.bestServiceRecommendation.reasons.map((rsn, i) => (
+                              <li key={i} className="flex items-center gap-1.5 text-[11px]">
+                                <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                <span className="truncate" title={rsn}>{rsn}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex justify-end">
+                        <button
+                          onClick={() => {
+                            const topServiceCalc = activeOpportunityPortfolio.services.find(
+                              s => s.serviceName === activeOpportunityPortfolio.bestServiceRecommendation?.serviceName
+                            );
+                            if (topServiceCalc) {
+                              setSelectedPortfolioCalc(null);
+                              setSelectedOpportunityCalc(topServiceCalc);
+                              setShowOpportunityCalcModal(true);
+                            }
+                          }}
+                          className="text-xs font-bold text-sky-600 hover:text-sky-700 underline flex items-center gap-1 cursor-pointer"
+                        >
+                          Show Calculation
+                          <ArrowUpRight className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1398,6 +1822,7 @@ export default function Dashboard() {
 
               {/* Navigation Tabs */}
               <div className="flex border-b border-slate-200 bg-white">
+
                 <button
                   onClick={() => setActiveTab('opportunities')}
                   className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
@@ -1582,8 +2007,22 @@ export default function Dashboard() {
                                 </div>
                               )}
                               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                                <span className="font-bold text-slate-500 uppercase text-[9px]">Revenue Potential</span>
-                                <span className="font-mono font-black text-emerald-600">{rec.estimatedFee}</span>
+                                <button
+                                  onClick={() => {
+                                    const calc = calculateServiceOpportunity(rec, { evidenceQuality: activeProspect.evidenceQuality });
+                                    setSelectedPortfolioCalc(null);
+                                    setSelectedOpportunityCalc(calc);
+                                    setShowOpportunityCalcModal(true);
+                                  }}
+                                  className="text-[10px] font-bold text-sky-600 hover:text-sky-700 underline flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  Show Calculation
+                                  <ArrowUpRight className="h-3 w-3" />
+                                </button>
+                                <div className="text-right">
+                                  <span className="font-bold text-slate-400 uppercase text-[8px] block">Revenue Potential</span>
+                                  <span className="font-mono font-black text-emerald-600">{rec.estimatedFee}</span>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1631,9 +2070,24 @@ export default function Dashboard() {
                                 </div>
                               )}
                               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                                <span className="font-bold text-slate-500 uppercase text-[9px]">Estimated Project Value</span>
-                                <span className="font-mono font-black text-emerald-600">${(rec.estimatedValue || 0).toLocaleString()}</span>
+                                <button
+                                  onClick={() => {
+                                    const calc = calculateServiceOpportunity(rec, { evidenceQuality: activeProspect.evidenceQuality });
+                                    setSelectedPortfolioCalc(null);
+                                    setSelectedOpportunityCalc(calc);
+                                    setShowOpportunityCalcModal(true);
+                                  }}
+                                  className="text-[10px] font-bold text-sky-600 hover:text-sky-700 underline flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  Show Calculation
+                                  <ArrowUpRight className="h-3 w-3" />
+                                </button>
+                                <div className="text-right">
+                                  <span className="font-bold text-slate-400 uppercase text-[8px] block">Estimated Project Value</span>
+                                  <span className="font-mono font-black text-emerald-600">${(rec.estimatedValue || 0).toLocaleString()}</span>
+                                </div>
                               </div>
+
                             </div>
                           ))}
                         </div>
@@ -1774,9 +2228,25 @@ export default function Dashboard() {
                       </div>
 
                       <div>
-                        <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Cost Estimate & Recommendations</h4>
+                        <div className="flex justify-between items-center mb-1">
+                          <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Cost Estimate & Recommendations</h4>
+                          {activeOpportunityPortfolio?.isAvailable && (
+                            <button
+                              onClick={() => {
+                                setSelectedOpportunityCalc(null);
+                                setSelectedPortfolioCalc(activeOpportunityPortfolio);
+                                setShowOpportunityCalcModal(true);
+                              }}
+                              className="text-[10px] font-bold text-sky-600 hover:text-sky-700 underline flex items-center gap-0.5 cursor-pointer"
+                            >
+                              Show Calculation Breakdown
+                              <ArrowUpRight className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                         <p className="mt-1 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-slate-50 p-3 rounded border border-slate-100">{activeProspect.pricingRecommendation}</p>
                       </div>
+
                     </div>
                   </div>
                 )}
@@ -2131,9 +2601,24 @@ export default function Dashboard() {
                   <div className="space-y-4 flex-1 flex flex-col">
                     <div className="flex justify-between items-center border-b border-slate-150 pb-2">
                       <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Estimated Service Opportunity Range</h4>
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">
-                        Total Range: {activeProspect.opportunityRange}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">
+                          Total Range: {activeProspect.opportunityRange}
+                        </span>
+                        {activeOpportunityPortfolio?.isAvailable && (
+                          <button
+                            onClick={() => {
+                              setSelectedOpportunityCalc(null);
+                              setSelectedPortfolioCalc(activeOpportunityPortfolio);
+                              setShowOpportunityCalcModal(true);
+                            }}
+                            className="bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer flex items-center gap-0.5"
+                          >
+                            Show Calculation
+                            <ArrowUpRight className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-4">
@@ -2173,12 +2658,25 @@ export default function Dashboard() {
 
                               <div className="flex justify-between items-center">
                                 <button
-                                  onClick={() => setShowCalcIndex(showCalcIndex === idx ? null : idx)}
-                                  className="text-[9px] font-bold text-sky-600 hover:text-sky-700"
+                                  onClick={() => {
+                                    const calc = calculateServiceOpportunity(rec, { evidenceQuality: activeProspect.evidenceQuality });
+                                    setSelectedPortfolioCalc(null);
+                                    setSelectedOpportunityCalc(calc);
+                                    setShowOpportunityCalcModal(true);
+                                  }}
+                                  className="text-[10px] font-bold text-sky-600 hover:text-sky-700 underline flex items-center gap-0.5 cursor-pointer"
                                 >
-                                  {showCalcIndex === idx ? '✕ Hide Calculation' : '➕ Show Calculation'}
+                                  Show Calculation
+                                  <ArrowUpRight className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => setShowCalcIndex(showCalcIndex === idx ? null : idx)}
+                                  className="text-[9px] font-medium text-slate-500 hover:text-slate-700"
+                                >
+                                  {showCalcIndex === idx ? '✕ Hide Quick Math' : '➕ Quick Math'}
                                 </button>
                               </div>
+
 
                               {showCalcIndex === idx && (
                                 <div className="p-2.5 bg-slate-50 border border-slate-150 rounded text-[10px] text-slate-500 font-sans space-y-1">

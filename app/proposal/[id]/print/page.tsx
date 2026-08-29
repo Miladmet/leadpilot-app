@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { calculateTrustScore } from '@/lib/trustEngine';
+import { calculateOpportunityPortfolio } from '@/lib/opportunityEngine';
+
 
 
 interface PrintPageProps {
@@ -99,7 +101,15 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
   } catch (e) {}
   const techStack = scoreExplanations.techStack || [];
 
+  // Auditable Opportunity Calculation Portfolio
+  const opportunityPortfolio = calculateOpportunityPortfolio(recommendations, {
+    evidenceQuality: prospect.evidenceQuality,
+    findingReliability: prospect.findingReliability,
+    competitorGaps
+  });
+
   return (
+
     <div className="min-h-screen bg-white text-slate-800 p-8 max-w-4xl mx-auto print:p-0">
       
       {/* Top action bar - hidden on print */}
@@ -503,35 +513,133 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
         </div>
       </section>
 
-      {/* SECTION 10: SAFE REVENUE ESTIMATES & FINANCIAL DISCLAIMER */}
+      {/* SECTION 10: AUDITABLE OPPORTUNITY VALUATION & PRICING MODEL BREAKDOWN */}
       <section className="mb-8 page-break-before">
         <h2 className="text-sm font-bold text-slate-900 uppercase border-b-2 border-slate-900 pb-2 mb-3">
-          10. Safe Project Value Valuation Range
+          10. Auditable Opportunity Valuation & Pricing Model Breakdown
         </h2>
-        
-        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-xs space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-            <span className="font-bold text-slate-700">Estimated Opportunity Range:</span>
-            <span className="text-lg font-black text-emerald-600 font-mono">{prospect.opportunityRange}</span>
-          </div>
 
-          <div>
-            <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider">Pricing Model Assumptions</h4>
-            <ul className="list-disc pl-4 mt-1.5 text-slate-600 space-y-1.5">
-              {pricingAssumptions.assumptions.map((asm: string, index: number) => (
-                <li key={index}>{asm}</li>
-              ))}
-            </ul>
-          </div>
+        {opportunityPortfolio.isAvailable ? (
+          <div className="space-y-4">
+            {/* Total Valuation Classification Summary */}
+            <div className="bg-slate-900 text-white p-5 rounded-xl space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Total Multi-Service Opportunity Range
+                </span>
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                  Verified Engine Model
+                </span>
+              </div>
 
-          <div>
-            <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider">Financial Disclaimer</h4>
-            <p className="mt-1.5 text-[10px] text-slate-400 italic leading-relaxed">
-              {pricingAssumptions.disclaimer}
+              <div className="grid grid-cols-3 gap-3 text-center pt-2 border-t border-slate-800">
+                <div className="bg-slate-800/80 p-2.5 rounded-lg">
+                  <span className="text-[9px] text-slate-400 block uppercase font-bold">Minimum Value</span>
+                  <strong className="text-sm font-black text-emerald-400">
+                    ${opportunityPortfolio.portfolio.min.toLocaleString()}
+                  </strong>
+                </div>
+                <div className="bg-slate-800/80 p-2.5 rounded-lg border border-emerald-500/40">
+                  <span className="text-[9px] text-slate-400 block uppercase font-bold">Likely Value</span>
+                  <strong className="text-base font-black text-emerald-300">
+                    ${opportunityPortfolio.portfolio.likely.toLocaleString()}
+                  </strong>
+                </div>
+                <div className="bg-slate-800/80 p-2.5 rounded-lg">
+                  <span className="text-[9px] text-slate-400 block uppercase font-bold">Maximum Value</span>
+                  <strong className="text-sm font-black text-emerald-400">
+                    ${opportunityPortfolio.portfolio.max.toLocaleString()}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Itemized Calculation Breakdown Table */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
+                    <th className="p-2.5">Opportunity & Issue</th>
+                    <th className="p-2.5">Base Range</th>
+                    <th className="p-2.5 text-center">Confidence</th>
+                    <th className="p-2.5 text-right">Weighted Range (Min - Max)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {opportunityPortfolio.services.map((srv, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50">
+                      <td className="p-2.5">
+                        <strong className="text-slate-900 block">{srv.serviceName}</strong>
+                        <span className="text-[10px] text-slate-500 line-clamp-1">{srv.detectedProblem}</span>
+                        {srv.supportingEvidence && (
+                          <span className="text-[9px] text-slate-400 italic block mt-0.5">
+                            Evidence: "{srv.supportingEvidence.slice(0, 75)}..."
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2.5 font-mono text-slate-600">
+                        {srv.baseRange?.formatted || '—'}
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <span className="bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {srv.confidence}% (×{srv.confidenceAdjustment})
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-right">
+                        <span className="font-mono font-bold text-emerald-700 block">{srv.weightedRange?.formatted}</span>
+                        <span className="text-[9px] text-slate-400">Likely: ${srv.weightedRange?.likely.toLocaleString()}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pricing Model & Assumptions */}
+            <div className="grid md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+              <div>
+                <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider mb-1.5">
+                  Pricing Model Attribution
+                </h4>
+                <div className="bg-white p-2.5 rounded border border-slate-200 space-y-1 text-[11px] text-slate-600">
+                  <p><strong>Model:</strong> {opportunityPortfolio.pricingModel.name} ({opportunityPortfolio.pricingModel.version})</p>
+                  <p><strong>Currency:</strong> {opportunityPortfolio.pricingModel.currency}</p>
+                  <p><strong>Last Updated:</strong> {opportunityPortfolio.pricingModel.lastUpdated}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider mb-1.5">
+                  Model Assumptions
+                </h4>
+                <ul className="bg-white p-2.5 rounded border border-slate-200 list-disc list-inside space-y-1 text-[11px] text-slate-600">
+                  {opportunityPortfolio.assumptions.map((asm, i) => (
+                    <li key={i}>{asm}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Mandatory Financial Disclaimer */}
+            <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl text-[10px] text-amber-900 leading-relaxed italic">
+              <strong>Mandatory Financial Disclaimer:</strong> {opportunityPortfolio.disclaimer}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-xs space-y-3">
+            <div className="flex items-center gap-2 text-amber-600 font-bold">
+              <span>⚠️ Opportunity Value Unavailable</span>
+            </div>
+            <p className="text-slate-600 text-xs">
+              {opportunityPortfolio.reason || 'Telemetry values or evidence quality are insufficient for financial estimation.'}
             </p>
+            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-[10px] text-amber-900 leading-relaxed italic">
+              <strong>Mandatory Financial Disclaimer:</strong> {opportunityPortfolio.disclaimer}
+            </div>
           </div>
-        </div>
+        )}
       </section>
+
 
       <footer className="mt-12 text-center text-xs text-slate-400 border-t border-slate-200 pt-6">
         <p className="mb-1 font-semibold">Findings are based on publicly observable website information and AI-assisted analysis. Recommendations should be independently reviewed.</p>

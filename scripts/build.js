@@ -24,8 +24,13 @@ try {
   console.log('[Build Gate] Enforcing Platform Trust Gate (Resilience, Degradation & Safety)...');
   execSync('node scripts/test-trust-engine.js', { stdio: 'inherit' });
 
+  // Execute the Opportunity Calculation Gate (Valuation, Confidence & Safety)
+  console.log('[Build Gate] Enforcing Opportunity Calculation Engine Gate...');
+  execSync('node scripts/test-opportunity-engine.js', { stdio: 'inherit' });
+
   // Compile Next.js project
   execSync('npx next build', { stdio: 'inherit' });
+
 
 
 
