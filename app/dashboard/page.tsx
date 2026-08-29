@@ -9,8 +9,10 @@ import {
   getTrustStatusLevel, 
   getTrustStatusColors, 
   TrustScoreResult,
-  TrustComponent 
+  TrustComponent,
+  TrustDiagnostics
 } from '@/lib/trustEngine';
+
 
 
 import { 
@@ -240,6 +242,9 @@ export default function Dashboard() {
   const [modalContent, setModalContent] = useState<ModalContent | null>(null);
   const [showTrustModal, setShowTrustModal] = useState(false);
   const [selectedTrustBreakdown, setSelectedTrustBreakdown] = useState<TrustScoreResult | null>(null);
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
+  const [diagnosticsData, setDiagnosticsData] = useState<TrustDiagnostics | null>(null);
+
 
 
   const router = useRouter();
@@ -834,15 +839,190 @@ export default function Dashboard() {
               </div>
             </div>
 
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={() => {
+                  setDiagnosticsData(selectedTrustBreakdown.diagnostics);
+                  setShowTrustModal(false);
+                  setShowDiagnosticsModal(true);
+                }}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-3 rounded-xl transition-colors uppercase tracking-wider text-center"
+              >
+                View Diagnostics
+              </button>
+              <button
+                onClick={() => setShowTrustModal(false)}
+                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 rounded-xl transition-colors uppercase tracking-wider"
+              >
+                Close Breakdown
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- SECTION: TRUST DIAGNOSTICS PANEL DRAWER ---------------- */}
+      {showDiagnosticsModal && diagnosticsData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-lg h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-slide-in">
+            <div className="space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-6 w-6 text-sky-600" />
+                  <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider">
+                    Trust Engine Diagnostics
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setShowDiagnosticsModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Status & Version Card */}
+              <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Trust Engine Status</span>
+                    <span className={`text-sm font-black uppercase mt-0.5 inline-block px-2.5 py-0.5 rounded-full border ${
+                      diagnosticsData.validationStatus === 'VALID'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    }`}>
+                      ● {diagnosticsData.trustEngineStatus}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 font-mono block">Engine Version</span>
+                    <span className="text-xs font-mono font-bold text-sky-400">v{diagnosticsData.trustEngineVersion}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-[10px]">
+                  <div>
+                    <span className="text-slate-400">Validation Status:</span>
+                    <strong className={`ml-1 ${diagnosticsData.validationStatus === 'VALID' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {diagnosticsData.validationStatus}
+                    </strong>
+                  </div>
+                  <div className="text-right truncate" title={diagnosticsData.lastAuditTimestamp}>
+                    <span className="text-slate-400">Audited:</span>
+                    <span className="ml-1 text-slate-200">{new Date(diagnosticsData.lastAuditTimestamp).toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Safety Principle Alert Box */}
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-1">
+                <span className="font-bold block uppercase tracking-wider text-[9px] text-amber-800 flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5 text-amber-700" />
+                  Trust Engine Safety Principle
+                </span>
+                <p className="leading-relaxed">
+                  If required telemetry is missing or invalid: <strong>DO NOT estimate</strong>, <strong>DO NOT substitute AI-generated values</strong>, and <strong>DO NOT calculate partial scores</strong>. Trustworthiness is more important than displaying a speculative number.
+                </p>
+              </div>
+
+              {/* Required Components Checklist */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Required Platform Components (6 Controls)
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {diagnosticsData.requiredComponents.map((compName) => {
+                    const isMissing = diagnosticsData.missingComponents.includes(compName);
+                    const isInvalid = diagnosticsData.invalidComponents.some(c => c.name === compName);
+                    const isOk = !isMissing && !isInvalid;
+
+                    return (
+                      <div 
+                        key={compName}
+                        className={`p-2 rounded-lg border text-xs flex items-center justify-between ${
+                          isOk 
+                            ? 'bg-emerald-50/50 border-emerald-200 text-emerald-800' 
+                            : 'bg-rose-50 border-rose-200 text-rose-800'
+                        }`}
+                      >
+                        <span className="font-semibold truncate">{compName}</span>
+                        <span className="font-bold text-[10px]">
+                          {isOk ? '✓ PASS' : isMissing ? 'MISSING' : 'INVALID'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Missing Components Section */}
+              {diagnosticsData.missingComponents.length > 0 && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">
+                    Missing Components Detected ({diagnosticsData.missingComponents.length})
+                  </span>
+                  <ul className="text-xs text-rose-800 list-disc list-inside space-y-0.5">
+                    {diagnosticsData.missingComponents.map((comp) => (
+                      <li key={comp} className="font-medium">
+                        <strong>{comp}</strong> — Telemetry unavailable or null
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[10px] text-rose-600 italic pt-1">
+                    Trust score calculation is blocked until complete telemetry is provided.
+                  </p>
+                </div>
+              )}
+
+              {/* Invalid Components Section */}
+              {diagnosticsData.invalidComponents.length > 0 && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">
+                    Invalid Components Detected ({diagnosticsData.invalidComponents.length})
+                  </span>
+                  <div className="space-y-1.5">
+                    {diagnosticsData.invalidComponents.map((item, idx) => (
+                      <div key={idx} className="bg-white p-2 rounded border border-rose-200 text-xs">
+                        <div className="flex justify-between font-bold text-rose-900">
+                          <span>{item.name}</span>
+                          <span className="font-mono text-rose-600">Value: {String(item.value)}</span>
+                        </div>
+                        <p className="text-[10px] text-rose-700 mt-0.5">{item.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[10px] text-slate-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Last Successful Calculation:</span>
+                  <span className="font-mono text-slate-700">
+                    {diagnosticsData.lastSuccessfulCalculation
+                      ? new Date(diagnosticsData.lastSuccessfulCalculation).toLocaleString()
+                      : 'None recorded'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Last Audit Timestamp:</span>
+                  <span className="font-mono text-slate-700">
+                    {new Date(diagnosticsData.lastAuditTimestamp).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <button
-              onClick={() => setShowTrustModal(false)}
+              onClick={() => setShowDiagnosticsModal(false)}
               className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 rounded-xl mt-6 transition-colors uppercase tracking-wider"
             >
-              Close Trust Breakdown
+              Close Diagnostics
             </button>
           </div>
         </div>
       )}
+
 
 
       {/* Top Navbar */}
@@ -910,36 +1090,68 @@ export default function Dashboard() {
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-xl border border-slate-700 shadow-md flex flex-col justify-between col-span-2 md:col-span-1">
               <div className="flex justify-between items-start">
                 <span className="text-[9px] text-slate-300 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-emerald-400" />
+                  <ShieldCheck className={`h-3 w-3 ${globalPlatformTrust.isAvailable ? 'text-emerald-400' : 'text-amber-400'}`} />
                   Platform Trust
                 </span>
                 <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded-full border ${globalPlatformTrust.statusColor.badge}`}>
-                  ● {globalPlatformTrust.statusLevel}
+                  ● {globalPlatformTrust.isAvailable ? globalPlatformTrust.statusLevel : (globalPlatformTrust.status || 'INVALID')}
                 </span>
               </div>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-2xl font-black text-emerald-400">{globalPlatformTrust.overallScore}%</span>
-                <button
-                  onClick={() => {
-                    setSelectedTrustBreakdown(globalPlatformTrust);
-                    setShowTrustModal(true);
-                  }}
-                  className="text-[10px] font-bold text-sky-300 hover:text-sky-200 underline flex items-center gap-0.5 cursor-pointer"
-                  title="View complete mathematical trust breakdown"
-                >
-                  Breakdown
-                  <ArrowUpRight className="h-3 w-3" />
-                </button>
-              </div>
-              <div className="mt-2 pt-2 border-t border-slate-700/60 grid grid-cols-3 gap-1 text-[8px] text-slate-300">
-                <div title="Database Security: 100%">DB: <strong className="text-emerald-400">100%</strong></div>
-                <div title="Storage Security: 100%">Storage: <strong className="text-emerald-400">100%</strong></div>
-                <div title="Tenant Isolation: 100%">Iso: <strong className="text-emerald-400">100%</strong></div>
-                <div title="Verification Pass Rate">Verif: <strong className="text-sky-300">{globalPlatformTrust.components.verificationEngine.score}%</strong></div>
-                <div title="Evidence Quality">Evid: <strong className="text-sky-300">{globalPlatformTrust.components.evidenceEngine.score}%</strong></div>
-                <div title="Crawl Coverage">Crawl: <strong className="text-sky-300">{globalPlatformTrust.components.crawlReliability.score}%</strong></div>
-              </div>
+
+              {globalPlatformTrust.isAvailable ? (
+                <>
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span className="text-2xl font-black text-emerald-400">{globalPlatformTrust.displayScore}</span>
+                    <button
+                      onClick={() => {
+                        setSelectedTrustBreakdown(globalPlatformTrust);
+                        setShowTrustModal(true);
+                      }}
+                      className="text-[10px] font-bold text-sky-300 hover:text-sky-200 underline flex items-center gap-0.5 cursor-pointer"
+                      title="View complete mathematical trust breakdown"
+                    >
+                      Breakdown
+                      <ArrowUpRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-slate-700/60 grid grid-cols-3 gap-1 text-[8px] text-slate-300">
+                    <div title="Database Security">DB: <strong className="text-emerald-400">{globalPlatformTrust.components.databaseSecurity?.score}%</strong></div>
+                    <div title="Storage Security">Storage: <strong className="text-emerald-400">{globalPlatformTrust.components.storageSecurity?.score}%</strong></div>
+                    <div title="Tenant Isolation">Iso: <strong className="text-emerald-400">{globalPlatformTrust.components.tenantIsolation?.score}%</strong></div>
+                    <div title="Verification Pass Rate">Verif: <strong className="text-sky-300">{globalPlatformTrust.components.verificationEngine?.score}%</strong></div>
+                    <div title="Evidence Quality">Evid: <strong className="text-sky-300">{globalPlatformTrust.components.evidenceEngine?.score}%</strong></div>
+                    <div title="Crawl Coverage">Crawl: <strong className="text-sky-300">{globalPlatformTrust.components.crawlReliability?.score}%</strong></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mt-2">
+                    <span className="text-xs font-black text-rose-400 block leading-tight">Trust Score Unavailable</span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5">
+                      {globalPlatformTrust.reason || 'Required telemetry missing'}
+                    </span>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-slate-700/60 flex items-center justify-between">
+                    <span className="text-[8px] text-rose-300 font-mono">
+                      {globalPlatformTrust.missingComponents.length > 0 
+                        ? `${globalPlatformTrust.missingComponents.length} missing` 
+                        : 'Invalid input'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setDiagnosticsData(globalPlatformTrust.diagnostics);
+                        setShowDiagnosticsModal(true);
+                      }}
+                      className="text-[10px] font-bold text-sky-300 hover:text-sky-200 underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      View Diagnostics
+                      <ArrowUpRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
+
 
             {/* 2. Companies Analyzed */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
@@ -1048,7 +1260,7 @@ export default function Dashboard() {
                 {/* PROSPECT TRUST SCORE BADGE */}
                 <div className="text-center border-x border-slate-800">
                   <span className="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Trust Score</span>
-                  {activeProspectTrust ? (
+                  {activeProspectTrust && activeProspectTrust.isAvailable ? (
                     <button
                       onClick={() => {
                         setSelectedTrustBreakdown(activeProspectTrust);
@@ -1057,13 +1269,26 @@ export default function Dashboard() {
                       className="inline-flex items-center gap-1 text-xs font-black text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
                       title="Click to view full Trust Breakdown for this prospect"
                     >
-                      {activeProspectTrust.overallScore}%
+                      {activeProspectTrust.displayScore}
                       <span className="text-[8px] font-normal underline text-sky-400">Why?</span>
+                    </button>
+                  ) : activeProspectTrust ? (
+                    <button
+                      onClick={() => {
+                        setDiagnosticsData(activeProspectTrust.diagnostics);
+                        setShowDiagnosticsModal(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                      title="Telemetry missing or invalid. Click to view diagnostics."
+                    >
+                      Unavailable
+                      <span className="text-[8px] font-normal underline text-sky-400">Diag</span>
                     </button>
                   ) : (
                     <span className="text-xs font-black text-slate-500">—</span>
                   )}
                 </div>
+
 
                 <div className="col-span-3 md:col-span-1 text-center bg-slate-800 py-1.5 rounded-lg border border-slate-700 text-[10px] font-bold">
                   {activeProspect.proposalStatus === 'Speculative' ? (

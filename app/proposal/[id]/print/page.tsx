@@ -182,45 +182,63 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       )}
 
       {/* PLATFORM TRUST STATUS CARD */}
-      <div className="mb-8 p-5 bg-slate-50 border border-slate-250 rounded-2xl space-y-4">
-        <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Platform Trust Certification</span>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-2xl font-black text-slate-900">{trustData.overallScore}%</span>
-              <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${trustData.statusColor.badge}`}>
-                ● {trustData.statusLevel}
-              </span>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="text-[10px] font-mono text-slate-500">Telemetry Engine: LeadPilot AI v2.4</span>
-            <p className="text-[10px] text-slate-400">Auditable & Deterministic Platform Controls</p>
-          </div>
-        </div>
-
-        {/* 6 Component Breakdown Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-          {trustData.componentList.map((comp) => (
-            <div key={comp.id} className="bg-white p-2.5 rounded-xl border border-slate-200 flex flex-col justify-between">
-              <div>
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block truncate" title={comp.name}>
-                  {comp.name}
+      {trustData.isAvailable ? (
+        <div className="mb-8 p-5 bg-slate-50 border border-slate-250 rounded-2xl space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Platform Trust Certification</span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-2xl font-black text-slate-900">{trustData.displayScore}</span>
+                <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${trustData.statusColor.badge}`}>
+                  ● {trustData.statusLevel}
                 </span>
-                <span className="text-[8px] text-slate-400 font-mono">Weight: {comp.weightPercent}%</span>
-              </div>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-sm font-black text-slate-900">{comp.score}%</span>
-                <span className="text-[9px] font-mono text-emerald-600 font-bold">+{comp.weightedPoints}</span>
               </div>
             </div>
-          ))}
-        </div>
+            <div className="text-right">
+              <span className="text-[10px] font-mono text-slate-500">Telemetry Engine: LeadPilot AI v{trustData.diagnostics.trustEngineVersion}</span>
+              <p className="text-[10px] text-slate-400">Auditable & Deterministic Platform Controls</p>
+            </div>
+          </div>
 
-        <p className="text-[10px] text-slate-500 leading-relaxed italic">
-          * {trustData.summary}
-        </p>
-      </div>
+          {/* 6 Component Breakdown Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+            {trustData.componentList.map((comp) => (
+              <div key={comp.id} className="bg-white p-2.5 rounded-xl border border-slate-200 flex flex-col justify-between">
+                <div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block truncate" title={comp.name}>
+                    {comp.name}
+                  </span>
+                  <span className="text-[8px] text-slate-400 font-mono">Weight: {comp.weightPercent}%</span>
+                </div>
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-sm font-black text-slate-900">{comp.score}%</span>
+                  <span className="text-[9px] font-mono text-emerald-600 font-bold">+{comp.weightedPoints}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[10px] text-slate-500 leading-relaxed italic">
+            * {trustData.summary}
+          </p>
+        </div>
+      ) : (
+        <div className="mb-8 p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Platform Trust Certification</span>
+              <span className="text-base font-bold text-slate-800">Trust Score Unavailable</span>
+            </div>
+            <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-300">
+              Audit Pending
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500 italic">
+            * Telemetry validation in progress. LeadPilot never fabricates or estimates audit confidence scores.
+          </p>
+        </div>
+      )}
+
 
 
       {/* SECTION 1: EXECUTIVE SUMMARY */}
