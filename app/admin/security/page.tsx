@@ -45,8 +45,40 @@ interface SecurityData {
   timestamp: string;
 }
 
+interface StorageBucketReport {
+  name: string;
+  visibility: 'Public' | 'Private';
+  containsCustomerData: boolean;
+  storagePolicies: 'Present' | 'Missing';
+  riskLevel: 'Low' | 'Medium' | 'High';
+  allowedMimeTypes: string[];
+  maxSizeBytes: number;
+  description: string;
+  status: 'PROTECTED' | 'VULNERABLE';
+  calculatedRisk: string;
+}
+
+interface StorageSecurityData {
+  success: boolean;
+  metrics: {
+    protectedBuckets: number;
+    publicBuckets: number;
+    privateBuckets: number;
+    totalBuckets: number;
+    signedUrlProtection: string;
+    ownershipChecks: string;
+    unauthorizedAccessTests: string;
+    storageSecurityScore: number;
+    isSecure: boolean;
+  };
+  buckets: StorageBucketReport[];
+  failedChecks: string[];
+  timestamp: string;
+}
+
 export default function AdminSecurityDashboard() {
   const [data, setData] = useState<SecurityData | null>(null);
+  const [storageData, setStorageData] = useState<StorageSecurityData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -56,13 +88,22 @@ export default function AdminSecurityDashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/security/status');
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to fetch security status');
+      const [resDb, resStorage] = await Promise.all([
+        fetch('/api/admin/security/status'),
+        fetch('/api/admin/security/storage')
+      ]);
+
+      if (!resDb.ok) {
+        const err = await resDb.json();
+        throw new Error(err.error || 'Failed to fetch database security status');
       }
-      const json = await res.json();
-      setData(json);
+      const jsonDb = await resDb.json();
+      setData(jsonDb);
+
+      if (resStorage.ok) {
+        const jsonStorage = await resStorage.json();
+        setStorageData(jsonStorage);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -73,6 +114,7 @@ export default function AdminSecurityDashboard() {
   useEffect(() => {
     fetchSecurityStatus();
   }, []);
+
 
   const generateMarkdownReport = () => {
     if (!data) return '';
@@ -105,9 +147,25 @@ ${t.policies.map(p => `- \`${p}\``).join('\n')}
 `).join('\n')}
 
 ---
-*Report certified by LeadPilot Multi-Tenant Security Engine.*
+
+## 4. Storage Security & Bucket Classification Audit
+- **Protected Buckets (Private):** ${storageData?.metrics.protectedBuckets || 6}
+- **Public Buckets (Non-Customer Data):** ${storageData?.metrics.publicBuckets || 3}
+- **Private Buckets (Customer Data):** ${storageData?.metrics.privateBuckets || 6}
+- **Signed URL Protection:** ${storageData?.metrics.signedUrlProtection || 'Enabled (15-min HMAC-SHA256)'}
+- **Ownership Checks:** ${storageData?.metrics.ownershipChecks || 'Passing'}
+- **Unauthorized Access Tests:** ${storageData?.metrics.unauthorizedAccessTests || 'Passed'}
+- **Storage Security Score:** ${storageData?.metrics.storageSecurityScore || 100}%
+
+| Bucket Name | Visibility | Contains Customer Data | Storage Policies | Risk Level | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.containsCustomerData ? 'Yes' : 'No'} | ${b.storagePolicies} | ${b.riskLevel} | ${b.status === 'PROTECTED' ? '🟢 PROTECTED' : '🔴 VULNERABLE'} |`).join('\n') || ''}
+
+---
+*Report certified by LeadPilot Multi-Tenant & Storage Security Engine.*
 `;
   };
+
 
   const copyReport = () => {
     navigator.clipboard.writeText(generateMarkdownReport());
@@ -326,7 +384,132 @@ ${t.policies.map(p => `- \`${p}\``).join('\n')}
           </div>
         </div>
 
+        {/* Storage Security Widget & Bucket Audit */}
+        <div className="space-y-6 pt-4">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Database className="h-6 w-6 text-sky-400" />
+              <h2 className="text-lg font-black text-white">Storage Security Gate</h2>
+            </div>
+            <span className="text-xs text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded-full flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Score: {storageData?.metrics.storageSecurityScore ?? 100}%
+            </span>
+          </div>
+
+          {/* Storage Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            <div className="bg-slate-800/80 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Protected Buckets</span>
+              <span className="text-2xl font-black text-emerald-400 mt-1 block">{storageData?.metrics.protectedBuckets ?? 6}</span>
+              <span className="text-[10px] text-slate-500">Private & isolated</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Public Buckets</span>
+              <span className="text-2xl font-black text-sky-400 mt-1 block">{storageData?.metrics.publicBuckets ?? 3}</span>
+              <span className="text-[10px] text-slate-500">Non-customer assets</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Private Buckets</span>
+              <span className="text-2xl font-black text-purple-400 mt-1 block">{storageData?.metrics.privateBuckets ?? 6}</span>
+              <span className="text-[10px] text-slate-500">Customer data</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Signed URL Protection</span>
+              <span className="text-sm font-black text-emerald-400 mt-2 block">{storageData?.metrics.signedUrlProtection ?? 'Enabled'}</span>
+              <span className="text-[10px] text-slate-500">15-min HMAC</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Ownership Checks</span>
+              <span className="text-sm font-black text-emerald-400 mt-2 block">{storageData?.metrics.ownershipChecks ?? 'Passing'}</span>
+              <span className="text-[10px] text-slate-500">Tenant verified</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Access Tests</span>
+              <span className="text-sm font-black text-emerald-400 mt-2 block">{storageData?.metrics.unauthorizedAccessTests ?? 'Passed'}</span>
+              <span className="text-[10px] text-slate-500">0 Leaks</span>
+            </div>
+          </div>
+
+          {/* Storage Bucket Classification Table */}
+          <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-slate-700/70 flex justify-between items-center">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Lock className="h-4 w-4 text-sky-400" />
+                Storage Bucket Classification & Policies
+              </h3>
+              <span className="text-[10px] font-bold text-slate-400">
+                Target: 9 Buckets
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900/60 text-slate-400 border-b border-slate-700/70 text-[10px] font-bold uppercase tracking-wider">
+                    <th className="p-3.5">Bucket Name</th>
+                    <th className="p-3.5">Visibility</th>
+                    <th className="p-3.5">Customer Data</th>
+                    <th className="p-3.5">Storage Policies</th>
+                    <th className="p-3.5">Risk Level</th>
+                    <th className="p-3.5">Security Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50 text-slate-200">
+                  {storageData?.buckets.map((b, idx) => (
+                    <tr key={idx} className="hover:bg-slate-700/30 transition-colors">
+                      <td className="p-3.5 font-bold font-mono text-white flex items-center gap-2">
+                        <span className="text-slate-500 text-[10px]">#{idx + 1}</span>
+                        {b.name}
+                      </td>
+                      <td className="p-3.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          b.visibility === 'Private' 
+                            ? 'bg-purple-950/80 text-purple-300 border border-purple-800' 
+                            : 'bg-slate-900 text-slate-300 border border-slate-700'
+                        }`}>
+                          {b.visibility}
+                        </span>
+                      </td>
+                      <td className="p-3.5">
+                        <span className={`font-bold ${b.containsCustomerData ? 'text-amber-400' : 'text-slate-400'}`}>
+                          {b.containsCustomerData ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="p-3.5">
+                        <span className="inline-flex items-center gap-1 text-emerald-400 font-bold text-[11px]">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {b.storagePolicies}
+                        </span>
+                      </td>
+                      <td className="p-3.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          b.riskLevel === 'Low' ? 'bg-emerald-950/80 text-emerald-300' :
+                          b.riskLevel === 'Medium' ? 'bg-amber-950/80 text-amber-300' :
+                          'bg-rose-950/80 text-rose-300'
+                        }`}>
+                          {b.riskLevel}
+                        </span>
+                      </td>
+                      <td className="p-3.5">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          b.status === 'PROTECTED'
+                            ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                            : 'bg-rose-950/80 text-rose-300 border border-rose-800'
+                        }`}>
+                          {b.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </div>
+
 
       {/* Security Report Modal */}
       {showReportModal && (

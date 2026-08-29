@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
+import { verifyToken } from '@/lib/auth';
 
 interface PrintPageProps {
   params: {
@@ -12,7 +14,28 @@ export const dynamic = 'force-dynamic';
 export default async function PrintProposalPage({ params }: PrintPageProps) {
   const { id } = params;
 
-  // Retrieve the prospect report
+  // 1. PDF Security: Verify User Authentication
+  const cookieStore = cookies();
+  const token = cookieStore.get('auth_token')?.value;
+  const authPayload = token ? verifyToken(token) : null;
+
+  if (!authPayload) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-6">
+        <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-2xl p-8 text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto text-xl font-black">
+            403
+          </div>
+          <h1 className="text-xl font-black">403 Forbidden</h1>
+          <p className="text-xs text-slate-300">
+            Storage Security Gate: Authentication is strictly required to view or export customer proposal PDFs.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Retrieve the prospect report and verify strict ownership
   const prospect = await prisma.prospect.findUnique({
     where: { id },
   });
@@ -20,6 +43,23 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
   if (!prospect) {
     notFound();
   }
+
+  if (prospect.userId !== authPayload.userId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-6">
+        <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-2xl p-8 text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto text-xl font-black">
+            403
+          </div>
+          <h1 className="text-xl font-black">403 Forbidden</h1>
+          <p className="text-xs text-slate-300">
+            Storage Security Violation: You do not have ownership of this proposal document. Cross-tenant access is blocked.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
 
   // Safely parse arrays
   let verifiedFacts = [];
