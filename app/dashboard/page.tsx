@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
 import { 
   BarChart3, 
   Search, 
@@ -728,11 +730,21 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <Link
+            href="/admin/security"
+            className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-sky-600 bg-slate-50 hover:bg-sky-50 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors shadow-2xs"
+            title="Multi-Tenant RLS Security Dashboard"
+          >
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <span className="hidden sm:inline">RLS Security</span>
+          </Link>
+
           <div className="border-l border-slate-200 pl-4 flex items-center gap-3">
             <span className="text-sm text-slate-700 font-semibold flex items-center gap-1">
               <UserIcon className="h-4 w-4 text-slate-400" />
               {user.email}
             </span>
+
             <button 
               onClick={handleLogout}
               className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"

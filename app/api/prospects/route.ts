@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getTenantPrisma } from '@/lib/tenantPrisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
@@ -9,8 +9,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const prospects = await prisma.prospect.findMany({
-      where: { userId },
+    const tenantDb = getTenantPrisma(userId);
+    const prospects = await tenantDb.prospect.findMany({
       orderBy: { createdAt: 'desc' },
     });
 
@@ -35,27 +35,29 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Prospect ID is required' }, { status: 400 });
     }
 
+    const tenantDb = getTenantPrisma(userId);
+
     // Verify ownership
-    const prospect = await prisma.prospect.findFirst({
-      where: { id, userId },
+    const prospect = await tenantDb.prospect.findUnique({
+      where: { id },
     });
 
     if (!prospect) {
-      return NextResponse.json({ error: 'Prospect not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Prospect not found or unauthorized' }, { status: 404 });
     }
 
-    await prisma.prospect.delete({
+    await tenantDb.prospect.delete({
       where: { id },
     });
 
     // Write log activity
-    await prisma.activityLog.create({
+    await tenantDb.activityLog.create({
       data: {
-        userId,
         action: 'DELETED_PROSPECT',
         details: `Deleted prospect report for ${prospect.companyName}`,
       },
     });
+
 
     return NextResponse.json({ success: true, message: 'Prospect deleted' });
   } catch (error: any) {

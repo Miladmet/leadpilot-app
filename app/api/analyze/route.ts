@@ -127,6 +127,61 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // 4b. Create relational customer records for multi-tenant protection
+    try {
+      await Promise.all([
+        prisma.researchReports.create({
+          data: {
+            userId: user.id,
+            prospectId: prospect.id,
+            url: crawlData.websiteUrl,
+            title: aiAnalysis.companyName,
+            category: 'Audit Research',
+            depth: 2,
+            crawledText: pruneHtmlContent(crawlData.combinedContent).slice(0, 5000),
+            diagnostics: JSON.stringify(crawlData.diagnostics),
+          },
+        }),
+        prisma.opportunityAnalysis.create({
+          data: {
+            userId: user.id,
+            prospectId: prospect.id,
+            opportunityScore: aiAnalysis.opportunityScore,
+            buyingSignalScore: aiAnalysis.buyingSignalScore,
+            recommendations: JSON.stringify(aiAnalysis.recommendations),
+            competitorGaps: JSON.stringify(aiAnalysis.competitorGaps),
+          },
+        }),
+        prisma.proposals.create({
+          data: {
+            userId: user.id,
+            prospectId: prospect.id,
+            title: `Growth & Optimization Proposal for ${aiAnalysis.companyName}`,
+            status: aiAnalysis.proposalStatus,
+            executiveSummary: aiAnalysis.executiveSummary,
+            scopeOfWork: JSON.stringify(aiAnalysis.recommendations),
+            pricing: aiAnalysis.pricingRecommendation,
+            roiEstimate: aiAnalysis.estimatedRoi,
+            plan30Day: aiAnalysis.thirtyDayPlan,
+            plan90Day: aiAnalysis.ninetyDayPlan,
+          },
+        }),
+        prisma.outreachMessages.create({
+          data: {
+            userId: user.id,
+            prospectId: prospect.id,
+            channel: 'Email',
+            recipient: `contact@${crawlData.websiteUrl.replace(/https?:\/\/(www\.)?/, '').split('/')[0]}`,
+            subject: `Growth Strategy Audit for ${aiAnalysis.companyName}`,
+            body: aiAnalysis.coldEmail,
+            status: 'Draft',
+          },
+        }),
+      ]);
+    } catch (relError) {
+      console.warn('Failed to insert auxiliary tenant records (non-blocking):', relError);
+    }
+
     // 5. Update user limits
     await prisma.user.update({
       where: { id: user.id },
@@ -145,6 +200,7 @@ export async function POST(req: NextRequest) {
         details: `Analyzed ${aiAnalysis.companyName} (${crawlData.diagnostics.pagesCrawled}/${crawlData.diagnostics.pagesDiscovered} pages, Pass Rate: ${aiAnalysis.verificationPassRate}%)`,
       },
     });
+
 
 
     return NextResponse.json({ success: true, prospect });

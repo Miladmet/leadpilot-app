@@ -22,6 +22,11 @@ model User {
   resetDate            DateTime      @default(now())
   prospects            Prospect[]
   activities           ActivityLog[]
+  researchReports      ResearchReports[]
+  opportunityAnalyses  OpportunityAnalysis[]
+  proposals            Proposals[]
+  outreachMessages     OutreachMessages[]
+  subscriptions        Subscriptions[]
 }
 
 model Prospect {
@@ -59,7 +64,6 @@ model Prospect {
   lowConfidenceCount   Int      @default(0)
   suppressedRecsCount  Int      @default(0)
   opportunityRange     String   @default("")
-
   revenueAssumptions   String   @default("") // JSON string
 
   // 3b. Crawl Coverage & Diagnostics Metrics
@@ -87,6 +91,11 @@ model Prospect {
   followUpSequence    String
   meetingAgenda       String
   outreachCampaign    String   @default("{}")
+
+  researchReports      ResearchReports[]
+  opportunityAnalyses  OpportunityAnalysis[]
+  proposals            Proposals[]
+  outreachMessages     OutreachMessages[]
 }
 
 model ActivityLog {
@@ -97,3 +106,83 @@ model ActivityLog {
   details   String
   createdAt DateTime @default(now())
 }
+
+model ResearchReports {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospectId      String?
+  prospect        Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  url             String
+  title           String    @default("")
+  category        String    @default("Homepage")
+  depth           Int       @default(0)
+  crawledText     String    @default("")
+  diagnostics     String    @default("{}")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model OpportunityAnalysis {
+  id                 String    @id @default(uuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospectId         String?
+  prospect           Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  opportunityScore   Int       @default(0)
+  buyingSignalScore  Int       @default(0)
+  recommendations    String    @default("[]")
+  competitorGaps     String    @default("[]")
+  riskFactors        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model Proposals {
+  id                    String    @id @default(uuid())
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospectId            String?
+  prospect              Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  title                 String    @default("Growth Strategy & System Optimization Proposal")
+  status                String    @default("Draft") // Draft, Ready, Sent, Accepted
+  executiveSummary      String    @default("")
+  scopeOfWork           String    @default("")
+  pricing               String    @default("")
+  roiEstimate           String    @default("")
+  plan30Day             String    @default("")
+  plan90Day             String    @default("")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model OutreachMessages {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospectId      String?
+  prospect        Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  channel         String    @default("Email") // Email, LinkedIn
+  recipient       String    @default("")
+  subject         String?
+  body            String    @default("")
+  status          String    @default("Draft") // Draft, Scheduled, Sent, Failed
+  sentAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Subscriptions {
+  id                   String    @id @default(uuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String    @default("")
+  stripeSubscriptionId String    @default("")
+  tier                 String    @default("FREE")
+  status               String    @default("active")
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+

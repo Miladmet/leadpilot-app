@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getTenantPrisma } from '@/lib/tenantPrisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 import nodemailer from 'nodemailer';
 
@@ -10,19 +10,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
     }
 
+    const tenantDb = getTenantPrisma(userId);
     const { prospectId, recipientEmail, subject, body, scheduledTime, sendImmediately, smtpConfig } = await req.json();
 
     if (!prospectId || !recipientEmail || !subject || !body) {
       return NextResponse.json({ error: 'Prospect ID, recipient email, subject, and body are required' }, { status: 400 });
     }
 
-    const prospect = await prisma.prospect.findUnique({
+    const prospect = await tenantDb.prospect.findUnique({
       where: { id: prospectId },
     });
 
-    if (!prospect || prospect.userId !== userId) {
-      return NextResponse.json({ error: 'Prospect record not found' }, { status: 404 });
+    if (!prospect) {
+      return NextResponse.json({ error: 'Prospect record not found or unauthorized' }, { status: 404 });
     }
+
 
     const smtpHost = smtpConfig?.host || process.env.SMTP_HOST;
     const smtpPort = parseInt(smtpConfig?.port || process.env.SMTP_PORT || '587');
@@ -97,21 +99,38 @@ export async function POST(req: NextRequest) {
       smtpConfig: smtpUser ? { host: smtpHost, port: smtpPort, user: smtpUser } : null
     };
 
-    const updatedProspect = await prisma.prospect.update({
+    const updatedProspect = await tenantDb.prospect.update({
       where: { id: prospectId },
       data: {
         outreachCampaign: JSON.stringify(campaignData)
       }
     });
 
+    // Record in OutreachMessages table
+    try {
+      await tenantDb.outreachMessages.create({
+        data: {
+          prospectId,
+          channel: 'Email',
+          recipient: recipientEmail,
+          subject,
+          body,
+          status,
+          sentAt: sentTime ? new Date(sentTime) : null,
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to record message in OutreachMessages table:', e);
+    }
+
     // Log Activity
-    await prisma.activityLog.create({
+    await tenantDb.activityLog.create({
       data: {
-        userId,
         action: sendImmediately ? 'CAMPAIGN_SENT' : 'CAMPAIGN_SCHEDULED',
         details: `${sendImmediately ? 'Sent' : 'Scheduled'} outbound audit pitch email for ${prospect.companyName} (${recipientEmail})`,
       },
     });
+
 
     return NextResponse.json({ success: true, status, campaign: campaignData, prospect: updatedProspect });
   } catch (error: any) {

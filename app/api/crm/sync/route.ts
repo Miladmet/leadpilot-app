@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getTenantPrisma } from '@/lib/tenantPrisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -14,14 +14,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Prospect ID is required' }, { status: 400 });
     }
 
+    const tenantDb = getTenantPrisma(userId);
+
     // Retrieve prospect data from database
-    const prospect = await prisma.prospect.findUnique({
+    const prospect = await tenantDb.prospect.findUnique({
       where: { id: prospectId },
     });
 
-    if (!prospect || prospect.userId !== userId) {
-      return NextResponse.json({ error: 'Prospect not found' }, { status: 404 });
+    if (!prospect) {
+      return NextResponse.json({ error: 'Prospect not found or unauthorized' }, { status: 404 });
     }
+
 
     // Determine active webhook endpoint (custom URL, environment variable, or local simulator)
     let webhookUrl = crmWebhookUrl || process.env.CRM_WEBHOOK_URL;
@@ -78,13 +81,13 @@ export async function POST(req: NextRequest) {
 
 
     // Log Activity
-    await prisma.activityLog.create({
+    await tenantDb.activityLog.create({
       data: {
-        userId,
         action: 'SYNCED_CRM',
         details: `Synced ${prospect.companyName} details to CRM hook: ${webhookUrl}`,
       },
     });
+
 
     return NextResponse.json({ success: true, url: webhookUrl });
   } catch (error: any) {

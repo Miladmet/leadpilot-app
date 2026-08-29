@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getTenantPrisma } from '@/lib/tenantPrisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
@@ -9,14 +9,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const tenantDb = getTenantPrisma(userId);
+
     // 1. Count prospects
-    const prospectsCount = await prisma.prospect.count({
-      where: { userId },
-    });
+    const prospectsCount = await tenantDb.prospect.count({});
 
     // 2. Fetch prospects scores for average
-    const prospects = await prisma.prospect.findMany({
-      where: { userId },
+    const prospects = await tenantDb.prospect.findMany({
       select: {
         opportunityScore: true,
         buyingSignalScore: true,
@@ -26,25 +25,24 @@ export async function GET(req: NextRequest) {
     let avgOppScore = 0;
     let avgBuyScore = 0;
     if (prospects.length > 0) {
-      const sumOpp = prospects.reduce((acc, p) => acc + p.opportunityScore, 0);
-      const sumBuy = prospects.reduce((acc, p) => acc + p.buyingSignalScore, 0);
+      const sumOpp = prospects.reduce((acc: number, p: any) => acc + p.opportunityScore, 0);
+      const sumBuy = prospects.reduce((acc: number, p: any) => acc + p.buyingSignalScore, 0);
       avgOppScore = Math.round(sumOpp / prospects.length);
       avgBuyScore = Math.round(sumBuy / prospects.length);
     }
 
     // 3. Get recent activities
-    const activities = await prisma.activityLog.findMany({
-      where: { userId },
+    const activities = await tenantDb.activityLog.findMany({
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
 
     // 4. Get recent prospects
-    const recentProspects = await prisma.prospect.findMany({
-      where: { userId },
+    const recentProspects = await tenantDb.prospect.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,
     });
+
 
     return NextResponse.json({
       success: true,

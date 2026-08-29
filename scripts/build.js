@@ -9,9 +9,17 @@ console.log(`[Build Setup] Detected production=${isProduction}. Using schema: ${
 try {
   // Generate Prisma Client for the active provider
   execSync(`npx prisma generate --schema=${schemaPath}`, { stdio: 'inherit' });
+
+  // In production, execute the RLS Security Gate to block deployment if customer tables lack RLS
+  if (isProduction && process.env.DATABASE_URL) {
+    console.log('[Build Gate] Enforcing Multi-Tenant Row Level Security (RLS) check...');
+    execSync('node scripts/verify-rls.js', { stdio: 'inherit' });
+  }
+
   // Compile Next.js project
   execSync('next build', { stdio: 'inherit' });
 } catch (error) {
-  console.error('[Build Setup] Compilation failed:', error);
+  console.error('[Build Setup] Compilation or Security Gate failed:', error);
   process.exit(1);
 }
+
