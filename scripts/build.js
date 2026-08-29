@@ -21,7 +21,8 @@ try {
   execSync('node scripts/verify-storage-security.js', { stdio: 'inherit' });
 
   // Compile Next.js project
-  execSync('next build', { stdio: 'inherit' });
+  execSync('npx next build', { stdio: 'inherit' });
+
 
 } catch (error) {
   console.error('[Build Setup] Compilation or Security Gate failed:', error);
