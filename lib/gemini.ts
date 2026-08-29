@@ -290,7 +290,13 @@ ${combinedText}
   try {
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    const auditedData = JSON.parse(responseText);
+    let cleanedText = responseText.trim();
+    if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/^```(?:json)?\n?/i, '');
+      cleanedText = cleanedText.replace(/\n?```$/i, '');
+    }
+    cleanedText = cleanedText.trim();
+    const auditedData = JSON.parse(cleanedText);
 
     const verifiedRecommendations = (auditedData.recommendations || []).filter(
       (r: any) => typeof r.confidence === 'number' && r.confidence >= 70 && r.status !== 'Suppressed'
