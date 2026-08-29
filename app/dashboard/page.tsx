@@ -32,8 +32,13 @@ import {
   Briefcase,
   AlertCircle,
   ThumbsDown,
-  ThumbsUp
+  ThumbsUp,
+  Globe,
+  Clock,
+  FileCheck,
+  Filter
 } from 'lucide-react';
+
 
 interface VerifiedFact {
   fact: string;
@@ -113,7 +118,15 @@ interface Prospect {
   lowConfidenceCount: number;
   suppressedRecsCount: number;
   opportunityRange: string;
+
   revenueAssumptions: string; // JSON
+  pagesDiscoveredCount?: number;
+  pagesCrawledCount?: number;
+  crawlCoveragePercent?: number;
+  crawlDurationMs?: number;
+  totalTextExtracted?: number;
+  crawledPagesData?: string; // JSON
+  crawlDiagnostics?: string; // JSON
   executiveSummary: string;
   expectedResults: string;
   estimatedRoi: string;
@@ -127,6 +140,28 @@ interface Prospect {
   meetingAgenda: string;
   createdAt: string;
 }
+
+interface DiscoveredPageItem {
+  url: string;
+  title: string;
+  category: string;
+  depth: number;
+  status: 'Crawled' | 'Skipped (Capped)' | 'Failed';
+  textLength: number;
+  snippet?: string;
+  discoveredFrom?: string;
+}
+
+interface CrawlDiagnosticsData {
+  pagesDiscovered: number;
+  pagesCrawled: number;
+  pagesSkipped: number;
+  crawlDurationMs: number;
+  totalTextExtracted: number;
+  coveragePercentage: number;
+  warningMessage?: string;
+}
+
 
 interface Activity {
   id: string;
@@ -176,11 +211,15 @@ export default function Dashboard() {
   const [showCalcIndex, setShowCalcIndex] = useState<number | null>(null);
   
   // Subtabs
-  const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions'>('facts');
+  const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions' | 'competitors'>('facts');
+  const [vaultSubTab, setVaultSubTab] = useState<'pages' | 'citations'>('pages');
+  const [vaultSearch, setVaultSearch] = useState('');
+  const [selectedPageSnippet, setSelectedPageSnippet] = useState<{ title: string; url: string; snippet?: string } | null>(null);
   const [outreachSubTab, setOutreachSubTab] = useState<'email' | 'linkedin' | 'followup' | 'discovery' | 'angle'>('email');
   const [billingLoading, setBillingLoading] = useState(false);
   const [syncingCrm, setSyncingCrm] = useState(false);
   const [crmSuccess, setCrmSuccess] = useState(false);
+
   const [campaignEmail, setCampaignEmail] = useState('');
   const [campaignSubject, setCampaignSubject] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
@@ -304,29 +343,52 @@ export default function Dashboard() {
     }
   };
 
+  const handleConfigureWebhook = () => {
+    const current = typeof window !== 'undefined' ? localStorage.getItem('leadpilot_crm_webhook') || '' : '';
+    const input = window.prompt(
+      'Enter your Zapier, Make, HubSpot, or CRM Webhook URL (leave empty to use the built-in local simulator):',
+      current
+    );
+    if (input !== null) {
+      const trimmed = input.trim();
+      if (trimmed) {
+        localStorage.setItem('leadpilot_crm_webhook', trimmed);
+        alert(`Webhook URL set to: ${trimmed}`);
+      } else {
+        localStorage.removeItem('leadpilot_crm_webhook');
+        alert('Using default CRM simulator webhook.');
+      }
+    }
+  };
+
   const handleCrmSync = async () => {
     if (!activeProspect) return;
     setSyncingCrm(true);
     setCrmSuccess(false);
     try {
+      const savedWebhook = typeof window !== 'undefined' ? localStorage.getItem('leadpilot_crm_webhook') : null;
       const res = await fetch('/api/crm/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prospectId: activeProspect.id }),
+        body: JSON.stringify({ 
+          prospectId: activeProspect.id,
+          crmWebhookUrl: savedWebhook || undefined,
+        }),
       });
+      const data = await res.json();
       if (res.ok) {
         setCrmSuccess(true);
         setTimeout(() => setCrmSuccess(false), 3000);
       } else {
-        const data = await res.json();
         alert(data.error || 'Failed to sync to CRM');
       }
-    } catch (e) {
-      alert('Failed to sync to CRM');
+    } catch (e: any) {
+      alert(e?.message || 'Failed to sync to CRM');
     } finally {
       setSyncingCrm(false);
     }
   };
+
 
   const handleSendCampaign = async (sendImmediately: boolean) => {
     if (!activeProspect) return;
@@ -475,6 +537,34 @@ export default function Dashboard() {
     if (!jsonStr) return [];
     try { return JSON.parse(jsonStr) || []; } catch { return []; }
   };
+
+  const parseCrawledPages = (jsonStr: string | undefined): DiscoveredPageItem[] => {
+    if (!jsonStr) return [];
+    try { return JSON.parse(jsonStr) || []; } catch { return []; }
+  };
+
+  const parseCrawlDiagnostics = (jsonStr: string | undefined, p?: Prospect | null): CrawlDiagnosticsData => {
+    if (jsonStr) {
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (parsed && typeof parsed.pagesDiscovered === 'number') {
+          return parsed;
+        }
+      } catch { }
+    }
+    const discovered = p?.pagesDiscoveredCount ?? 1;
+    const crawled = p?.pagesCrawledCount ?? 1;
+    return {
+      pagesDiscovered: discovered,
+      pagesCrawled: crawled,
+      pagesSkipped: Math.max(0, discovered - crawled),
+      crawlDurationMs: p?.crawlDurationMs ?? 0,
+      totalTextExtracted: p?.totalTextExtracted ?? 0,
+      coveragePercentage: p?.crawlCoveragePercent ?? 100,
+      warningMessage: crawled <= 1 ? 'Limited website coverage may reduce analysis quality.' : undefined
+    };
+  };
+
 
   // Trigger modal drawer
   const openShowWhy = (title: string, explanation: string, breakdown: ScorePoint[], evidence: string[], status?: string) => {
@@ -773,10 +863,10 @@ export default function Dashboard() {
               </div>
 
               {/* Suppressed / audit counts sub-header */}
-              <div className="px-6 py-2 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-[10px] text-slate-500 font-semibold">
+              <div className="px-6 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center text-[10px] text-slate-500 font-semibold gap-2">
                 <span>Facts Verified: <strong className="text-emerald-600">{activeProspect.factsVerifiedCount}</strong></span>
                 <span>Claims Rejected: <strong className="text-rose-600">{activeProspect.claimsRejectedCount}</strong></span>
-                <span>Low Confidence suppressed: <strong className="text-amber-600">{activeProspect.suppressedRecsCount}</strong></span>
+                <span>Crawl Coverage: <strong className="text-sky-700">{activeProspect.pagesCrawledCount || 1} / {activeProspect.pagesDiscoveredCount || 1} pages ({activeProspect.crawlCoveragePercent || 100}%)</strong></span>
                 <span>Opportunity Range: <strong className="text-slate-700 font-mono">{activeProspect.opportunityRange}</strong></span>
               </div>
 
@@ -791,6 +881,62 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+
+              {/* Crawl Diagnostics Panel (Requirement 12) */}
+              {(() => {
+                const diag = parseCrawlDiagnostics(activeProspect.crawlDiagnostics, activeProspect);
+                return (
+                  <div className="px-6 py-3 bg-slate-50 border-b border-slate-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Globe className="h-3.5 w-3.5 text-sky-600" />
+                        Website Research Engine • Crawl Diagnostics
+                      </span>
+                      <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                        Coverage: {diag.coveragePercentage}%
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+                      <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                        <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pages Discovered</span>
+                        <strong className="text-slate-800 text-sm font-black">{diag.pagesDiscovered}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                        <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pages Crawled</span>
+                        <strong className="text-emerald-600 text-sm font-black">{diag.pagesCrawled}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                        <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pages Skipped</span>
+                        <strong className="text-slate-600 text-sm font-black">{diag.pagesSkipped}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                        <span className="text-[9px] text-slate-400 font-semibold block uppercase">Crawl Duration</span>
+                        <strong className="text-indigo-600 text-sm font-black">
+                          {((diag.crawlDurationMs || 0) / 1000).toFixed(1)}s
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                        <span className="text-[9px] text-slate-400 font-semibold block uppercase">Text Extracted</span>
+                        <strong className="text-amber-600 text-sm font-black">
+                          {((diag.totalTextExtracted || 0) / 1024).toFixed(1)} KB
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* SINGLE PAGE COVERAGE WARNING (Requirement 13) */}
+              {(activeProspect.pagesCrawledCount || 1) <= 1 && (
+                <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center gap-2.5 shadow-2xs">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <p className="font-semibold text-xs">
+                    Limited website coverage may reduce analysis quality.
+                  </p>
+                </div>
+              )}
+
 
               {/* SPECULATIVE CAVEAT BANNER IF EVIDENCE IS LOW */}
               {activeProspect.proposalStatus === 'Speculative' && (
@@ -1133,6 +1279,15 @@ export default function Dashboard() {
                             {syncingCrm ? '⏳ Syncing...' : crmSuccess ? '✓ Synced to CRM' : '🔗 Sync to CRM'}
                           </button>
 
+                          <button
+                            onClick={handleConfigureWebhook}
+                            title="Configure CRM or Zapier Webhook URL"
+                            className="text-xs px-2.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 shadow-sm transition-colors"
+                          >
+                            ⚙️
+                          </button>
+
+
                           <a
                             href={`/proposal/${activeProspect.id}/print`}
                             target="_blank"
@@ -1367,35 +1522,167 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* 4. Evidence Vault */}
+                {/* 4. Evidence Vault (Requirement 6: Store all discovered pages in the Evidence Vault) */}
                 {activeTab === 'vault' && (
                   <div className="space-y-4 flex-1 flex flex-col">
-                    <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Evidence Citations Vault</h4>
-                    <p className="text-[11px] text-slate-400">Verifiable quotes, job releases, and content signals tracked by the verification checks.</p>
-                    
-                    <div className="flex-1 overflow-y-auto max-h-[300px] space-y-3 pr-1">
-                      {parseSignals(activeProspect.buyingSignals).map((sig, idx) => (
-                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2">
-                          <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
-                            <span className="font-bold text-sky-700 uppercase tracking-wide text-[9px] bg-sky-50 px-2 py-0.5 rounded border border-sky-100">
-                              Signal: {sig.signal}
-                            </span>
-                            <span className="text-[9px] text-slate-400">Audited: {sig.dateDiscovered}</span>
-                          </div>
-                          
-                          <blockquote className="border-l-2 border-slate-400 pl-2 text-slate-600 italic">
-                            "{sig.sourceText}"
-                          </blockquote>
+                    <div className="flex flex-wrap justify-between items-center border-b border-slate-100 pb-2 gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setVaultSubTab('pages')}
+                          className={`text-xs px-3 py-1.5 rounded-full font-bold transition-all flex items-center gap-1.5 ${
+                            vaultSubTab === 'pages' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          <Globe className="h-3.5 w-3.5" />
+                          Discovered & Crawled Pages ({parseCrawledPages(activeProspect.crawledPagesData).length || activeProspect.pagesCrawledCount || 1})
+                        </button>
+                        <button
+                          onClick={() => setVaultSubTab('citations')}
+                          className={`text-xs px-3 py-1.5 rounded-full font-bold transition-all flex items-center gap-1.5 ${
+                            vaultSubTab === 'citations' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          <FileCheck className="h-3.5 w-3.5" />
+                          Verifiable Citations ({parseSignals(activeProspect.buyingSignals).length})
+                        </button>
+                      </div>
 
-                          <a href={sig.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-600 flex items-center gap-0.5 hover:underline pt-1 truncate">
-                            <LinkIcon className="h-3 w-3" />
-                            Source page: {sig.sourceUrl}
-                          </a>
+                      {vaultSubTab === 'pages' && (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Filter pages by URL or title..."
+                            value={vaultSearch}
+                            onChange={(e) => setVaultSearch(e.target.value)}
+                            className="text-xs pl-7 pr-3 py-1 bg-slate-50 border border-slate-200 rounded-lg w-56 focus:outline-none focus:border-sky-500"
+                          />
+                          <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2 top-2" />
                         </div>
-                      ))}
+                      )}
                     </div>
+
+                    {/* SubTab 1: Discovered & Crawled Pages Inventory */}
+                    {vaultSubTab === 'pages' && (() => {
+                      const allPages = parseCrawledPages(activeProspect.crawledPagesData);
+                      const filteredPages = allPages.filter(p => 
+                        !vaultSearch ||
+                        p.url.toLowerCase().includes(vaultSearch.toLowerCase()) ||
+                        p.title.toLowerCase().includes(vaultSearch.toLowerCase()) ||
+                        p.category.toLowerCase().includes(vaultSearch.toLowerCase())
+                      );
+
+                      if (allPages.length === 0) {
+                        return (
+                          <div className="p-8 text-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-xl">
+                            <Globe className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                            <p className="font-semibold text-slate-600">Single Homepage Audited</p>
+                            <p className="text-[11px] mt-0.5">Run a new scan to crawl up to 20 prioritized internal pages.</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs flex-1 flex flex-col max-h-[340px]">
+                          <div className="overflow-y-auto flex-1">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-600 font-bold z-10">
+                                <tr>
+                                  <th className="p-2.5">Page Title & URL</th>
+                                  <th className="p-2.5">Category</th>
+                                  <th className="p-2.5">Depth</th>
+                                  <th className="p-2.5">Status</th>
+                                  <th className="p-2.5 text-right">Extracted</th>
+                                  <th className="p-2.5 text-center">Snippet</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-150 bg-white">
+                                {filteredPages.map((page, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                    <td className="p-2.5 max-w-[240px]">
+                                      <span className="font-bold text-slate-800 block truncate" title={page.title}>{page.title || 'Untitled Page'}</span>
+                                      <a
+                                        href={page.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-[10px] text-sky-600 hover:underline flex items-center gap-1 truncate"
+                                        title={page.url}
+                                      >
+                                        <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                                        {page.url}
+                                      </a>
+                                    </td>
+                                    <td className="p-2.5">
+                                      <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
+                                        {page.category}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5">
+                                      <span className="text-[10px] font-mono text-slate-500">
+                                        Level {page.depth}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5">
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                        page.status === 'Crawled'
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                          : page.status === 'Failed'
+                                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                          : 'bg-slate-100 text-slate-500 border-slate-200'
+                                      }`}>
+                                        {page.status === 'Crawled' ? '✓ Crawled' : page.status}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-right font-mono text-slate-500 text-[10px]">
+                                      {page.textLength ? `${(page.textLength / 1024).toFixed(1)} KB` : '—'}
+                                    </td>
+                                    <td className="p-2.5 text-center">
+                                      {page.snippet ? (
+                                        <button
+                                          onClick={() => setSelectedPageSnippet({ title: page.title, url: page.url, snippet: page.snippet })}
+                                          className="text-[10px] font-bold text-sky-600 hover:text-sky-700 hover:underline"
+                                        >
+                                          View Text
+                                        </button>
+                                      ) : (
+                                        <span className="text-slate-300 text-[10px]">—</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* SubTab 2: Verifiable Evidence & Citations */}
+                    {vaultSubTab === 'citations' && (
+                      <div className="flex-1 overflow-y-auto max-h-[300px] space-y-3 pr-1">
+                        {parseSignals(activeProspect.buyingSignals).map((sig, idx) => (
+                          <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2">
+                            <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
+                              <span className="font-bold text-sky-700 uppercase tracking-wide text-[9px] bg-sky-50 px-2 py-0.5 rounded border border-sky-100">
+                                Signal: {sig.signal}
+                              </span>
+                              <span className="text-[9px] text-slate-400">Audited: {sig.dateDiscovered}</span>
+                            </div>
+                            
+                            <blockquote className="border-l-2 border-slate-400 pl-2 text-slate-600 italic">
+                              "{sig.sourceText}"
+                            </blockquote>
+
+                            <a href={sig.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-600 flex items-center gap-0.5 hover:underline pt-1 truncate">
+                              <LinkIcon className="h-3 w-3" />
+                              Source page: {sig.sourceUrl}
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
+
 
                 {/* 5. Safe Opportunity Valuation Engine */}
                 {activeTab === 'valuation' && (
@@ -1632,6 +1919,44 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* Extracted Page Content Preview Modal */}
+      {selectedPageSnippet && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-4">
+            <div className="flex justify-between items-start border-b border-slate-150 pb-3">
+              <div className="max-w-[500px]">
+                <span className="text-[10px] font-bold text-sky-600 uppercase tracking-wider block">Evidence Vault Content Extracted</span>
+                <h4 className="font-bold text-slate-800 text-sm truncate">{selectedPageSnippet.title || 'Page Content'}</h4>
+                <a href={selectedPageSnippet.url} target="_blank" rel="noreferrer" className="text-[11px] text-slate-400 hover:text-sky-600 flex items-center gap-1 truncate mt-0.5">
+                  <ExternalLink className="h-3 w-3" />
+                  {selectedPageSnippet.url}
+                </a>
+              </div>
+              <button
+                onClick={() => setSelectedPageSnippet(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-[300px] overflow-y-auto text-xs text-slate-700 font-sans leading-relaxed whitespace-pre-wrap">
+              {selectedPageSnippet.snippet || 'No text snippet recorded.'}
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={() => setSelectedPageSnippet(null)}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

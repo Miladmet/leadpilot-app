@@ -59,7 +59,18 @@ model Prospect {
   lowConfidenceCount   Int      @default(0)
   suppressedRecsCount  Int      @default(0)
   opportunityRange     String   @default("")
+
   revenueAssumptions   String   @default("") // JSON string
+
+  // 3b. Crawl Coverage & Diagnostics Metrics
+  pagesDiscoveredCount Int      @default(1)
+  pagesCrawledCount    Int      @default(1)
+  crawlCoveragePercent Int      @default(100)
+  crawlDurationMs      Int      @default(0)
+  totalTextExtracted   Int      @default(0)
+  crawledPagesData     String   @default("[]") // JSON of Array<{ url, title, category, depth, status, textLength }>
+  crawlDiagnostics     String   @default("{}") // JSON of { pagesDiscovered, pagesCrawled, pagesSkipped, crawlDurationMs, textExtractedBytes, warningMessage }
+
 
   // 4. Proposal Builder
   executiveSummary    String

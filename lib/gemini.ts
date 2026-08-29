@@ -120,12 +120,8 @@ export async function analyzeCompany(combinedText: string, companyName: string):
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-    },
-  });
+  const candidateModels = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+
 
   const isFallback = combinedText.includes('crawling_failed');
   let fallbackDomain = '';
@@ -146,42 +142,44 @@ ${isFallback ? `
 The direct website crawler was blocked. You MUST build this proposal, gaps snapshot, and audit based on your pre-trained public knowledge archive of company "${fallbackCompany}" (Domain: ${fallbackDomain}).
 For verified facts, set "sourceUrl" to "https://${fallbackDomain}" and "evidenceText" to "Cited from public domain archives".
 ` : `
-Analyze the XML-formatted company crawled website text. Every claim you make must be traceable back to specific quotes and source URLs in the text.
+Analyze the XML-formatted company crawled website text containing MULTIPLE crawled pages. Every claim you make must be traceable back to specific quotes and source URLs across the crawled pages inventory.
 `}
 
-Your output must be self-corrected. Follow these Self-Auditing rules:
-1. Checked Facts: Look at the crawled text. Is there direct textual evidence verifying this fact? If not, change status to "Suppressed" and drop it. Otherwise, mark status "Verified" and verify confidence is 100%. Never invent facts.
-2. AI Insights: Does the text evidence directly support the finding?
-   - If evidence is weak: reduce the confidence score, set status to "Uncertain".
-   - If evidence is missing or conflicts: set status "Suppressed".
-   - If evidence is strong: set status "Likely" or "Verified".
-3. What Would You Sell? Service Recommendation Engine:
-   - Recommend the most appropriate service offering.
-   - Limit recommendations to exactly the 3 highest-confidence opportunities. Rank by Evidence Strength, Business Impact, and Confidence.
-   - For every recommended service, explain the exact pricing calculation formula in the "calculation" field (e.g. Setup Fee ($15,000) + 4 months retainer ($5,000/mo) = $35,000).
-   - For every recommendation, list the supporting text quotes in "evidenceList". If no quotes are present, change status to "Suppressed".
-   - If confidence is < 70%, change status to "Suppressed".
-   - Compute an Opportunity Prioritization score ("priorityScore") mathematically using the formula: (Evidence Quality * 0.4) + (Confidence Score * 0.4) + (Business Impact Score [Low=10, Medium=20, High=30] * 0.2). Map this score to a priority label:
+
+Your output must be self-corrected. Follow these Multi-Page Evidence & Self-Auditing rules:
+1. Checked Facts Across All Pages:
+   - Search the entire crawled pages inventory (Homepage, About, Pricing, Products, Services, Blog, Careers, FAQ, Contact, Terms, Privacy).
+   - Trace each verified fact to its specific source page URL and extract exact direct text quotes. Set status "Verified" and confidence 100%. Never invent facts.
+2. AI Insights & Evidence Density Boost:
+   - Synthesize findings across multiple pages.
+   - When findings are corroborated across 2 or more distinct crawled pages, award higher confidence (85% - 98%).
+   - If evidence is weak or limited to a single ambiguous quote, set confidence 70% - 80% with status "Likely". If missing, set "Suppressed".
+3. What Would You Sell? Multi-Page Service Recommendation Engine:
+   - Recommend the most impactful service offerings based on the aggregated multi-page audit (e.g., pricing optimizations from Pricing pages, lead capture gaps from Product pages, recruitment/talent operations from Career pages).
+   - Limit recommendations to exactly the 3 highest-confidence opportunities. Rank by Evidence Strength, Multi-Page Impact, and Confidence.
+   - For every recommended service, provide the exact pricing calculation formula in "calculation" (e.g. Setup Fee ($15,000) + 4 months retainer ($5,000/mo) = $35,000).
+   - Provide concrete text quotes from the crawled pages in "evidenceList".
+   - Compute an Opportunity Prioritization score ("priorityScore"): (Evidence Quality * 0.4) + (Confidence Score * 0.4) + (Business Impact Score [Low=10, Medium=20, High=30] * 0.2). Map this score to:
      - < 50: "Weak"
      - 50 - 69: "Moderate"
      - 70 - 79: "Strong"
      - 80 - 89: "High Priority"
      - >= 90: "Very High Priority"
-   - Output the priority label in "priority", score in "priorityScore", and formula in "calculationDetails".
-4. Competitor Gap Snapshot:
+4. Comprehensive Competitor Gap Snapshot:
    - Identify 2 to 5 relevant competitors for this prospect domain/industry.
-   - Compare publicly observable website features (e.g., Lead Capture Forms, Blog, Online Scheduling, Mobile Responsiveness, SSL, Chatbot) prospect vs competitors.
-   - Output a JSON array under "competitorGaps" containing the gap analysis with featureName, prospectStatus ("Detected" | "Not Detected" | "Not Visible" | "No Blog Found"), competitorStatus (e.g. "Present on 3 of 5 sites"), and confidence (100%).
-5. Calculate Trust Scores & Technologies:
-   - "evidenceQuality": 0 to 100 percentage. Rate how clear the supporting quotes are.
-   - "verificationPassRate": 0 to 100 percentage. Count of (Verified + Likely items) divided by total initial items generated.
-   - "findingReliability": 0 to 100 percentage. Combined score of quality and verification success.
-   - Observe script sources, meta elements, and text clues to detect active technologies (e.g. WordPress, Stripe, HubSpot, Google Analytics, Shopify, React). Return this list of systems inside the "techStack" field of "scoreExplanations".
+   - Audit web features across the ENTIRE crawled pages inventory (e.g., if a Blog page, Pricing page, Online Scheduling, Lead Capture, SSL, Terms, or Careers page was crawled, mark the feature "Detected" with 100% confidence; only mark "Not Detected" if truly absent across all crawled pages).
+   - Return an array in "competitorGaps" with featureName, prospectStatus ("Detected" | "Not Detected" | "Not Visible" | "No Blog Found"), competitorStatus, and confidence.
+5. Trust Scores & Verified Multi-Page Evidence Scaling:
+   - "evidenceQuality": 0 to 100 percentage. Measures clarity and richness of quotes across crawled pages.
+   - "verificationPassRate": 0 to 100 percentage. Rate of verified + likely items against total generated. Scale higher when multiple pages yield verified claims.
+   - "findingReliability": 0 to 100 percentage. Composite score of evidence quality, pass rate, and page coverage depth.
+   - Detect technologies (e.g., WordPress, Stripe, HubSpot, Google Analytics, Shopify, Next.js, Cloudflare) across scripts, meta tags, and text clues across all crawled pages. Return list in "techStack".
 6. Safe Financial Estimates:
-   - NEVER claim future revenue. Calculate a safe "opportunityRange" (e.g. "$15,000 - $35,000") representing the total project contract sizes of the recommended services.
-   - Construct "revenueAssumptions" containing: "assumptions" (list), "pricingModel" (explanation), and "disclaimer" (standard caveat stating no future revenues are guaranteed).
-7. Recalculate mathematical score explanations:
-   - Ensure the breakdowns (+20 Active hiring, etc.) sum up exactly to the opportunityScore and buyingSignalScore.
+   - Calculate safe "opportunityRange" (e.g. "$15,000 - $35,000") representing realistic project contract values.
+   - Provide "revenueAssumptions" with assumptions list, pricingModel, and disclaimer.
+7. Mathematical Score Explanations:
+   - Ensure breakdown point values sum up exactly to opportunityScore and buyingSignalScore.
+
 
 Return a JSON object conforming exactly to this schema:
 {
@@ -288,7 +286,29 @@ ${combinedText}
 `;
 
   try {
-    const result = await model.generateContent(prompt);
+    let result = null;
+    let lastError = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: 'application/json',
+          },
+        });
+        result = await model.generateContent(prompt);
+        break;
+      } catch (err: any) {
+        console.warn(`[Gemini Pipeline] Model ${modelName} failed, attempting next candidate:`, err?.message || err);
+        lastError = err;
+      }
+    }
+
+    if (!result) {
+      throw lastError || new Error('All Gemini model candidates failed to generate content');
+    }
+
     const responseText = result.response.text();
     let cleanedText = responseText.trim();
     if (cleanedText.startsWith('```')) {

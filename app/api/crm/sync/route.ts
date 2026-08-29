@@ -23,8 +23,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Prospect not found' }, { status: 404 });
     }
 
-    // Default webhook endpoint from environment or a fallback simulator hook
-    const webhookUrl = crmWebhookUrl || process.env.CRM_WEBHOOK_URL || 'https://httpbin.org/post';
+    // Determine active webhook endpoint (custom URL, environment variable, or local simulator)
+    let webhookUrl = crmWebhookUrl || process.env.CRM_WEBHOOK_URL;
+    if (!webhookUrl || webhookUrl.trim() === '') {
+      webhookUrl = 'http://localhost:3000/api/crm/mock';
+    }
 
     let recommendationsList = [];
     try {
@@ -51,17 +54,28 @@ export async function POST(req: NextRequest) {
     };
 
     // Post to the webhook
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    let response;
+    try {
+      response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (fetchErr: any) {
+      throw new Error(`Could not connect to CRM webhook (${webhookUrl}): ${fetchErr.message}`);
+    }
 
     if (!response.ok) {
-      throw new Error(`CRM Hook returned status code: ${response.status}`);
+      if (response.status === 404) {
+        throw new Error(
+          `CRM Webhook endpoint returned 404 Not Found. The webhook URL (${webhookUrl}) appears to be deleted or expired. Please check your Zapier / CRM settings or use the local simulator.`
+        );
+      }
+      throw new Error(`CRM Webhook returned status code ${response.status}`);
     }
+
 
     // Log Activity
     await prisma.activityLog.create({

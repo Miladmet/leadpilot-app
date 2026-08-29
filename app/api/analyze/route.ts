@@ -6,17 +6,14 @@ import { analyzeCompany } from '@/lib/gemini';
 
 function pruneHtmlContent(content: string): string {
   if (!content) return '';
+  // Preserve <website>, </website>, <page...>, </page> XML structure while cleaning any residual tags
   let pruned = content
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
-    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-    .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
-  pruned = pruned.replace(/<!--[\s\S]*?-->/g, '');
-  pruned = pruned.replace(/<\/?[^>]+(>|$)/g, ' ');
-  pruned = pruned.replace(/\s+/g, ' ').trim();
-  return pruned;
+    .replace(/<!--[\s\S]*?-->/g, '');
+  return pruned.trim();
 }
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -106,6 +103,15 @@ export async function POST(req: NextRequest) {
         opportunityRange: aiAnalysis.opportunityRange,
         revenueAssumptions: aiAnalysis.revenueAssumptions,
 
+        // NEW: Crawl Coverage & Diagnostics Metrics
+        pagesDiscoveredCount: crawlData.diagnostics.pagesDiscovered,
+        pagesCrawledCount: crawlData.diagnostics.pagesCrawled,
+        crawlCoveragePercent: crawlData.diagnostics.coveragePercentage,
+        crawlDurationMs: crawlData.diagnostics.crawlDurationMs,
+        totalTextExtracted: crawlData.diagnostics.totalTextExtracted,
+        crawledPagesData: JSON.stringify(crawlData.discoveredPages),
+        crawlDiagnostics: JSON.stringify(crawlData.diagnostics),
+
         executiveSummary: aiAnalysis.executiveSummary,
         expectedResults: aiAnalysis.expectedResults,
         estimatedRoi: aiAnalysis.estimatedRoi,
@@ -136,9 +142,10 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         action: 'ANALYZED_COMPANY',
-        details: `Generated proposal for ${aiAnalysis.companyName} (Pass Rate: ${aiAnalysis.verificationPassRate}%)`,
+        details: `Analyzed ${aiAnalysis.companyName} (${crawlData.diagnostics.pagesCrawled}/${crawlData.diagnostics.pagesDiscovered} pages, Pass Rate: ${aiAnalysis.verificationPassRate}%)`,
       },
     });
+
 
     return NextResponse.json({ success: true, prospect });
   } catch (error: any) {
