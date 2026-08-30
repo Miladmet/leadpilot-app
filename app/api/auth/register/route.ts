@@ -11,6 +11,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
+    if (password.length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -70,7 +74,14 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: any) {
-    console.error('Registration API Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('[Auth API] Registration exception:', {
+      message: error?.message,
+      stack: error?.stack,
+      timestamp: new Date().toISOString()
+    });
+    return NextResponse.json(
+      { error: 'The registration service encountered an unexpected error. Please retry.' },
+      { status: 500 }
+    );
   }
 }

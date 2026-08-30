@@ -46,7 +46,14 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: any) {
-    console.error('Login API Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('[Auth API] Login exception:', {
+      message: error?.message,
+      stack: error?.stack,
+      timestamp: new Date().toISOString()
+    });
+    return NextResponse.json(
+      { error: 'The authentication service encountered an unexpected error. Please retry.' },
+      { status: 500 }
+    );
   }
 }

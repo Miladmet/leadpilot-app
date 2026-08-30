@@ -44,6 +44,10 @@ try {
   console.log('[Build Gate] Enforcing Traffic Growth Engine Verification Gate...');
   execSync('node scripts/test-growth-engine.js', { stdio: 'inherit' });
 
+  // Execute Authentication Reliability & Diagnostics Gate
+  console.log('[Build Gate] Enforcing Authentication Reliability & Diagnostics Gate...');
+  execSync('node scripts/test-auth-diagnostics.js', { stdio: 'inherit' });
+
   // Compile Next.js project
   execSync('npx next build', { stdio: 'inherit' });
 
