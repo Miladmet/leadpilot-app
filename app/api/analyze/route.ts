@@ -6,6 +6,7 @@ import { analyzeCompany } from '@/lib/gemini';
 import { withTimeout, withRetry, TIMEOUT_LIMITS } from '@/lib/stability';
 import { normalizeWebsiteUrl, detectAnalysisChanges } from '@/lib/changeDetection';
 import { classifyAnalysisError } from '@/lib/analysisErrors';
+import { selfHealDatabaseSchema } from '@/lib/dbSelfHeal';
 
 export const maxDuration = 60; // 60s maximum execution duration on Vercel
 export const dynamic = 'force-dynamic';
@@ -189,73 +190,107 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Save to Database with new client acquisition layout
-    const prospect = await prisma.prospect.create({
-      data: {
-        userId: user.id,
-        companyName: sanitizeString(aiAnalysis.companyName, 'Target Company'),
-        websiteUrl: crawlData.websiteUrl,
-        
-        // Serialized payloads
-        verifiedFacts: JSON.stringify(Array.isArray(aiAnalysis.verifiedFacts) ? aiAnalysis.verifiedFacts : []),
-        aiInferences: JSON.stringify(Array.isArray(aiAnalysis.aiInferences) ? aiAnalysis.aiInferences : []),
-        buyingSignals: JSON.stringify(syntheticSignals),
-        recommendations: JSON.stringify(Array.isArray(aiAnalysis.recommendations) ? aiAnalysis.recommendations : []),
-        competitorGaps: JSON.stringify(Array.isArray(aiAnalysis.competitorGaps) ? aiAnalysis.competitorGaps : []),
-        scoreExplanations: JSON.stringify(aiAnalysis.scoreExplanations || {}),
+    // 5. Save to Database with resilient auto-heal and fallback
+    const prospectPayload: any = {
+      userId: user.id,
+      companyName: sanitizeString(aiAnalysis.companyName, 'Target Company'),
+      websiteUrl: crawlData.websiteUrl,
+      
+      // Serialized payloads
+      verifiedFacts: JSON.stringify(Array.isArray(aiAnalysis.verifiedFacts) ? aiAnalysis.verifiedFacts : []),
+      aiInferences: JSON.stringify(Array.isArray(aiAnalysis.aiInferences) ? aiAnalysis.aiInferences : []),
+      buyingSignals: JSON.stringify(syntheticSignals),
+      recommendations: JSON.stringify(Array.isArray(aiAnalysis.recommendations) ? aiAnalysis.recommendations : []),
+      competitorGaps: JSON.stringify(Array.isArray(aiAnalysis.competitorGaps) ? aiAnalysis.competitorGaps : []),
+      scoreExplanations: JSON.stringify(aiAnalysis.scoreExplanations || {}),
 
-        opportunityScore: sanitizeInt(aiAnalysis.opportunityScore, 50),
-        buyingSignalScore: sanitizeInt(aiAnalysis.buyingSignalScore, 50),
-        potentialRevenue: sanitizeInt(aiAnalysis.potentialRevenue, 15000),
-        closingProbability: sanitizeInt(aiAnalysis.closingProbability, 50),
-        problemSeverity: sanitizeString(aiAnalysis.problemSeverity, 'Medium'),
-        leadQuality: sanitizeString(aiAnalysis.leadQuality, 'Warm'),
-        proposalStatus: sanitizeString(aiAnalysis.proposalStatus, 'Ready'),
+      opportunityScore: sanitizeInt(aiAnalysis.opportunityScore, 50),
+      buyingSignalScore: sanitizeInt(aiAnalysis.buyingSignalScore, 50),
+      potentialRevenue: sanitizeInt(aiAnalysis.potentialRevenue, 15000),
+      closingProbability: sanitizeInt(aiAnalysis.closingProbability, 50),
+      problemSeverity: sanitizeString(aiAnalysis.problemSeverity, 'Medium'),
+      leadQuality: sanitizeString(aiAnalysis.leadQuality, 'Warm'),
+      proposalStatus: sanitizeString(aiAnalysis.proposalStatus, 'Ready'),
 
-        // NEW: Trust Metrics
-        evidenceQuality: sanitizeInt(aiAnalysis.evidenceQuality, 90),
-        verificationPassRate: sanitizeInt(aiAnalysis.verificationPassRate, 95),
-        findingReliability: sanitizeInt(aiAnalysis.findingReliability, 92),
-        factsVerifiedCount: sanitizeInt(aiAnalysis.factsVerifiedCount, 0),
-        claimsRejectedCount: sanitizeInt(aiAnalysis.claimsRejectedCount, 0),
-        lowConfidenceCount: sanitizeInt(aiAnalysis.lowConfidenceCount, 0),
-        suppressedRecsCount: sanitizeInt(aiAnalysis.suppressedRecsCount, 0),
-        opportunityRange: sanitizeString(aiAnalysis.opportunityRange, '$10,000 - $25,000'),
-        revenueAssumptions: typeof aiAnalysis.revenueAssumptions === 'string'
-          ? aiAnalysis.revenueAssumptions
-          : JSON.stringify(aiAnalysis.revenueAssumptions || {}),
+      // NEW: Trust Metrics
+      evidenceQuality: sanitizeInt(aiAnalysis.evidenceQuality, 90),
+      verificationPassRate: sanitizeInt(aiAnalysis.verificationPassRate, 95),
+      findingReliability: sanitizeInt(aiAnalysis.findingReliability, 92),
+      factsVerifiedCount: sanitizeInt(aiAnalysis.factsVerifiedCount, 0),
+      claimsRejectedCount: sanitizeInt(aiAnalysis.claimsRejectedCount, 0),
+      lowConfidenceCount: sanitizeInt(aiAnalysis.lowConfidenceCount, 0),
+      suppressedRecsCount: sanitizeInt(aiAnalysis.suppressedRecsCount, 0),
+      opportunityRange: sanitizeString(aiAnalysis.opportunityRange, '$10,000 - $25,000'),
+      revenueAssumptions: typeof aiAnalysis.revenueAssumptions === 'string'
+        ? aiAnalysis.revenueAssumptions
+        : JSON.stringify(aiAnalysis.revenueAssumptions || {}),
 
-        // NEW: Crawl Coverage & Diagnostics Metrics
-        pagesDiscoveredCount: sanitizeInt(crawlData.diagnostics.pagesDiscovered, 1),
-        pagesCrawledCount: sanitizeInt(crawlData.diagnostics.pagesCrawled, 1),
-        crawlCoveragePercent: sanitizeInt(crawlData.diagnostics.coveragePercentage, 100),
-        crawlDurationMs: sanitizeInt(crawlData.diagnostics.crawlDurationMs, 0),
-        totalTextExtracted: sanitizeInt(crawlData.diagnostics.totalTextExtracted, 0),
-        crawledPagesData: JSON.stringify(crawlData.discoveredPages || []),
-        crawlDiagnostics: JSON.stringify(crawlData.diagnostics || {}),
+      // NEW: Crawl Coverage & Diagnostics Metrics
+      pagesDiscoveredCount: sanitizeInt(crawlData.diagnostics.pagesDiscovered, 1),
+      pagesCrawledCount: sanitizeInt(crawlData.diagnostics.pagesCrawled, 1),
+      crawlCoveragePercent: sanitizeInt(crawlData.diagnostics.coveragePercentage, 100),
+      crawlDurationMs: sanitizeInt(crawlData.diagnostics.crawlDurationMs, 0),
+      totalTextExtracted: sanitizeInt(crawlData.diagnostics.totalTextExtracted, 0),
+      crawledPagesData: JSON.stringify(crawlData.discoveredPages || []),
+      crawlDiagnostics: JSON.stringify(crawlData.diagnostics || {}),
 
-        // NEW: Versioning & Change Detection
-        analysisVersion: sanitizeInt(versionNumber, 1),
-        previousAnalysisId: previousProspect ? previousProspect.id : null,
-        changeSummary: JSON.stringify(changeSummaryPayload || {}),
+      // NEW: Versioning & Change Detection
+      analysisVersion: sanitizeInt(versionNumber, 1),
+      previousAnalysisId: previousProspect ? previousProspect.id : null,
+      changeSummary: JSON.stringify(changeSummaryPayload || {}),
 
-        executiveSummary: sanitizeString(aiAnalysis.executiveSummary),
-        expectedResults: sanitizeString(aiAnalysis.expectedResults),
-        estimatedRoi: sanitizeString(aiAnalysis.estimatedRoi),
-        thirtyDayPlan: sanitizeString(aiAnalysis.thirtyDayPlan),
-        ninetyDayPlan: sanitizeString(aiAnalysis.ninetyDayPlan),
-        pricingRecommendation: sanitizeString(aiAnalysis.pricingRecommendation),
+      executiveSummary: sanitizeString(aiAnalysis.executiveSummary),
+      expectedResults: sanitizeString(aiAnalysis.expectedResults),
+      estimatedRoi: sanitizeString(aiAnalysis.estimatedRoi),
+      thirtyDayPlan: sanitizeString(aiAnalysis.thirtyDayPlan),
+      ninetyDayPlan: sanitizeString(aiAnalysis.ninetyDayPlan),
+      pricingRecommendation: sanitizeString(aiAnalysis.pricingRecommendation),
 
-        coldEmail: sanitizeString(aiAnalysis.coldEmail),
-        linkedInMessage: sanitizeString(aiAnalysis.linkedInMessage),
-        discoveryScript: sanitizeString(aiAnalysis.discoveryScript),
-        followUpSequence: sanitizeString(aiAnalysis.followUpSequence),
-        meetingAgenda: sanitizeString(aiAnalysis.meetingAgenda),
-      },
-    });
+      coldEmail: sanitizeString(aiAnalysis.coldEmail),
+      linkedInMessage: sanitizeString(aiAnalysis.linkedInMessage),
+      discoveryScript: sanitizeString(aiAnalysis.discoveryScript),
+      followUpSequence: sanitizeString(aiAnalysis.followUpSequence),
+      meetingAgenda: sanitizeString(aiAnalysis.meetingAgenda),
+    };
 
+    let prospect: any;
+    try {
+      prospect = await prisma.prospect.create({
+        data: prospectPayload,
+      });
+    } catch (createErr: any) {
+      console.warn('[Analyze API] Initial prospect.create failed. Running database auto-heal...', createErr?.message);
+      await selfHealDatabaseSchema(prisma);
 
-    // 4b. Create relational customer records for multi-tenant protection
+      try {
+        prospect = await prisma.prospect.create({
+          data: prospectPayload,
+        });
+      } catch (retryErr: any) {
+        console.warn('[Analyze API] Retry failed, executing resilient core fallback insert...', retryErr?.message);
+        const {
+          analysisVersion,
+          previousAnalysisId,
+          changeSummary,
+          pagesDiscoveredCount,
+          pagesCrawledCount,
+          crawlCoveragePercent,
+          crawlDurationMs,
+          totalTextExtracted,
+          crawledPagesData,
+          crawlDiagnostics,
+          opportunityRange,
+          revenueAssumptions,
+          ...corePayload
+        } = prospectPayload;
+
+        prospect = await prisma.prospect.create({
+          data: corePayload,
+        });
+      }
+    }
+
+    // 4b. Create relational customer records for multi-tenant protection (non-blocking)
     try {
       await Promise.all([
         prisma.researchReports.create({
@@ -310,26 +345,32 @@ export async function POST(req: NextRequest) {
       console.warn('Failed to insert auxiliary tenant records (non-blocking):', relError);
     }
 
-    // 5. Update user limits
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        analysesUsed: {
-          increment: 1,
+    // 5. Update user limits (non-blocking)
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          analysesUsed: {
+            increment: 1,
+          },
         },
-      },
-    });
+      });
+    } catch (limitErr) {
+      console.warn('Failed to increment analysesUsed (non-blocking):', limitErr);
+    }
 
-    // 6. Log Activity
-    await prisma.activityLog.create({
-      data: {
-        userId: user.id,
-        action: 'ANALYZED_COMPANY',
-        details: `Analyzed ${aiAnalysis.companyName} (${crawlData.diagnostics.pagesCrawled}/${crawlData.diagnostics.pagesDiscovered} pages, Pass Rate: ${aiAnalysis.verificationPassRate}%)`,
-      },
-    });
-
-
+    // 6. Log Activity (non-blocking)
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          action: 'ANALYZED_COMPANY',
+          details: `Analyzed ${aiAnalysis.companyName} (${crawlData.diagnostics.pagesCrawled}/${crawlData.diagnostics.pagesDiscovered} pages, Pass Rate: ${aiAnalysis.verificationPassRate}%)`,
+        },
+      });
+    } catch (logErr) {
+      console.warn('Failed to log activity (non-blocking):', logErr);
+    }
 
     return NextResponse.json({ success: true, prospect, changeReport: changeSummaryPayload });
 

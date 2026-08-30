@@ -34,7 +34,7 @@ async function main() {
       assert.ok(POSTGRES_SELF_HEAL_STATEMENTS.length >= 10);
       for (const sql of POSTGRES_SELF_HEAL_STATEMENTS) {
         assert.ok(sql.includes('ADD COLUMN IF NOT EXISTS'), `Must be idempotent: ${sql}`);
-        assert.ok(sql.includes('"Prospect"'), `Must target Prospect table: ${sql}`);
+        assert.ok(sql.includes('"Prospect"') || sql.includes('"User"'), `Must target Prospect or User table: ${sql}`);
       }
     });
 
