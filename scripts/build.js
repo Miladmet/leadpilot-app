@@ -40,8 +40,13 @@ try {
   console.log('[Build Gate] Enforcing Analysis Change Detection & Explanation Engine Gate...');
   execSync('node scripts/test-change-detection.js', { stdio: 'inherit' });
 
+  // Execute the Traffic Growth Engine Gate (SEO Keywords, Free Tools, Social, Referrals & Audits)
+  console.log('[Build Gate] Enforcing Traffic Growth Engine Verification Gate...');
+  execSync('node scripts/test-growth-engine.js', { stdio: 'inherit' });
+
   // Compile Next.js project
   execSync('npx next build', { stdio: 'inherit' });
+
 
 
 

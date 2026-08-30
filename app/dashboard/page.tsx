@@ -36,6 +36,17 @@ import {
   AnalysisComparisonReport,
   ALLOWED_ROOT_CAUSES
 } from '@/lib/changeDetection';
+import {
+  generateLinkedInPost,
+  generateTwitterThread,
+  generateAgencyTips,
+  generateWebsiteTeardown,
+  generateOpportunityDiscoveryPost,
+  generateContentIdeas,
+  generateReferralCode,
+  getReferralRewardTiers
+} from '@/lib/growthEngine';
+
 
 
 
@@ -260,11 +271,14 @@ export default function Dashboard() {
   const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions' | 'competitors'>('facts');
   const [vaultSubTab, setVaultSubTab] = useState<'pages' | 'citations'>('pages');
   const [vaultSearch, setVaultSearch] = useState('');
-  const [selectedPageSnippet, setSelectedPageSnippet] = useState<{ title: string; url: string; snippet?: string } | null>(null);
-  const [outreachSubTab, setOutreachSubTab] = useState<'email' | 'linkedin' | 'followup' | 'discovery' | 'angle'>('email');
+  const [outreachSubTab, setOutreachSubTab] = useState<'email' | 'linkedin' | 'followup' | 'discovery' | 'angle' | 'social' | 'ideas'>('email');
+  const [socialType, setSocialType] = useState<'linkedin' | 'twitter' | 'tips' | 'teardown' | 'discovery'>('linkedin');
+  const [showReferralModal, setShowReferralModal] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [billingLoading, setBillingLoading] = useState(false);
   const [syncingCrm, setSyncingCrm] = useState(false);
   const [crmSuccess, setCrmSuccess] = useState(false);
+
 
   const [campaignEmail, setCampaignEmail] = useState('');
   const [campaignSubject, setCampaignSubject] = useState('');
@@ -1471,6 +1485,82 @@ export default function Dashboard() {
 
 
 
+      {/* ---------------- SECTION: REFERRAL & REWARDS MODAL ---------------- */}
+      {showReferralModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-200 space-y-6">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-bold text-sky-600 uppercase tracking-widest block">Agency Growth Network</span>
+                <h3 className="text-xl font-black text-slate-900">Referral & Rewards System</h3>
+              </div>
+              <button
+                onClick={() => setShowReferralModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+              Invite peer agencies, consultants, and freelancers to LeadPilot. When they register and run audits, you automatically receive platform credits and extra analysis quotas.
+            </p>
+
+            {/* Custom Referral Link Box */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Your Personal Referral Link:</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={`https://leadpilot.ai/register?ref=${generateReferralCode(user.id)}`}
+                  className="flex-1 bg-white border border-slate-250 text-xs px-3.5 py-2.5 rounded-xl font-mono text-slate-800 focus:outline-none"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`https://leadpilot.ai/register?ref=${generateReferralCode(user.id)}`);
+                    setCopiedText('referral-link');
+                    setTimeout(() => setCopiedText(null), 2500);
+                  }}
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm shrink-0 cursor-pointer"
+                >
+                  {copiedText === 'referral-link' ? '✓ Copied' : 'Copy Link'}
+                </button>
+              </div>
+            </div>
+
+            {/* 3 Referral Tracks */}
+            <div className="space-y-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Available Reward Tiers:</span>
+              <div className="grid gap-2.5">
+                {getReferralRewardTiers().map((tier, idx) => (
+                  <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between shadow-2xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <strong className="text-xs font-bold text-slate-900">{tier.track}</strong>
+                        <span className="bg-sky-100 text-sky-800 text-[9px] font-bold px-2 py-0.5 rounded-full">{tier.badge}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">{tier.target}</span>
+                    </div>
+                    <div className="text-right">
+                      <strong className="text-xs font-black text-emerald-600 block">{tier.reward}</strong>
+                      <span className="text-[10px] text-slate-400">{tier.rewardValue}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowReferralModal(false)}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-4">
@@ -1483,7 +1573,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="hidden md:flex flex-col items-end gap-1">
             <span className="text-xs text-slate-500 font-medium">
               Quota Used: {user.analysesUsed} / {user.subscriptionTier === 'AGENCY' ? '∞' : user.analysesLimit}
@@ -1496,6 +1586,14 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <button
+            onClick={() => setShowReferralModal(true)}
+            className="flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
+            title="Refer Agencies & Earn Rewards"
+          >
+            <span>🎁 Refer & Earn</span>
+          </button>
+
           <Link
             href="/admin/security"
             className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-sky-600 bg-slate-50 hover:bg-sky-50 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors shadow-2xs"
@@ -1504,6 +1602,7 @@ export default function Dashboard() {
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
             <span className="hidden sm:inline">RLS Security</span>
           </Link>
+
 
           <div className="border-l border-slate-200 pl-4 flex items-center gap-3">
             <span className="text-sm text-slate-700 font-semibold flex items-center gap-1">
@@ -2942,8 +3041,22 @@ export default function Dashboard() {
                             📄 Open PDF Proposal
                             <ArrowUpRight className="h-3.5 w-3.5" />
                           </a>
+
+                          <button
+                            onClick={() => {
+                              const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://leadpilot.ai'}/audit/${activeProspect.id}`;
+                              navigator.clipboard.writeText(publicUrl);
+                              setShareCopied(true);
+                              setTimeout(() => setShareCopied(false), 2500);
+                            }}
+                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                            title="Copy Public Viral Audit Link"
+                          >
+                            <span>{shareCopied ? '✓ Link Copied!' : '🌐 Share Public Audit'}</span>
+                          </button>
                         </div>
                       </div>
+
 
                       <div>
                         <h4 className="text-xs text-slate-500 font-bold uppercase tracking-wider">Executive Summary</h4>
@@ -3018,13 +3131,13 @@ export default function Dashboard() {
                           onClick={() => setOutreachSubTab('followup')}
                           className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'followup' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
                         >
-                          Follow-Up Email
+                          Follow-Up
                         </button>
                         <button
                           onClick={() => setOutreachSubTab('discovery')}
                           className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'discovery' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
                         >
-                          Discovery Questions
+                          Discovery
                         </button>
                         <button
                           onClick={() => setOutreachSubTab('angle')}
@@ -3032,44 +3145,179 @@ export default function Dashboard() {
                         >
                           Sales Angle
                         </button>
-                      </div>
-
-                      <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
-                          Deliverable: {outreachSubTab === 'discovery' ? 'Discovery Questions' : outreachSubTab === 'angle' ? 'Sales Angle' : outreachSubTab}
-                        </span>
-                        
                         <button
-                          onClick={() => {
-                            let text = '';
-                            if (outreachSubTab === 'email') text = activeProspect.coldEmail;
-                            else if (outreachSubTab === 'linkedin') text = activeProspect.linkedInMessage;
-                            else if (outreachSubTab === 'followup') text = activeProspect.followUpSequence;
-                            else if (outreachSubTab === 'discovery') text = activeProspect.discoveryScript;
-                            else if (outreachSubTab === 'angle') text = activeProspect.meetingAgenda;
-                            copyToClipboard(text, outreachSubTab);
-                          }}
-                          className="text-sky-600 hover:text-sky-700 text-xs font-bold flex items-center gap-1 bg-sky-50 px-2.5 py-1 rounded"
+                          onClick={() => setOutreachSubTab('social')}
+                          className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'social' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
                         >
-                          {copiedText === outreachSubTab ? (
-                            <>
-                              <Check className="h-3 w-3" /> Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3" /> Copy script
-                            </>
-                          )}
+                          Social Posts
+                        </button>
+                        <button
+                          onClick={() => setOutreachSubTab('ideas')}
+                          className={`flex-1 py-1 px-2 rounded transition-all ${outreachSubTab === 'ideas' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'hover:text-slate-800'}`}
+                        >
+                          YouTube & Blog
                         </button>
                       </div>
 
-                      <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-mono whitespace-pre-wrap leading-relaxed overflow-y-auto h-[180px]">
-                        {outreachSubTab === 'email' && activeProspect.coldEmail}
-                        {outreachSubTab === 'linkedin' && activeProspect.linkedInMessage}
-                        {outreachSubTab === 'followup' && activeProspect.followUpSequence}
-                        {outreachSubTab === 'discovery' && activeProspect.discoveryScript}
-                        {outreachSubTab === 'angle' && activeProspect.meetingAgenda}
-                      </pre>
+                      {/* Regular Email / Script Subtabs */}
+                      {outreachSubTab !== 'social' && outreachSubTab !== 'ideas' && (
+                        <>
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
+                              Deliverable: {outreachSubTab === 'discovery' ? 'Discovery Questions' : outreachSubTab === 'angle' ? 'Sales Angle' : outreachSubTab}
+                            </span>
+                            
+                            <button
+                              onClick={() => {
+                                let text = '';
+                                if (outreachSubTab === 'email') text = activeProspect.coldEmail;
+                                else if (outreachSubTab === 'linkedin') text = activeProspect.linkedInMessage;
+                                else if (outreachSubTab === 'followup') text = activeProspect.followUpSequence;
+                                else if (outreachSubTab === 'discovery') text = activeProspect.discoveryScript;
+                                else if (outreachSubTab === 'angle') text = activeProspect.meetingAgenda;
+                                copyToClipboard(text, outreachSubTab);
+                              }}
+                              className="text-sky-600 hover:text-sky-700 text-xs font-bold flex items-center gap-1 bg-sky-50 px-2.5 py-1 rounded cursor-pointer"
+                            >
+                              {copiedText === outreachSubTab ? (
+                                <>
+                                  <Check className="h-3 w-3" /> Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3" /> Copy script
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-mono whitespace-pre-wrap leading-relaxed overflow-y-auto h-[180px]">
+                            {outreachSubTab === 'email' && activeProspect.coldEmail}
+                            {outreachSubTab === 'linkedin' && activeProspect.linkedInMessage}
+                            {outreachSubTab === 'followup' && activeProspect.followUpSequence}
+                            {outreachSubTab === 'discovery' && activeProspect.discoveryScript}
+                            {outreachSubTab === 'angle' && activeProspect.meetingAgenda}
+                          </pre>
+                        </>
+                      )}
+
+                      {/* SOCIAL CONTENT GENERATOR */}
+                      {outreachSubTab === 'social' && (() => {
+                        let content = '';
+                        if (socialType === 'linkedin') content = generateLinkedInPost(activeProspect);
+                        else if (socialType === 'twitter') content = generateTwitterThread(activeProspect);
+                        else if (socialType === 'tips') content = generateAgencyTips(activeProspect);
+                        else if (socialType === 'teardown') content = generateWebsiteTeardown(activeProspect);
+                        else if (socialType === 'discovery') content = generateOpportunityDiscoveryPost(activeProspect);
+
+                        return (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-1.5 items-center justify-between border-b border-slate-150 pb-2">
+                              <div className="flex flex-wrap gap-1">
+                                <button
+                                  onClick={() => setSocialType('linkedin')}
+                                  className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                                    socialType === 'linkedin' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  LinkedIn Post
+                                </button>
+                                <button
+                                  onClick={() => setSocialType('twitter')}
+                                  className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                                    socialType === 'twitter' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  X / Twitter Thread
+                                </button>
+                                <button
+                                  onClick={() => setSocialType('tips')}
+                                  className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                                    socialType === 'tips' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  Agency Tips
+                                </button>
+                                <button
+                                  onClick={() => setSocialType('teardown')}
+                                  className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                                    socialType === 'teardown' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  Video Teardown Script
+                                </button>
+                                <button
+                                  onClick={() => setSocialType('discovery')}
+                                  className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                                    socialType === 'discovery' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  Discovery Post
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={() => copyToClipboard(content, `social-${socialType}`)}
+                                className="text-sky-600 hover:text-sky-700 text-xs font-bold flex items-center gap-1 bg-sky-50 px-2.5 py-1 rounded cursor-pointer"
+                              >
+                                {copiedText === `social-${socialType}` ? (
+                                  <>
+                                    <Check className="h-3 w-3" /> Copied Post
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-3 w-3" /> Copy Post
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            <pre className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs md:text-sm font-sans whitespace-pre-wrap leading-relaxed overflow-y-auto h-[180px]">
+                              {content}
+                            </pre>
+                          </div>
+                        );
+                      })()}
+
+                      {/* YOUTUBE & BLOG CONTENT IDEAS */}
+                      {outreachSubTab === 'ideas' && (() => {
+                        const ideas = generateContentIdeas(activeProspect);
+                        return (
+                          <div className="space-y-3 overflow-y-auto max-h-[220px] pr-1">
+                            {ideas.map((idea) => (
+                              <div key={idea.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-sky-600 block">{idea.format}</span>
+                                    <h4 className="text-xs font-bold text-slate-900">{idea.title}</h4>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      const text = `${idea.title}\nFormat: ${idea.format}\nHook: ${idea.hook}\n\nOutline:\n${idea.outline.map(o => `• ${o}`).join('\n')}`;
+                                      copyToClipboard(text, idea.id);
+                                    }}
+                                    className="text-[10px] font-bold text-sky-600 hover:text-sky-700 bg-white border border-slate-200 px-2 py-0.5 rounded cursor-pointer shrink-0"
+                                  >
+                                    {copiedText === idea.id ? '✓ Copied' : 'Copy Outline'}
+                                  </button>
+                                </div>
+                                <p className="text-[11px] text-slate-600 italic">
+                                  "{idea.hook}"
+                                </p>
+                                <ul className="text-[10px] text-slate-600 space-y-1 bg-white p-2 rounded border border-slate-150">
+                                  {idea.outline.map((item, idx) => (
+                                    <li key={idx} className="flex items-center gap-1.5">
+                                      <span className="text-sky-500 font-bold">•</span>
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
 
                       {/* Outbound Campaign Manager */}
                       {(outreachSubTab === 'email' || outreachSubTab === 'followup') && (() => {

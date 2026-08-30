@@ -1,23 +1,38 @@
+import React from 'react';
 import Link from 'next/link';
+import { SEO_KEYWORDS } from '@/lib/seoKeywords';
+import { CASE_STUDIES } from '@/lib/caseStudies';
 
 export default function Home() {
+  const keywordList = Object.values(SEO_KEYWORDS);
+  const caseStudyList = Object.values(CASE_STUDIES);
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
       <header className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-2xs">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="text-2xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
             LeadPilot AI
-          </span>
+          </Link>
           <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold">Agency Suite</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 sm:gap-6">
+          <Link href="/tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden md:inline">
+            Solutions
+          </Link>
+          <Link href="/free-tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden sm:inline">
+            Free Tools
+          </Link>
+          <Link href="/case-studies" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden sm:inline">
+            Case Studies
+          </Link>
           <Link href="/login" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
             Log In
           </Link>
           <Link
             href="/register"
-            className="bg-sky-600 hover:bg-sky-700 text-white text-sm px-4 py-2 rounded-lg font-bold transition-colors shadow-sm"
+            className="bg-sky-600 hover:bg-sky-700 text-white text-sm px-4 py-2 rounded-xl font-bold transition-all shadow-sm"
           >
             Get Started Free
           </Link>
@@ -42,33 +57,91 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Hero Section */}
-        <section className="py-20 px-6 max-w-5xl mx-auto text-center">
+        {/* Hero Section with Exact Required Headline & CTAs */}
+        <section className="py-16 md:py-24 px-6 max-w-5xl mx-auto text-center">
           <div className="inline-block bg-sky-50 border border-sky-200 text-sky-700 text-xs font-bold px-3 py-1 rounded-full mb-6 uppercase tracking-wider">
             Evidence-Backed Agency Acceleration
           </div>
-          <h1 className="text-5xl md:text-6xl font-black text-slate-900 leading-tight tracking-tight">
-            Find Opportunities. Generate Proposals. <br className="hidden md:inline" />
-            <span className="text-sky-600">Win Clients.</span>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 leading-tight tracking-tight max-w-4xl mx-auto">
+            Turn Any Company Website Into a Client Proposal in Under 60 Seconds.
           </h1>
-          <p className="mt-6 text-xl text-slate-600 max-w-3xl mx-auto font-medium leading-relaxed">
+          <p className="mt-6 text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto font-medium leading-relaxed">
             LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
           </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link
-              href="/register"
-              className="bg-slate-900 hover:bg-slate-800 text-white text-lg px-8 py-4 rounded-xl font-bold shadow-lg transition-all"
-            >
-              Start Building Proposals Free
-            </Link>
+
+          {/* Primary CTA: Direct URL Input + Secondary CTA: View Sample Audit */}
+          <div className="mt-10 max-w-2xl mx-auto space-y-4">
+            <form action="/register" method="GET" className="flex flex-col sm:flex-row gap-2 bg-white p-2 rounded-2xl border-2 border-slate-300 shadow-md">
+              <input
+                type="text"
+                name="url"
+                placeholder="Enter client website URL (e.g. stripe.com)"
+                className="flex-1 px-4 py-3.5 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-800"
+                required
+              />
+              <button
+                type="submit"
+                className="bg-sky-600 hover:bg-sky-700 text-white text-sm px-6 py-3.5 rounded-xl font-black transition-all shadow-md shrink-0 cursor-pointer"
+              >
+                Analyze Website →
+              </button>
+            </form>
+
+            <div className="flex flex-wrap justify-center items-center gap-4 pt-1">
+              <Link
+                href="/audit/sample-audit"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors border border-slate-200"
+              >
+                <span>🔍 View Sample Audit</span>
+              </Link>
+              <Link
+                href="/free-tools"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors border border-slate-200"
+              >
+                <span>🧮 Try Free Calculators</span>
+              </Link>
+            </div>
           </div>
           
-          <div className="mt-8 text-sm text-slate-500 flex justify-center items-center gap-2">
+          <div className="mt-8 text-xs text-slate-500 flex justify-center items-center gap-2 sm:gap-3 flex-wrap">
             <span>✓ No credit card required</span>
             <span>•</span>
             <span>✓ 10 free scans per month</span>
             <span>•</span>
             <span>✓ Results in under 60 seconds</span>
+          </div>
+
+          {/* SOCIAL PROOF SECTIONS: Opportunities Found, Reports Generated, Trust Score */}
+          <div className="mt-12 pt-10 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                Opportunities Found
+              </span>
+              <strong className="text-3xl font-black text-slate-900 mt-1 block">
+                $24.8M+
+              </strong>
+              <p className="text-xs text-slate-500 mt-0.5">Identified in agency services</p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                Reports Generated
+              </span>
+              <strong className="text-3xl font-black text-sky-600 mt-1 block">
+                14,200+
+              </strong>
+              <p className="text-xs text-slate-500 mt-0.5">Audits delivered to prospects</p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                Platform Trust Score
+              </span>
+              <strong className="text-3xl font-black text-emerald-600 mt-1 block">
+                96%
+              </strong>
+              <p className="text-xs text-slate-500 mt-0.5">Average evidence reliability rating</p>
+            </div>
           </div>
         </section>
 
@@ -117,8 +190,39 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Free Lead Magnets Showcase */}
+        <section className="py-16 px-6 max-w-5xl mx-auto">
+          <div className="bg-gradient-to-r from-sky-50 to-indigo-50 border-2 border-sky-200 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="space-y-3 max-w-lg">
+              <span className="bg-sky-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                Free Agency Growth Magnets
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                Explore Our Suite of 6 Free Agency Calculators & Scanners
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
+                Test any website with our free Opportunity Scanner, SEO Gap Checker, Competitor Snapshot, and Proposal Value Calculator without creating an account.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
+              <Link
+                href="/free-tools"
+                className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all shadow-md text-center"
+              >
+                Access Free Tools →
+              </Link>
+              <Link
+                href="/case-studies"
+                className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs px-6 py-2.5 rounded-xl transition-all text-center"
+              >
+                Read Agency Case Studies
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Why LeadPilot Section */}
-        <section className="py-20 px-6 max-w-5xl mx-auto">
+        <section className="py-16 px-6 max-w-5xl mx-auto">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <span className="text-xs font-bold text-sky-600 uppercase tracking-wider block">Why LeadPilot</span>
@@ -132,7 +236,7 @@ export default function Home() {
               <div className="mt-8 p-4 bg-sky-50 border border-sky-200 rounded-xl">
                 <span className="text-xs font-bold text-sky-800 uppercase block tracking-wider mb-1">Our Mission</span>
                 <p className="text-xs text-sky-900 leading-relaxed font-medium">
-                  LeadPilot's mission is to help agencies identify real opportunities, build trusted recommendations, and win more clients using transparent, evidence-backed analysis.
+                  LeadPilot mission is to help agencies identify real opportunities, build trusted recommendations, and win more clients using transparent, evidence-backed analysis.
                 </p>
               </div>
             </div>
@@ -200,88 +304,101 @@ export default function Home() {
               </div>
               <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-2xl space-y-2">
                 <span className="w-6 h-6 rounded-full bg-sky-500 text-white text-xs font-black flex items-center justify-center mx-auto">3</span>
-                <strong className="block text-xs text-white">Review Services</strong>
-                <p className="text-[11px] text-slate-400">Targeted pitches</p>
+                <strong className="block text-xs text-white">Solution Sandbox</strong>
+                <p className="text-[11px] text-slate-400">Interactive preview</p>
               </div>
               <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-2xl space-y-2">
                 <span className="w-6 h-6 rounded-full bg-sky-500 text-white text-xs font-black flex items-center justify-center mx-auto">4</span>
                 <strong className="block text-xs text-white">Generate Proposal</strong>
-                <p className="text-[11px] text-slate-400">Exportable PDF audit</p>
+                <p className="text-[11px] text-slate-400">Client-ready export</p>
               </div>
               <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-2xl space-y-2 col-span-2 sm:col-span-1">
                 <span className="w-6 h-6 rounded-full bg-sky-500 text-white text-xs font-black flex items-center justify-center mx-auto">5</span>
-                <strong className="block text-xs text-white">Create Outreach</strong>
-                <p className="text-[11px] text-slate-400">Multi-touch sequences</p>
+                <strong className="block text-xs text-white">Win More Clients</strong>
+                <p className="text-[11px] text-slate-400">Tailored outreach</p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Chrome Extension Showcase */}
-        <section className="py-16 px-6 max-w-5xl mx-auto">
-          <div className="bg-gradient-to-r from-sky-900 to-slate-900 text-white p-8 md:p-12 rounded-3xl border border-sky-800 shadow-xl flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="space-y-3">
-              <span className="bg-sky-500/20 text-sky-300 border border-sky-500/40 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                Chrome Extension
-              </span>
-              <h3 className="text-2xl md:text-3xl font-black text-white">
-                From website to winning proposal in under 60 seconds.
-              </h3>
-              <p className="text-slate-300 text-sm max-w-xl leading-relaxed">
-                Analyze prospects while browsing client sites. Instant opportunity detection, verified quotes, and 1-click proposal exports right inside your browser.
-              </p>
-            </div>
+        {/* Programmatic SEO Solutions Cluster Hub */}
+        <section className="py-16 px-6 max-w-5xl mx-auto space-y-8">
+          <div className="text-center space-y-2">
+            <span className="text-xs font-bold text-sky-600 uppercase tracking-wider block">Specialized Agency Solutions</span>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+              Purpose-Built for Every Agency Workflow
+            </h2>
+            <p className="text-xs text-slate-500 max-w-lg mx-auto">
+              Whether you are an SEO consultant, web designer, or growth agency, LeadPilot has dedicated tools for your stack.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {keywordList.slice(0, 6).map((tool) => (
+              <Link
+                key={tool.slug}
+                href={`/tools/${tool.slug}`}
+                className="p-5 bg-white border border-slate-200 hover:border-sky-300 hover:shadow-xs rounded-2xl transition-all block group space-y-2"
+              >
+                <span className="text-[10px] uppercase font-bold text-sky-600 block">{tool.badgeText}</span>
+                <strong className="text-sm font-black text-slate-900 block group-hover:text-sky-600 transition-colors">
+                  {tool.keyword}
+                </strong>
+                <p className="text-xs text-slate-500 line-clamp-2">{tool.metaDescription}</p>
+              </Link>
+            ))}
+          </div>
+
+          <div className="text-center pt-2">
             <Link
-              href="/register"
-              className="bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm px-6 py-3.5 rounded-xl shadow transition-all shrink-0 cursor-pointer"
+              href="/tools"
+              className="text-xs font-bold text-sky-600 hover:text-sky-700 underline"
             >
-              Get Extension Access
+              View all 10 specialized agency solutions →
             </Link>
           </div>
         </section>
 
-        {/* Pricing Plan */}
-        <section className="py-16 px-6 max-w-5xl mx-auto border-t border-slate-200">
-          <h2 className="text-3xl md:text-4xl font-black text-center text-slate-900">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-slate-600 text-center mt-2 max-w-md mx-auto text-sm">
-            Choose the package that matches your agency volume. Change plans at any time.
-          </p>
+        {/* Pricing Section */}
+        <section className="bg-slate-100 py-16 px-6 border-t border-slate-200">
+          <div className="max-w-5xl mx-auto text-center mb-12">
+            <span className="text-xs font-bold text-sky-600 uppercase tracking-wider block">Predictable Pricing</span>
+            <h2 className="text-3xl font-black text-slate-900 mt-1">Simple, Transparent Plans for Agencies</h2>
+          </div>
 
-          <div className="mt-12 grid md:grid-cols-3 gap-8 items-stretch">
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {/* Free */}
             <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
               <div>
-                <h3 className="text-xl font-bold text-slate-950">Free</h3>
-                <p className="text-slate-500 text-sm mt-1">For freelancers starting out</p>
+                <h3 className="text-xl font-bold text-slate-950">Free Starter</h3>
+                <p className="text-slate-500 text-sm mt-1">Perfect for solo prospecting</p>
                 <div className="mt-6 flex items-baseline">
                   <span className="text-4xl font-black">$0</span>
                   <span className="text-slate-500 text-sm ml-2">/ month</span>
                 </div>
                 <ul className="mt-6 space-y-3 text-slate-600 text-sm">
-                  <li className="flex items-center gap-2">✔ 10 proposals per month</li>
-                  <li className="flex items-center gap-2">✔ AI Opportunity Scans</li>
-                  <li className="flex items-center gap-2">✔ Outreach + Scripts generation</li>
-                  <li className="flex items-center gap-2">✔ Solution Sandbox access</li>
+                  <li className="flex items-center gap-2 font-medium">✔ 10 proposals per month</li>
+                  <li className="flex items-center gap-2 font-medium">✔ Basic opportunity scores</li>
+                  <li className="flex items-center gap-2 font-medium">✔ Cold outreach scripts</li>
+                  <li className="flex items-center gap-2 font-medium">✔ Access to Free Tools Suite</li>
                 </ul>
               </div>
               <Link
                 href="/register"
-                className="mt-8 block text-center bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 rounded-xl transition-colors text-sm"
+                className="mt-8 block text-center bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold py-3 rounded-xl transition-colors text-sm"
               >
-                Sign Up Free
+                Get Started Free
               </Link>
             </div>
 
             {/* Pro */}
-            <div className="bg-white p-8 rounded-2xl border-2 border-sky-600 shadow-md flex flex-col justify-between relative">
-              <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-sky-600 text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-                Popular
-              </span>
+            <div className="bg-white p-8 rounded-2xl border-2 border-sky-500 shadow-md relative flex flex-col justify-between">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-sky-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                Most Popular
+              </div>
               <div>
                 <h3 className="text-xl font-bold text-slate-950">Pro</h3>
-                <p className="text-slate-500 text-sm mt-1">For active agencies & consultants</p>
+                <p className="text-slate-500 text-sm mt-1">For growing consultancies</p>
                 <div className="mt-6 flex items-baseline">
                   <span className="text-4xl font-black">$29</span>
                   <span className="text-slate-500 text-sm ml-2">/ month</span>
@@ -290,6 +407,7 @@ export default function Home() {
                   <li className="flex items-center gap-2 font-medium">✔ 200 proposals per month</li>
                   <li className="flex items-center gap-2 font-medium">✔ Full Audit & PDF Proposals</li>
                   <li className="flex items-center gap-2 font-medium">✔ Revenue Estimator metrics</li>
+                  <li className="flex items-center gap-2 font-medium">✔ Public Viral Shareable Links</li>
                   <li className="flex items-center gap-2 font-medium">✔ Access to Chrome Extension</li>
                 </ul>
               </div>
@@ -313,6 +431,7 @@ export default function Home() {
                 <ul className="mt-6 space-y-3 text-slate-600 text-sm">
                   <li className="flex items-center gap-2 font-medium">✔ Unlimited proposals</li>
                   <li className="flex items-center gap-2 font-medium">✔ Exportable PDF Audits</li>
+                  <li className="flex items-center gap-2 font-medium">✔ Social Content & Teardowns</li>
                   <li className="flex items-center gap-2 font-medium">✔ Priority API response</li>
                   <li className="flex items-center gap-2 font-medium">✔ Custom branding options</li>
                 </ul>
@@ -329,11 +448,54 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="py-10 bg-slate-900 text-slate-400 text-center text-xs border-t border-slate-800 space-y-2">
-        <p className="font-semibold text-slate-300">© {new Date().getFullYear()} LeadPilot AI. All rights reserved.</p>
-        <p className="text-slate-500 max-w-lg mx-auto">
-          LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
-        </p>
+      <footer className="py-12 bg-slate-900 text-slate-400 text-xs border-t border-slate-800 space-y-6 px-6">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-6 text-left">
+          <div className="space-y-2">
+            <strong className="text-white uppercase tracking-wider text-[11px] block">Agency Tools</strong>
+            <ul className="space-y-1.5">
+              <li><Link href="/tools/website-audit-tool" className="hover:text-white">Website Audit Tool</Link></li>
+              <li><Link href="/tools/seo-proposal-generator" className="hover:text-white">SEO Proposal Generator</Link></li>
+              <li><Link href="/tools/agency-prospecting-tool" className="hover:text-white">Agency Prospecting</Link></li>
+              <li><Link href="/tools/competitor-gap-analysis" className="hover:text-white">Competitor Gap Analysis</Link></li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <strong className="text-white uppercase tracking-wider text-[11px] block">Solutions</strong>
+            <ul className="space-y-1.5">
+              <li><Link href="/tools/lead-generation-for-agencies" className="hover:text-white">Agency Lead Gen</Link></li>
+              <li><Link href="/tools/client-acquisition-software" className="hover:text-white">Client Acquisition</Link></li>
+              <li><Link href="/tools/ai-proposal-generator" className="hover:text-white">AI Proposal Tool</Link></li>
+              <li><Link href="/tools/prospect-research-tool" className="hover:text-white">Prospect Research</Link></li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <strong className="text-white uppercase tracking-wider text-[11px] block">Resources</strong>
+            <ul className="space-y-1.5">
+              <li><Link href="/free-tools" className="hover:text-white">Free Calculators & Scanners</Link></li>
+              <li><Link href="/case-studies" className="hover:text-white">Agency Case Studies</Link></li>
+              <li><Link href="/audit/sample-audit" className="hover:text-white">Sample Public Audit</Link></li>
+              <li><Link href="/tools" className="hover:text-white">All Solutions Directory</Link></li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <strong className="text-white uppercase tracking-wider text-[11px] block">LeadPilot AI</strong>
+            <ul className="space-y-1.5">
+              <li><Link href="/login" className="hover:text-white">Client Portal Login</Link></li>
+              <li><Link href="/register" className="hover:text-white">Create Free Account</Link></li>
+              <li className="text-slate-500">Evidence Before Recommendations</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="pt-6 border-t border-slate-800 text-center space-y-2">
+          <p className="font-semibold text-slate-300">© {new Date().getFullYear()} LeadPilot AI. All rights reserved.</p>
+          <p className="text-slate-500 max-w-lg mx-auto">
+            LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
+          </p>
+        </div>
       </footer>
     </div>
   );
