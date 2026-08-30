@@ -139,12 +139,27 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
           </div>
           <button
             id="print-btn"
-            className="bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow transition-colors flex items-center gap-1.5"
+            className="bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             🖨️ Export PDF
           </button>
         </div>
       </div>
+
+      {/* PDF Safety Fallback Banner */}
+      <div id="print-error-banner" className="hidden mb-6 p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex justify-between items-center print:hidden shadow-xs">
+        <div className="flex items-center gap-2">
+          <span>⚠️</span>
+          <span>PDF rendering encountered a temporary interruption. All report data is safely preserved.</span>
+        </div>
+        <button
+          id="retry-print-btn"
+          className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm cursor-pointer"
+        >
+          Retry PDF Generation
+        </button>
+      </div>
+
 
       {/* PRINT STYLES */}
       <style dangerouslySetInnerHTML={{ __html: `
@@ -685,15 +700,23 @@ export default async function PrintProposalPage({ params }: PrintPageProps) {
       <script
         dangerouslySetInnerHTML={{
           __html: `
-            const btn = document.getElementById('print-btn');
-            if (btn) {
-              btn.addEventListener('click', function() {
+            function triggerPrint() {
+              try {
                 window.print();
-              });
+              } catch (err) {
+                console.error('PDF Generation interrupted:', err);
+                const banner = document.getElementById('print-error-banner');
+                if (banner) banner.classList.remove('hidden');
+              }
             }
+            const btn = document.getElementById('print-btn');
+            if (btn) btn.addEventListener('click', triggerPrint);
+            const retryBtn = document.getElementById('retry-print-btn');
+            if (retryBtn) retryBtn.addEventListener('click', triggerPrint);
           `,
         }}
       />
+
     </div>
   );
 }

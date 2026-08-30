@@ -28,6 +28,8 @@ import {
   SANDBOX_POSITIONING,
   SANDBOX_DISCLAIMER
 } from '@/lib/sandboxEngine';
+import ErrorBoundary from '@/components/ErrorBoundary';
+
 
 
 
@@ -1993,9 +1995,11 @@ export default function Dashboard() {
 
               {/* Tab Contents */}
               <div className="p-6 flex-1 flex flex-col bg-white">
+                <ErrorBoundary sectionName="Interactive Workspace">
                 
                 {/* 0. Solution Sandbox Module */}
                 {activeTab === 'sandbox' && (
+
                   <div className="space-y-6 flex-1 flex flex-col">
                     {activeSolutionSandbox && activeSolutionSandbox.isAvailable && activeSolutionSandbox.sandboxes ? (
                       <div className="space-y-6 flex-1 flex flex-col">
@@ -3343,8 +3347,10 @@ export default function Dashboard() {
                   </div>
                 )}
 
+                </ErrorBoundary>
               </div>
             </div>
+
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 shadow-sm flex-1 flex flex-col justify-center items-center">
               <Search className="h-12 w-12 text-slate-300 stroke-1 mb-4" />

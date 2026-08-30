@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 import { crawlWebsite } from '@/lib/scraper';
 import { analyzeCompany } from '@/lib/gemini';
+import { withTimeout, withRetry, TIMEOUT_LIMITS } from '@/lib/stability';
 
 function pruneHtmlContent(content: string): string {
   if (!content) return '';
@@ -13,7 +14,6 @@ function pruneHtmlContent(content: string): string {
     .replace(/<!--[\s\S]*?-->/g, '');
   return pruned.trim();
 }
-
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,21 +43,79 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Execute WebMCP crawler
+    // 2. Execute WebMCP crawler with 30s timeout and 3-attempt exponential backoff
     console.log(`Starting WebMCP crawling workflow for client opportunities: ${url}`);
-    const crawlData = await crawlWebsite(url);
+    let crawlData;
+    try {
+      crawlData = await withTimeout(
+        withRetry(
+          () => crawlWebsite(url),
+          { maxRetries: 3, backoffMs: 300, operationName: 'Crawl Engine' }
+        ),
+        TIMEOUT_LIMITS.CRAWL_MS,
+        'Crawl Engine'
+      );
+    } catch (crawlErr: any) {
+      // CRAWL SAFETY: Do not continue opportunity generation. Record diagnostic information.
+      console.error('[Crawl Safety] Crawl failed or timed out:', crawlErr);
+      const isTimeout = crawlErr.code === 'ETIMEDOUT' || crawlErr.message?.includes('timed out');
+      const is403 = crawlErr.message?.includes('403');
+      const is404 = crawlErr.message?.includes('404');
+      const reason = isTimeout ? 'Operation timed out.' : is403 ? '403 Forbidden' : is404 ? '404 Not Found' : 'Blocked or unreachable';
 
-    if (!crawlData.combinedContent || crawlData.combinedContent.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Failed to retrieve website data. Please verify the URL.' },
-        { status: 400 }
+        {
+          error: 'Website Crawl Failed',
+          status: 'Website Crawl Failed',
+          reason,
+          diagnostics: {
+            url,
+            attemptedAt: new Date().toISOString(),
+            failureType: isTimeout ? 'Timeout' : 'Network/HTTP Error',
+            details: crawlErr.message || 'Target host blocked or failed crawl requests.'
+          }
+        },
+        { status: 422 }
       );
     }
 
-    // 3. Perform AI Analysis with Gemini (Double-Agent Auditor Pipeline)
+    if (!crawlData.combinedContent || crawlData.combinedContent.trim().length === 0) {
+      return NextResponse.json(
+        {
+          error: 'Website Crawl Failed',
+          status: 'Website Crawl Failed',
+          reason: 'Empty Content Extracted',
+          diagnostics: { url, failureType: 'Content Extraction Failure' }
+        },
+        { status: 422 }
+      );
+    }
+
+    // 3. Perform AI Analysis with Gemini (60s timeout, 2 retries)
     console.log(`Running Gemini Verification Pipeline for: ${crawlData.companyName}`);
     const prunedContent = pruneHtmlContent(crawlData.combinedContent);
-    const aiAnalysis = await analyzeCompany(prunedContent, crawlData.companyName);
+    let aiAnalysis;
+    try {
+      aiAnalysis = await withTimeout(
+        withRetry(
+          () => analyzeCompany(prunedContent, crawlData.companyName),
+          { maxRetries: 2, backoffMs: 500, operationName: 'AI Analysis' }
+        ),
+        TIMEOUT_LIMITS.AI_ANALYSIS_MS,
+        'AI Analysis'
+      );
+    } catch (aiErr: any) {
+      console.error('[AI Analysis Safety] AI pipeline failed or timed out:', aiErr);
+      return NextResponse.json(
+        {
+          error: aiErr.code === 'ETIMEDOUT' ? 'Operation timed out.' : 'AI Analysis temporarily unavailable.',
+          reason: aiErr.message || 'AI provider outage or timeout.',
+          diagnostics: { company: crawlData.companyName, failureType: 'AI_PROVIDER_ERROR' }
+        },
+        { status: 504 }
+      );
+    }
+
 
     // Create synthetic buying signals from high-confidence insights to populate schema
     const syntheticSignals = aiAnalysis.aiInferences

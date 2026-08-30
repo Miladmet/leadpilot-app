@@ -32,8 +32,13 @@ try {
   console.log('[Build Gate] Enforcing Solution Sandbox Safety & Model Gate...');
   execSync('node scripts/test-sandbox-engine.js', { stdio: 'inherit' });
 
+  // Execute the Production Stability Framework Gate (Fault Isolation, Timeouts & Retries)
+  console.log('[Build Gate] Enforcing Production Stability Framework Gate...');
+  execSync('node scripts/test-stability-framework.js', { stdio: 'inherit' });
+
   // Compile Next.js project
   execSync('npx next build', { stdio: 'inherit' });
+
 
 
 

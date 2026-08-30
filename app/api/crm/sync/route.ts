@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantPrisma } from '@/lib/tenantPrisma';
 import { getUserIdFromRequest } from '@/lib/auth';
+import { withTimeout, withRetry, TIMEOUT_LIMITS, crmQueue } from '@/lib/stability';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +25,6 @@ export async function POST(req: NextRequest) {
     if (!prospect) {
       return NextResponse.json({ error: 'Prospect not found or unauthorized' }, { status: 404 });
     }
-
 
     // Determine active webhook endpoint (custom URL, environment variable, or local simulator)
     let webhookUrl = crmWebhookUrl || process.env.CRM_WEBHOOK_URL;
@@ -56,45 +56,61 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString()
     };
 
-    // Post to the webhook
-    let response;
+    // Execute CRM sync with 15s timeout protection and 3-attempt exponential backoff
     try {
-      response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      await withTimeout(
+        withRetry(
+          async () => {
+            const response = await fetch(webhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+              throw new Error(`CRM Webhook responded with status ${response.status}`);
+            }
+            return response;
+          },
+          { maxRetries: 3, backoffMs: 300, operationName: 'CRM Sync' }
+        ),
+        TIMEOUT_LIMITS.CRM_SYNC_MS,
+        'CRM Sync'
+      );
+
+      // Log Activity
+      await tenantDb.activityLog.create({
+        data: {
+          action: 'SYNCED_CRM',
+          details: `Synced ${prospect.companyName} details to CRM hook: ${webhookUrl}`,
         },
-        body: JSON.stringify(payload),
       });
-    } catch (fetchErr: any) {
-      throw new Error(`Could not connect to CRM webhook (${webhookUrl}): ${fetchErr.message}`);
+
+      return NextResponse.json({ success: true, status: 'Synced', url: webhookUrl });
+    } catch (syncError: any) {
+      // CRM FAULT ISOLATION: Never crash or block LeadPilot if CRM fails
+      console.warn(`[CRM Sync Safety] CRM unavailable or timed out: ${syncError.message}. Queuing request.`);
+      
+      const queuedItem = crmQueue.enqueue({
+        prospectId: prospect.id,
+        crmType: webhookUrl.includes('hubspot') ? 'HubSpot' : webhookUrl.includes('salesforce') ? 'Salesforce' : 'Webhook',
+        payload
+      });
+
+      return NextResponse.json({
+        success: true,
+        status: 'Sync Pending',
+        queued: true,
+        queueId: queuedItem.id,
+        message: 'CRM endpoint unavailable; sync request queued for automatic retry.'
+      }, { status: 202 });
     }
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(
-          `CRM Webhook endpoint returned 404 Not Found. The webhook URL (${webhookUrl}) appears to be deleted or expired. Please check your Zapier / CRM settings or use the local simulator.`
-        );
-      }
-      throw new Error(`CRM Webhook returned status code ${response.status}`);
-    }
-
-
-    // Log Activity
-    await tenantDb.activityLog.create({
-      data: {
-        action: 'SYNCED_CRM',
-        details: `Synced ${prospect.companyName} details to CRM hook: ${webhookUrl}`,
-      },
-    });
-
-
-    return NextResponse.json({ success: true, url: webhookUrl });
   } catch (error: any) {
     console.error('CRM Sync Error:', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to sync opportunity details to CRM.' },
+      { error: error?.message || 'Failed to process CRM sync request.' },
       { status: 500 }
     );
   }
 }
+
