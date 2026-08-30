@@ -271,6 +271,7 @@ export default function Dashboard() {
   const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions' | 'competitors'>('facts');
   const [vaultSubTab, setVaultSubTab] = useState<'pages' | 'citations'>('pages');
   const [vaultSearch, setVaultSearch] = useState('');
+  const [selectedPageSnippet, setSelectedPageSnippet] = useState<{ title: string; url: string; snippet?: string } | null>(null);
   const [outreachSubTab, setOutreachSubTab] = useState<'email' | 'linkedin' | 'followup' | 'discovery' | 'angle' | 'social' | 'ideas'>('email');
   const [socialType, setSocialType] = useState<'linkedin' | 'twitter' | 'tips' | 'teardown' | 'discovery'>('linkedin');
   const [showReferralModal, setShowReferralModal] = useState(false);
