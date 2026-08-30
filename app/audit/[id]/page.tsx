@@ -115,8 +115,8 @@ export default async function PublicAuditPage({ params }: Props) {
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
               {audit.companyName}
             </h1>
-            <p className="text-xs text-slate-500 font-mono">
-              {audit.websiteUrl} • Generated on {new Date(audit.createdAt).toLocaleDateString()}
+            <p className="text-xs text-slate-500 font-mono" suppressHydrationWarning>
+              {audit.websiteUrl} • Generated on {audit.createdAt ? audit.createdAt.substring(0, 10) : '2026-08-30'}
             </p>
           </div>
 

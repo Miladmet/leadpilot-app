@@ -114,7 +114,7 @@ export default function CaseStudiesIndexPage() {
 
       {/* Footer */}
       <footer className="py-8 px-6 bg-white border-t border-slate-200 text-center text-xs text-slate-500">
-        <p>© {new Date().getFullYear()} LeadPilot AI. Evidence-backed agency client acquisition.</p>
+        <p suppressHydrationWarning>© {new Date().getFullYear()} LeadPilot AI. Evidence-backed agency client acquisition.</p>
       </footer>
     </div>
   );

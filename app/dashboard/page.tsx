@@ -1513,12 +1513,12 @@ export default function Dashboard() {
                 <input
                   type="text"
                   readOnly
-                  value={`https://leadpilot.ai/register?ref=${generateReferralCode(user.id)}`}
+                  value={`https://leadpilot.ai/register?ref=${generateReferralCode(user?.id || 'agency')}`}
                   className="flex-1 bg-white border border-slate-250 text-xs px-3.5 py-2.5 rounded-xl font-mono text-slate-800 focus:outline-none"
                 />
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(`https://leadpilot.ai/register?ref=${generateReferralCode(user.id)}`);
+                    navigator.clipboard.writeText(`https://leadpilot.ai/register?ref=${generateReferralCode(user?.id || 'agency')}`);
                     setCopiedText('referral-link');
                     setTimeout(() => setCopiedText(null), 2500);
                   }}
@@ -3044,7 +3044,7 @@ export default function Dashboard() {
 
                           <button
                             onClick={() => {
-                              const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://leadpilot.ai'}/audit/${activeProspect.id}`;
+                              const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://leadpilot.ai'}/audit/${activeProspect?.id || ''}`;
                               navigator.clipboard.writeText(publicUrl);
                               setShareCopied(true);
                               setTimeout(() => setShareCopied(false), 2500);

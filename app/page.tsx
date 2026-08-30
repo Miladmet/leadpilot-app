@@ -491,7 +491,7 @@ export default function Home() {
         </div>
 
         <div className="pt-6 border-t border-slate-800 text-center space-y-2">
-          <p className="font-semibold text-slate-300">© {new Date().getFullYear()} LeadPilot AI. All rights reserved.</p>
+          <p className="font-semibold text-slate-300" suppressHydrationWarning>© {new Date().getFullYear()} LeadPilot AI. All rights reserved.</p>
           <p className="text-slate-500 max-w-lg mx-auto">
             LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
           </p>
