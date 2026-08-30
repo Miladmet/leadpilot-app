@@ -249,6 +249,19 @@ interface ModalContent {
   status?: string;
 }
 
+interface AnalysisErrorState {
+  classification: string;
+  userMessage: string;
+  referenceCode?: string;
+  isRetryable: boolean;
+  adminDetails?: {
+    prismaErrorCode: string;
+    model: string;
+    missingItem: string;
+    migrationStatus: string;
+  };
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -259,6 +272,7 @@ export default function Dashboard() {
   const [activeProspect, setActiveProspect] = useState<Prospect | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
+  const [analysisError, setAnalysisError] = useState<AnalysisErrorState | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   
   // Dashboard navigation tabs
@@ -367,11 +381,12 @@ export default function Dashboard() {
     }
   };
 
-  const handleAnalyze = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAnalyze = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!url) return;
     setAnalyzing(true);
     setError('');
+    setAnalysisError(null);
 
     try {
       const res = await fetch('/api/analyze', {
@@ -382,7 +397,15 @@ export default function Dashboard() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Verification check failed. Verify domain.');
+        setAnalysisError({
+          classification: data.classification || 'ANALYSIS_ERROR',
+          userMessage: data.error || 'Verification check failed. Verify domain.',
+          referenceCode: data.referenceCode,
+          isRetryable: data.isRetryable ?? false,
+          adminDetails: data.adminDetails
+        });
+        setError(data.error || 'Verification check failed. Verify domain.');
+        return;
       }
 
       const newProspect = data.prospect;
@@ -391,7 +414,14 @@ export default function Dashboard() {
       setUrl('');
       await Promise.all([fetchStats(), fetchUserData()]);
     } catch (err: any) {
-      setError(err.message);
+      const errorMsg = err.message || 'Network connectivity issue. Please retry in a few moments.';
+      setAnalysisError({
+        classification: 'NETWORK_FAILURE',
+        userMessage: errorMsg,
+        referenceCode: 'NETWORK_FAILURE',
+        isRetryable: true
+      });
+      setError(errorMsg);
     } finally {
       setAnalyzing(false);
     }
@@ -1802,11 +1832,95 @@ export default function Dashboard() {
               </button>
             </form>
 
-            {error && (
+            {/* STRUCTURED ERROR BANNER & DIAGNOSTICS */}
+            {analysisError?.classification === 'SCHEMA_MISMATCH' ? (
+              <div className="mt-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs space-y-3.5 shadow-sm animate-in fade-in">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1.5 text-rose-900">
+                    <p className="font-bold text-sm leading-snug">
+                      Analysis could not be saved because the application and database schemas are out of sync.
+                    </p>
+                    <p className="text-rose-700 text-xs font-semibold">
+                      This issue cannot be resolved by retrying.
+                    </p>
+                    <div className="pt-1 flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Reference Code:</span>
+                      <span className="font-mono font-bold text-rose-900 text-xs bg-rose-200/70 px-2 py-0.5 rounded border border-rose-300">
+                        SCHEMA_MISMATCH
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Administrator Diagnostic Telemetry */}
+                {analysisError.adminDetails && (
+                  <div className="pt-3 border-t border-rose-200 bg-rose-100/60 p-3 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-900 flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5 text-rose-700" />
+                        Administrator Diagnostics
+                      </span>
+                      <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 border border-rose-300">
+                        Schema Drift Detected
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
+                      <div className="bg-white p-2 rounded-lg border border-rose-200">
+                        <span className="text-[9px] uppercase text-slate-500 block font-sans font-bold">Prisma Error Code</span>
+                        <strong className="text-rose-700">{analysisError.adminDetails.prismaErrorCode}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-rose-200">
+                        <span className="text-[9px] uppercase text-slate-500 block font-sans font-bold">Model</span>
+                        <strong className="text-slate-800">{analysisError.adminDetails.model}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-rose-200">
+                        <span className="text-[9px] uppercase text-slate-500 block font-sans font-bold">Missing Table or Column</span>
+                        <strong className="text-rose-700">{analysisError.adminDetails.missingItem}</strong>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg border border-rose-200">
+                        <span className="text-[9px] uppercase text-slate-500 block font-sans font-bold">Migration Status</span>
+                        <strong className="text-amber-700">{analysisError.adminDetails.migrationStatus}</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : analysisError ? (
+              <div className="mt-3 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs space-y-2 text-rose-800 shadow-sm animate-in fade-in">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-semibold">{analysisError.userMessage}</p>
+                      {analysisError.referenceCode && (
+                        <span className="text-[9px] font-mono text-rose-600 block">
+                          Reference: {analysisError.referenceCode}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ONLY show Retry button when error is genuinely retryable */}
+                  {analysisError.isRetryable && (
+                    <button
+                      type="button"
+                      onClick={() => handleAnalyze()}
+                      disabled={analyzing}
+                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50 shadow-xs"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${analyzing ? 'animate-spin' : ''}`} />
+                      <span>Retry Analysis</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : error ? (
               <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
                 {error}
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Core proposal workspace */}

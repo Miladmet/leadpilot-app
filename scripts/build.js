@@ -52,6 +52,10 @@ try {
   console.log('[Build Gate] Enforcing Authentication Failure Diagnostics Gate...');
   execSync('node scripts/test-auth-failure-diagnostics.js', { stdio: 'inherit' });
 
+  // Execute Error Classification & Retry Safety Gate (Schema mismatch & retry safety)
+  console.log('[Build Gate] Enforcing Error Classification & Retry Safety Gate...');
+  execSync('node scripts/test-error-classification.js', { stdio: 'inherit' });
+
   // Execute Database Schema Verification Gate (Model & Column Drift Detection)
   console.log('[Build Gate] Enforcing Database Schema Verification Gate...');
   execSync('node scripts/verify-schema-drift.js', { stdio: 'inherit' });
