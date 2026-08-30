@@ -20,7 +20,8 @@ import {
   X, 
   CheckCircle2, 
   HelpCircle,
-  WifiOff
+  WifiOff,
+  Terminal
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -28,6 +29,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<ClassifiedAuthError | null>(null);
+  const [devDiagnostics, setDevDiagnostics] = useState<any>(null);
   
   // Diagnostics Drawer State
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -60,6 +62,7 @@ export default function LoginPage() {
     if (e) e.preventDefault();
     setLoading(true);
     setAuthError(null);
+    setDevDiagnostics(null);
 
     // Client-side quick checks
     if (!email.trim()) {
@@ -108,6 +111,9 @@ export default function LoginPage() {
           timestamp: new Date().toISOString()
         });
         setAuthError(classified);
+        if (data.devDiagnostics) {
+          setDevDiagnostics(data.devDiagnostics);
+        }
         return;
       }
 
@@ -302,6 +308,56 @@ export default function LoginPage() {
                   <HelpCircle className="h-3 w-3 text-slate-500" />
                   <span>View Diagnostics</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* DEVELOPMENT DIAGNOSTICS PANEL (DEV MODE ONLY) */}
+          {devDiagnostics && (
+            <div className="rounded-2xl bg-slate-900 border border-amber-500/50 p-4 text-xs space-y-3.5 shadow-lg animate-in fade-in">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Terminal className="h-4 w-4 text-amber-400" />
+                  <h4 className="font-bold text-white text-xs uppercase tracking-wider">
+                    Authentication Failed
+                  </h4>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-700">
+                  DEVELOPMENT ONLY
+                </span>
+              </div>
+
+              <div className="space-y-2 text-slate-300 font-sans text-xs">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Classification:</span>
+                  <span className="font-mono font-bold text-amber-300 text-xs">{devDiagnostics.classification}</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Environment:</span>
+                  <span className="font-mono text-sky-300">{devDiagnostics.environment}</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Database:</span>
+                  <span className={`font-mono font-bold ${devDiagnostics.database === 'Connected' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {devDiagnostics.database}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Authentication Service:</span>
+                  <span className={`font-mono font-bold ${devDiagnostics.authService === 'Reachable' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {devDiagnostics.authService}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">User Record:</span>
+                  <span className={`font-mono font-bold ${devDiagnostics.userRecord === 'Found' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {devDiagnostics.userRecord}
+                  </span>
+                </div>
               </div>
             </div>
           )}
