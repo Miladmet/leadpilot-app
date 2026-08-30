@@ -1,0 +1,67 @@
+[
+  {
+    "id": "DEPLOY_1788114173024",
+    "timestamp": "2026-08-30T18:22:52.891Z",
+    "commitId": "local-build",
+    "overallHealth": "HEALTHY",
+    "schemaStatus": "Healthy",
+    "apiStatus": "Healthy",
+    "securityStatus": "Healthy",
+    "trustStatus": "Healthy",
+    "storageStatus": "Healthy",
+    "missingColumnsCount": 0,
+    "missingTablesCount": 0
+  },
+  {
+    "id": "DEPLOY_1788114139420",
+    "timestamp": "2026-08-30T18:22:19.339Z",
+    "commitId": "test-commit-sha",
+    "overallHealth": "HEALTHY",
+    "schemaStatus": "Healthy",
+    "apiStatus": "Healthy",
+    "securityStatus": "Healthy",
+    "trustStatus": "Healthy",
+    "storageStatus": "Healthy",
+    "missingColumnsCount": 0,
+    "missingTablesCount": 0
+  },
+  {
+    "id": "DEPLOY_1788114028376",
+    "timestamp": "2026-08-30T18:20:28.264Z",
+    "commitId": "local-build",
+    "overallHealth": "HEALTHY",
+    "schemaStatus": "Healthy",
+    "apiStatus": "Healthy",
+    "securityStatus": "Healthy",
+    "trustStatus": "Healthy",
+    "storageStatus": "Healthy",
+    "missingColumnsCount": 0,
+    "missingTablesCount": 0
+  },
+  {
+    "id": "DEPLOY_1788113972001",
+    "timestamp": "2026-08-30T18:19:31.911Z",
+    "commitId": "test-commit-sha",
+    "overallHealth": "HEALTHY",
+    "schemaStatus": "Healthy",
+    "apiStatus": "Healthy",
+    "securityStatus": "Healthy",
+    "trustStatus": "Healthy",
+    "storageStatus": "Healthy",
+    "missingColumnsCount": 0,
+    "missingTablesCount": 0
+  },
+  {
+    "id": "DEPLOY_1788113791795",
+    "timestamp": "2026-08-30T18:16:31.678Z",
+    "commitId": "test-commit-sha",
+    "overallHealth": "FAILED",
+    "schemaStatus": "Healthy",
+    "apiStatus": "FAILED",
+    "securityStatus": "Healthy",
+    "trustStatus": "Healthy",
+    "storageStatus": "Healthy",
+    "missingColumnsCount": 0,
+    "missingTablesCount": 0
+  }
+]

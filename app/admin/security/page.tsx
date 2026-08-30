@@ -20,7 +20,9 @@ import {
   Activity,
   Server,
   Clock,
-  Sparkles
+  Sparkles,
+  History,
+  Terminal
 } from 'lucide-react';
 
 interface TableReport {
@@ -148,11 +150,29 @@ interface InfraData {
   alerts: Array<{ id: string; severity: string; type: string; message: string; details: any }>;
 }
 
+interface DeploymentHistoryItem {
+  id: string;
+  timestamp: string;
+  commitId: string;
+  overallHealth: 'HEALTHY' | 'FAILED';
+  schemaStatus: string;
+  apiStatus: string;
+  securityStatus: string;
+  trustStatus: string;
+  storageStatus: string;
+  missingColumnsCount: number;
+  missingTablesCount: number;
+}
+
 export default function AdminSecurityDashboard() {
   const [data, setData] = useState<SecurityData | null>(null);
   const [storageData, setStorageData] = useState<StorageSecurityData | null>(null);
   const [schemaData, setSchemaData] = useState<SchemaHealthData | null>(null);
   const [infraData, setInfraData] = useState<InfraData | null>(null);
+  const [deployHistory, setDeployHistory] = useState<DeploymentHistoryItem[]>([]);
+  const [validatingDeploy, setValidatingDeploy] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [selectedDeployReport, setSelectedDeployReport] = useState<string | null>(null);
   const [verifyingSchema, setVerifyingSchema] = useState(false);
   const [healingSchema, setHealingSchema] = useState(false);
   const [runningAudit, setRunningAudit] = useState(false);
@@ -166,11 +186,12 @@ export default function AdminSecurityDashboard() {
     setLoading(true);
     setError('');
     try {
-      const [resDb, resStorage, resSchema, resInfra] = await Promise.all([
+      const [resDb, resStorage, resSchema, resInfra, resHistory] = await Promise.all([
         fetch('/api/admin/security/status'),
         fetch('/api/admin/security/storage'),
         fetch('/api/admin/security/schema-health'),
-        fetch('/api/admin/infra/status')
+        fetch('/api/admin/infra/status'),
+        fetch('/api/admin/deployments/history')
       ]);
 
       if (!resDb.ok) {
@@ -194,10 +215,36 @@ export default function AdminSecurityDashboard() {
         const jsonInfra = await resInfra.json();
         setInfraData(jsonInfra);
       }
+
+      if (resHistory.ok) {
+        const jsonHistory = await resHistory.json();
+        if (jsonHistory.history) {
+          setDeployHistory(jsonHistory.history);
+        }
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTriggerValidation = async () => {
+    setValidatingDeploy(true);
+    try {
+      const res = await fetch('/api/admin/deployments/history', { method: 'POST' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.validation) {
+          setSelectedDeployReport(json.validation.report);
+          setShowDeployModal(true);
+        }
+        await fetchSecurityStatus();
+      }
+    } catch (err) {
+      console.error('Trigger validation failed:', err);
+    } finally {
+      setValidatingDeploy(false);
     }
   };
 
@@ -382,40 +429,76 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                {infraData?.platformStatus?.overall === 'Healthy' ? 'All Subsystems Operational' : 'Subsystems Monitored'}
+                {deployHistory[0]?.overallHealth === 'FAILED' ? 'Action Required: Drift Detected' : 'All Systems Operational'}
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {/* Overall Deployment Health */}
             <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between">
-              <span className="text-xs text-slate-300 font-medium">Trust</span>
-              <span className="text-[11px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-                {infraData?.platformStatus?.subsystems?.trust?.status || 'Healthy'}
+              <span className="text-xs text-slate-300 font-medium">Overall Health</span>
+              <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${
+                deployHistory[0]?.overallHealth === 'FAILED'
+                  ? 'text-rose-400 bg-rose-950/80 border-rose-800'
+                  : 'text-emerald-400 bg-emerald-950/80 border-emerald-800'
+              }`}>
+                {deployHistory[0]?.overallHealth || 'HEALTHY'}
               </span>
             </div>
-            <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between">
-              <span className="text-xs text-slate-300 font-medium">Security</span>
-              <span className="text-[11px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-                {infraData?.platformStatus?.subsystems?.security?.status || 'Healthy'}
-              </span>
-            </div>
-            <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between">
-              <span className="text-xs text-slate-300 font-medium">Storage</span>
-              <span className="text-[11px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-                {infraData?.platformStatus?.subsystems?.storage?.status || 'Healthy'}
-              </span>
-            </div>
+            {/* Schema Status */}
             <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between">
               <span className="text-xs text-slate-300 font-medium">Schema</span>
-              <span className="text-[11px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-                {infraData?.platformStatus?.subsystems?.schema?.status || 'Healthy'}
+              <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${
+                deployHistory[0]?.schemaStatus === 'FAILED'
+                  ? 'text-rose-400 bg-rose-950/80 border-rose-800'
+                  : 'text-emerald-400 bg-emerald-950/80 border-emerald-800'
+              }`}>
+                {deployHistory[0]?.schemaStatus || 'Healthy'}
               </span>
             </div>
-            <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between col-span-2 sm:col-span-1">
-              <span className="text-xs text-slate-300 font-medium">Deployment</span>
-              <span className="text-[11px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-                {infraData?.platformStatus?.subsystems?.deployment?.status || 'Healthy'}
+            {/* API Status */}
+            <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between">
+              <span className="text-xs text-slate-300 font-medium">API</span>
+              <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${
+                deployHistory[0]?.apiStatus === 'FAILED'
+                  ? 'text-rose-400 bg-rose-950/80 border-rose-800'
+                  : 'text-emerald-400 bg-emerald-950/80 border-emerald-800'
+              }`}>
+                {deployHistory[0]?.apiStatus || 'Healthy'}
+              </span>
+            </div>
+            {/* Security Status */}
+            <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between">
+              <span className="text-xs text-slate-300 font-medium">Security</span>
+              <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${
+                deployHistory[0]?.securityStatus === 'FAILED'
+                  ? 'text-rose-400 bg-rose-950/80 border-rose-800'
+                  : 'text-emerald-400 bg-emerald-950/80 border-emerald-800'
+              }`}>
+                {deployHistory[0]?.securityStatus || 'Healthy'}
+              </span>
+            </div>
+            {/* Trust Status */}
+            <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between">
+              <span className="text-xs text-slate-300 font-medium">Trust</span>
+              <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${
+                deployHistory[0]?.trustStatus === 'FAILED'
+                  ? 'text-rose-400 bg-rose-950/80 border-rose-800'
+                  : 'text-emerald-400 bg-emerald-950/80 border-emerald-800'
+              }`}>
+                {deployHistory[0]?.trustStatus || 'Healthy'}
+              </span>
+            </div>
+            {/* Storage Status */}
+            <div className="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl flex items-center justify-between">
+              <span className="text-xs text-slate-300 font-medium">Storage</span>
+              <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${
+                deployHistory[0]?.storageStatus === 'FAILED'
+                  ? 'text-rose-400 bg-rose-950/80 border-rose-800'
+                  : 'text-emerald-400 bg-emerald-950/80 border-emerald-800'
+              }`}>
+                {deployHistory[0]?.storageStatus || 'Healthy'}
               </span>
             </div>
           </div>
@@ -739,6 +822,179 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
           </div>
         </div>
 
+        {/* ---------------- POST-DEPLOYMENT VALIDATION & HISTORY SECTION ---------------- */}
+        <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm space-y-5 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/70 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5 text-indigo-400" />
+                <h2 className="text-base font-bold text-white uppercase tracking-wider">
+                  Post-Deploy Validation & History
+                </h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Automated continuous validation across Database Schema, Critical Queries, APIs, Auth, Trust, RLS, and Storage.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleTriggerValidation}
+                disabled={validatingDeploy}
+                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                <RefreshCw className={`h-3 w-3 ${validatingDeploy ? 'animate-spin' : ''}`} />
+                <span>{validatingDeploy ? 'Validating Deploy...' : 'Run Post-Deploy Validation'}</span>
+              </button>
+
+              {deployHistory.length > 0 && (
+                <button
+                  onClick={async () => {
+                    handleTriggerValidation();
+                  }}
+                  className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <FileText className="h-3 w-3" />
+                  <span>Deployment Report</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 6 Required Status Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {/* 1. Overall Health */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-3 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Overall Health</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${deployHistory[0]?.overallHealth === 'FAILED' ? 'bg-rose-400 animate-pulse' : 'bg-emerald-400'}`} />
+                <span className={`text-xs font-black uppercase ${deployHistory[0]?.overallHealth === 'FAILED' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {deployHistory[0]?.overallHealth || 'HEALTHY'}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Schema Status */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-3 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Schema Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${deployHistory[0]?.schemaStatus === 'FAILED' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                <span className={`text-xs font-black uppercase ${deployHistory[0]?.schemaStatus === 'FAILED' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {deployHistory[0]?.schemaStatus || 'Healthy'}
+                </span>
+              </div>
+            </div>
+
+            {/* 3. API Status */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-3 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">API Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${deployHistory[0]?.apiStatus === 'FAILED' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                <span className={`text-xs font-black uppercase ${deployHistory[0]?.apiStatus === 'FAILED' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {deployHistory[0]?.apiStatus || 'Healthy'}
+                </span>
+              </div>
+            </div>
+
+            {/* 4. Security Status */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-3 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Security Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${deployHistory[0]?.securityStatus === 'FAILED' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                <span className={`text-xs font-black uppercase ${deployHistory[0]?.securityStatus === 'FAILED' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {deployHistory[0]?.securityStatus || 'Healthy'}
+                </span>
+              </div>
+            </div>
+
+            {/* 5. Trust Status */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-3 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trust Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${deployHistory[0]?.trustStatus === 'FAILED' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                <span className={`text-xs font-black uppercase ${deployHistory[0]?.trustStatus === 'FAILED' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {deployHistory[0]?.trustStatus || 'Healthy'}
+                </span>
+              </div>
+            </div>
+
+            {/* 6. Storage Status */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-3 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Storage Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${deployHistory[0]?.storageStatus === 'FAILED' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                <span className={`text-xs font-black uppercase ${deployHistory[0]?.storageStatus === 'FAILED' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {deployHistory[0]?.storageStatus || 'Healthy'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Deployment History Table */}
+          <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-900/80 text-slate-400 border-b border-slate-700/70 text-[10px] font-bold uppercase tracking-wider">
+                  <th className="p-3">Deployment ID</th>
+                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Commit</th>
+                  <th className="p-3">Overall Health</th>
+                  <th className="p-3">Schema</th>
+                  <th className="p-3">API</th>
+                  <th className="p-3">Security</th>
+                  <th className="p-3">Storage</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50 text-slate-200">
+                {deployHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-4 text-center text-slate-400">
+                      No deployments recorded yet. Click "Run Post-Deploy Validation" to record this deployment.
+                    </td>
+                  </tr>
+                ) : (
+                  deployHistory.slice(0, 10).map((dep) => (
+                    <tr key={dep.id} className="hover:bg-slate-700/30 transition-colors">
+                      <td className="p-3 font-mono text-slate-300">{dep.id}</td>
+                      <td className="p-3 text-slate-300 font-mono text-[11px]">{new Date(dep.timestamp).toLocaleString()}</td>
+                      <td className="p-3 font-mono text-[11px] text-sky-400">{dep.commitId?.slice(0, 7) || 'local'}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          dep.overallHealth === 'HEALTHY'
+                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                            : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                        }`}>
+                          {dep.overallHealth}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`text-[11px] font-bold ${dep.schemaStatus === 'Healthy' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {dep.schemaStatus}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`text-[11px] font-bold ${dep.apiStatus === 'Healthy' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {dep.apiStatus}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`text-[11px] font-bold ${dep.securityStatus === 'Healthy' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {dep.securityStatus}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`text-[11px] font-bold ${dep.storageStatus === 'Healthy' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {dep.storageStatus}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* Tables RLS Inventory */}
         <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-700/70 flex justify-between items-center">
@@ -982,6 +1238,54 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
                 <button
                   onClick={() => setShowReportModal(false)}
                   className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deployment Health Report Modal */}
+      {showDeployModal && selectedDeployReport && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-slate-850 border border-slate-700 rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-5 w-5 text-indigo-400" />
+                <h3 className="font-bold text-white text-base">Production Deployment Health Report</h3>
+              </div>
+              <button
+                onClick={() => setShowDeployModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-300 leading-relaxed whitespace-pre-wrap select-all">
+              {selectedDeployReport}
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <span className="text-[11px] text-slate-400">
+                Format: Automated Post-Deployment Verification Report
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedDeployReport);
+                    alert('Report copied to clipboard!');
+                  }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy Report
+                </button>
+                <button
+                  onClick={() => setShowDeployModal(false)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-colors"
                 >
                   Close
                 </button>
