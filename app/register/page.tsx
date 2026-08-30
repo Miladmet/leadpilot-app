@@ -40,20 +40,29 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link href="/" className="flex justify-center text-3xl font-black text-sky-600">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <Link href="/" className="inline-block text-3xl font-black text-sky-600">
           LeadPilot AI
         </Link>
-        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-slate-900">
-          Create your account
+        <div className="mt-2">
+          <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-full border border-sky-200 uppercase tracking-wider">
+            Find Opportunities. Generate Proposals. Win Clients.
+          </span>
+        </div>
+        <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-slate-900">
+          Create your agency account
         </h2>
-        <p className="mt-2 text-center text-sm text-slate-600">
+        <p className="mt-2 text-center text-xs text-slate-500 max-w-xs mx-auto">
+          LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
+        </p>
+        <p className="mt-3 text-center text-sm text-slate-600">
           Already have an account?{' '}
           <Link href="/login" className="font-semibold text-sky-600 hover:text-sky-500">
             Sign in
           </Link>
         </p>
       </div>
+
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white px-4 py-8 shadow sm:rounded-xl sm:px-10 border border-slate-200">

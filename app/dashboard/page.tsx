@@ -1474,9 +1474,25 @@ export default function Dashboard() {
         {/* Left Column: Stats & Workspace */}
         <div className="lg:col-span-2 space-y-6 flex flex-col">
           
+          {/* Core Positioning & Brand Principles Banner */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <span className="text-[9px] uppercase font-bold text-sky-600 tracking-wider block">LeadPilot AI Value Proposition</span>
+              <p className="text-xs font-bold text-slate-800">
+                LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5 shrink-0">
+              <span className="bg-slate-100 text-slate-600 text-[9px] font-semibold px-2 py-0.5 rounded-full border border-slate-200">Trust before AI</span>
+              <span className="bg-slate-100 text-slate-600 text-[9px] font-semibold px-2 py-0.5 rounded-full border border-slate-200">Evidence before recommendations</span>
+              <span className="bg-slate-100 text-slate-600 text-[9px] font-semibold px-2 py-0.5 rounded-full border border-slate-200">&lt;60s Delivery</span>
+            </div>
+          </div>
+
           {/* Agency Revenue Dashboard stats */}
           {/* Agency Revenue & Platform Trust Dashboard stats */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+
             
             {/* 1. PLATFORM TRUST STATUS CARD */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-xl border border-slate-700 shadow-md flex flex-col justify-between col-span-2 md:col-span-1">
@@ -1597,11 +1613,12 @@ export default function Dashboard() {
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
               <Sparkles className="h-5 w-5 text-sky-500" />
-              Build Client Solution & Proposal
+              Find Opportunities. Generate Proposals. Win Clients.
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Enter any company URL. The system gathers facts, runs the double-agent verification check, and drafts compliant proposals.
+              Analyze a website and generate evidence-backed opportunities, solutions, and proposals.
             </p>
+
 
             <form onSubmit={handleAnalyze} className="mt-4 flex gap-2">
               <input
@@ -3352,26 +3369,76 @@ export default function Dashboard() {
             </div>
 
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 shadow-sm flex-1 flex flex-col justify-center items-center">
-              <Search className="h-12 w-12 text-slate-300 stroke-1 mb-4" />
-              <p className="font-bold text-slate-800 text-sm">No analysis active</p>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                Enter a website URL above or select a past lead to load their Client Acquisition Proposal.
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-12 text-center text-slate-600 shadow-sm flex-1 flex flex-col justify-center items-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto text-2xl shadow-2xs font-bold">
+                🔍
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  Turn any company website into:
+                </h3>
+                <div className="mt-3 space-y-2 text-left inline-block bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-600 font-bold">✅</span>
+                    <span>Verified opportunities</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-600 font-bold">✅</span>
+                    <span>Service recommendations</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-600 font-bold">✅</span>
+                    <span>Proposal-ready solutions</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-600 font-bold">✅</span>
+                    <span>Personalized outreach</span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs font-bold text-sky-700 bg-sky-50 px-3.5 py-1.5 rounded-full border border-sky-200 shadow-2xs">
+                Analyze a website to get started.
+              </p>
+              <p className="text-[11px] text-slate-400 max-w-md">
+                LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
               </p>
             </div>
           )}
+
 
         </div>
 
         {/* Right Column: History, Billing, Logs */}
         <div className="space-y-6">
           
+          {/* Chrome Extension Panel */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl border border-slate-700 shadow-sm space-y-3">
+            <div className="flex justify-between items-start">
+              <span className="bg-sky-500/20 text-sky-300 border border-sky-500/40 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Chrome Extension
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">&lt;60s Speed</span>
+            </div>
+            <h4 className="font-black text-sm text-white">
+              From website to winning proposal in under 60 seconds.
+            </h4>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis directly from any browser tab.
+            </p>
+            <div className="pt-1">
+              <span className="text-[10px] text-emerald-400 font-semibold block">
+                ✓ 1-Click Prospect Audit & Proposal Generation
+              </span>
+            </div>
+          </div>
+
           {/* Billing Plan Manager */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <CreditCard className="h-4.5 w-4.5 text-slate-500" />
               Billing & Subscription
             </h3>
+
 
             {user.subscriptionTier === 'FREE' ? (
               <div className="mt-3 space-y-3">

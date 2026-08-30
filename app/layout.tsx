@@ -2,12 +2,13 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'LeadPilot AI - Turn Any Company Website Into A Personalized Sales Email',
-  description: 'AI-powered outreach and sales intelligence in under 60 seconds.',
+  title: 'LeadPilot AI - Find Opportunities. Generate Proposals. Win Clients.',
+  description: 'LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.',
   verification: {
     google: 'google6d2d4ba6b8465c71',
   },
 };
+
 
 export default function RootLayout({
   children,
