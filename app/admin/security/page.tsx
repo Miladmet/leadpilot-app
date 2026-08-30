@@ -15,7 +15,8 @@ import {
   Copy,
   Check,
   Database,
-  ExternalLink
+  ExternalLink,
+  Wrench
 } from 'lucide-react';
 
 interface TableReport {
@@ -109,6 +110,7 @@ export default function AdminSecurityDashboard() {
   const [storageData, setStorageData] = useState<StorageSecurityData | null>(null);
   const [schemaData, setSchemaData] = useState<SchemaHealthData | null>(null);
   const [verifyingSchema, setVerifyingSchema] = useState(false);
+  const [healingSchema, setHealingSchema] = useState(false);
   const [copiedSchema, setCopiedSchema] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -160,6 +162,21 @@ export default function AdminSecurityDashboard() {
       console.error('Failed to run live schema verification:', err);
     } finally {
       setVerifyingSchema(false);
+    }
+  };
+
+  const handleAutoHealSchema = async () => {
+    setHealingSchema(true);
+    try {
+      const res = await fetch('/api/admin/security/schema-health', { method: 'POST' });
+      if (res.ok) {
+        const json = await res.json();
+        setSchemaData(json);
+      }
+    } catch (err) {
+      console.error('Failed to run schema auto-heal:', err);
+    } finally {
+      setHealingSchema(false);
     }
   };
 
@@ -576,6 +593,15 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={handleAutoHealSchema}
+                disabled={healingSchema}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                <Wrench className={`h-3 w-3 ${healingSchema ? 'animate-spin' : ''}`} />
+                <span>{healingSchema ? 'Auto-Healing...' : 'Auto-Heal Schema'}</span>
+              </button>
+
               <button
                 onClick={handleVerifySchema}
                 disabled={verifyingSchema}

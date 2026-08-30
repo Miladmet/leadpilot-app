@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 import { runSchemaVerification } from '@/lib/schemaVerification';
 import { isSchemaMismatchError, parsePrismaSchemaError, USER_FACING_SCHEMA_ERROR } from '@/lib/schemaErrorLogger';
+import { selfHealDatabaseSchema } from '@/lib/dbSelfHeal';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,5 +33,26 @@ export async function GET(req: NextRequest) {
 
     console.error('[Schema Health API Error]:', error);
     return NextResponse.json({ error: 'Failed to inspect database schema health.' }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 401 });
+    }
+
+    const healResult = await selfHealDatabaseSchema(prisma);
+    const verificationResult = await runSchemaVerification();
+
+    return NextResponse.json({
+      success: true,
+      healResult,
+      ...verificationResult
+    });
+  } catch (error: any) {
+    console.error('[Schema Auto-Heal API Error]:', error);
+    return NextResponse.json({ error: error?.message || 'Failed to auto-heal schema.' }, { status: 500 });
   }
 }
