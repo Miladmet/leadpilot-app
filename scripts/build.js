@@ -70,6 +70,10 @@ try {
   console.log('[Build Gate] Enforcing Database Self-Healing & Drift Recovery Gate...');
   execSync('node scripts/test-db-self-heal.js', { stdio: 'inherit' });
 
+  // Execute Deployment Verification Engine Gate (Health Score, Route Checks, Platform Status & Alerts)
+  console.log('[Build Gate] Enforcing Deployment Verification Engine Gate...');
+  execSync('node scripts/test-deployment-verification.js', { stdio: 'inherit' });
+
   // Execute Database Schema Verification Gate (Model & Column Drift Detection)
   console.log('[Build Gate] Enforcing Database Schema Verification Gate...');
   execSync('node scripts/verify-schema-drift.js', { stdio: 'inherit' });
