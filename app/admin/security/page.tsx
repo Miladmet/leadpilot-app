@@ -271,16 +271,24 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
 
           <div className="flex items-center gap-3">
             <button
+              onClick={handleAutoHealSchema}
+              disabled={healingSchema}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+            >
+              <Wrench className={`h-3.5 w-3.5 ${healingSchema ? 'animate-spin' : ''}`} />
+              <span>{healingSchema ? 'Auto-Healing...' : 'Auto-Heal Schema'}</span>
+            </button>
+            <button
               onClick={fetchSecurityStatus}
               disabled={loading}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
               Refresh Audit
             </button>
             <button
               onClick={() => setShowReportModal(true)}
-              className="px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+              className="px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <FileText className="h-3.5 w-3.5" />
               View Security Report
@@ -370,6 +378,160 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               RLS Deployment Gate: ACTIVE
             </span>
+          </div>
+        </div>
+
+        {/* ---------------- DATABASE HEALTH SECTION ---------------- */}
+        <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm space-y-5 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/70 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-sky-400" />
+                <h2 className="text-base font-bold text-white uppercase tracking-wider">
+                  Database Health & Auto-Heal
+                </h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Automated continuous schema drift detection and one-click self-healing across Prisma models and live tables.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={handleAutoHealSchema}
+                disabled={healingSchema}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                <Wrench className={`h-3 w-3 ${healingSchema ? 'animate-spin' : ''}`} />
+                <span>{healingSchema ? 'Auto-Healing...' : 'Auto-Heal Schema'}</span>
+              </button>
+
+              <button
+                onClick={handleVerifySchema}
+                disabled={verifyingSchema}
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border border-slate-600 disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                <RefreshCw className={`h-3 w-3 ${verifyingSchema ? 'animate-spin' : ''}`} />
+                <span>Verify Schema</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (schemaData?.reportText) {
+                    navigator.clipboard.writeText(schemaData.reportText);
+                    setCopiedSchema(true);
+                    setTimeout(() => setCopiedSchema(false), 2000);
+                  }
+                }}
+                className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                {copiedSchema ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
+                <span>{copiedSchema ? 'Copied' : 'Copy Report'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 5 Core Health Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+            {/* 1. Schema Status */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Schema Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${schemaData?.isHealthy ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`} />
+                <span className={`text-sm font-black uppercase ${schemaData?.isHealthy ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {schemaData?.schemaStatus || 'Healthy'}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Migration Status */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Migration Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${schemaData?.migrationStatus === 'Up To Date' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className={`text-sm font-black uppercase ${schemaData?.migrationStatus === 'Up To Date' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {schemaData?.migrationStatus || 'Up To Date'}
+                </span>
+              </div>
+            </div>
+
+            {/* 3. Missing Columns */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Missing Columns</span>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className={`text-xl font-black ${(schemaData?.missingColumnsCount || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {schemaData?.missingColumnsCount ?? 0}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {(schemaData?.missingColumnsCount || 0) === 0 ? 'None' : 'Detected'}
+                </span>
+              </div>
+            </div>
+
+            {/* 4. Missing Tables */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Missing Tables</span>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className={`text-xl font-black ${(schemaData?.missingTablesCount || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {schemaData?.missingTablesCount ?? 0}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {(schemaData?.missingTablesCount || 0) === 0 ? 'None' : 'Detected'}
+                </span>
+              </div>
+            </div>
+
+            {/* 5. Last Verification Time */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl col-span-2 md:col-span-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Last Verification Time</span>
+              <div className="mt-2 text-xs font-mono text-slate-200">
+                {schemaData?.lastVerification ? new Date(schemaData.lastVerification).toLocaleTimeString() : 'Just now'}
+              </div>
+            </div>
+          </div>
+
+          {/* Model Verification Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
+            {schemaData?.models.map((m) => (
+              <div
+                key={m.modelName}
+                className={`p-4 rounded-xl border transition-all ${
+                  m.status === 'HEALTHY'
+                    ? 'bg-slate-900/60 border-slate-700/60'
+                    : 'bg-rose-950/30 border-rose-800/80'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-bold text-white text-xs block">{m.modelName}</span>
+                  <span className="text-[10px] font-mono text-slate-400">table: {m.tableName}</span>
+                </div>
+
+                {m.status === 'HEALTHY' ? (
+                  <div className="space-y-1">
+                    <span className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      <span>All Columns Present</span>
+                    </span>
+                    <p className="text-[10px] text-slate-400">
+                      {m.existingColumns.length} columns verified
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <span className="text-rose-400 font-bold text-xs flex items-center gap-1.5">
+                      <XCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>Schema Drift Detected</span>
+                    </span>
+                    <div className="text-[10px] text-rose-300 bg-rose-950/80 p-2 rounded-lg border border-rose-800/60 font-mono">
+                      <span className="font-bold block text-rose-200">Missing Column:</span>
+                      {m.missingColumns.map((col) => (
+                        <div key={col}>- {col}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -574,160 +736,6 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-
-        {/* ---------------- DATABASE HEALTH SECTION ---------------- */}
-        <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm space-y-5 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/70 pb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-sky-400" />
-                <h2 className="text-base font-bold text-white uppercase tracking-wider">
-                  Database Health
-                </h2>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                Automated continuous schema drift detection and deployment verification across Prisma models and live tables.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={handleAutoHealSchema}
-                disabled={healingSchema}
-                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
-              >
-                <Wrench className={`h-3 w-3 ${healingSchema ? 'animate-spin' : ''}`} />
-                <span>{healingSchema ? 'Auto-Healing...' : 'Auto-Heal Schema'}</span>
-              </button>
-
-              <button
-                onClick={handleVerifySchema}
-                disabled={verifyingSchema}
-                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border border-slate-600 disabled:opacity-50 cursor-pointer shadow-xs"
-              >
-                <RefreshCw className={`h-3 w-3 ${verifyingSchema ? 'animate-spin' : ''}`} />
-                <span>Verify Schema</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (schemaData?.reportText) {
-                    navigator.clipboard.writeText(schemaData.reportText);
-                    setCopiedSchema(true);
-                    setTimeout(() => setCopiedSchema(false), 2000);
-                  }
-                }}
-                className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                {copiedSchema ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
-                <span>{copiedSchema ? 'Copied' : 'Copy Report'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 5 Core Health Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-            {/* 1. Schema Status */}
-            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Schema Status</span>
-              <div className="mt-2 flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${schemaData?.isHealthy ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`} />
-                <span className={`text-sm font-black uppercase ${schemaData?.isHealthy ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {schemaData?.schemaStatus || 'Healthy'}
-                </span>
-              </div>
-            </div>
-
-            {/* 2. Migration Status */}
-            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Migration Status</span>
-              <div className="mt-2 flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${schemaData?.migrationStatus === 'Up To Date' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className={`text-sm font-black uppercase ${schemaData?.migrationStatus === 'Up To Date' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {schemaData?.migrationStatus || 'Up To Date'}
-                </span>
-              </div>
-            </div>
-
-            {/* 3. Missing Columns */}
-            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Missing Columns</span>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className={`text-xl font-black ${(schemaData?.missingColumnsCount || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {schemaData?.missingColumnsCount ?? 0}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  {(schemaData?.missingColumnsCount || 0) === 0 ? 'None' : 'Detected'}
-                </span>
-              </div>
-            </div>
-
-            {/* 4. Missing Tables */}
-            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Missing Tables</span>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className={`text-xl font-black ${(schemaData?.missingTablesCount || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {schemaData?.missingTablesCount ?? 0}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  {(schemaData?.missingTablesCount || 0) === 0 ? 'None' : 'Detected'}
-                </span>
-              </div>
-            </div>
-
-            {/* 5. Last Verification Time */}
-            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl col-span-2 md:col-span-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Last Verification Time</span>
-              <div className="mt-2 text-xs font-mono text-slate-200">
-                {schemaData?.lastVerification ? new Date(schemaData.lastVerification).toLocaleTimeString() : 'Just now'}
-              </div>
-            </div>
-          </div>
-
-          {/* Model Verification Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
-            {schemaData?.models.map((m) => (
-              <div
-                key={m.modelName}
-                className={`p-4 rounded-xl border transition-all ${
-                  m.status === 'HEALTHY'
-                    ? 'bg-slate-900/60 border-slate-700/60'
-                    : 'bg-rose-950/30 border-rose-800/80'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-white text-xs block">{m.modelName}</span>
-                  <span className="text-[10px] font-mono text-slate-400">table: {m.tableName}</span>
-                </div>
-
-                {m.status === 'HEALTHY' ? (
-                  <div className="space-y-1">
-                    <span className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                      <span>All Columns Present</span>
-                    </span>
-                    <p className="text-[10px] text-slate-400">
-                      {m.existingColumns.length} columns verified
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <span className="text-rose-400 font-bold text-xs flex items-center gap-1.5">
-                      <XCircle className="h-3.5 w-3.5 shrink-0" />
-                      <span>Schema Drift Detected</span>
-                    </span>
-                    <div className="text-[10px] text-rose-300 bg-rose-950/80 p-2 rounded-lg border border-rose-800/60 font-mono">
-                      <span className="font-bold block text-rose-200">Missing Column:</span>
-                      {m.missingColumns.map((col) => (
-                        <div key={col}>- {col}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         </div>
 
