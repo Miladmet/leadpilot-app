@@ -94,9 +94,14 @@ interface SchemaHealthData {
   lastVerification: string;
   totalModelsChecked: number;
   missingItemsCount: number;
+  missingTablesCount: number;
+  missingColumnsCount: number;
+  missingTables: string[];
+  missingColumns: string[];
   missingItems: Array<{ model: string; type: 'TABLE' | 'COLUMN'; name: string }>;
   models: ModelVerificationReport[];
   reportText: string;
+  driftBlockedText?: string | null;
 }
 
 export default function AdminSecurityDashboard() {
@@ -555,59 +560,26 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
           </div>
         </div>
 
-        {/* ---------------- DATABASE SCHEMA HEALTH SECTION ---------------- */}
-        <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm space-y-4 p-6">
+        {/* ---------------- DATABASE HEALTH SECTION ---------------- */}
+        <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm space-y-5 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/70 pb-4">
             <div>
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-sky-400" />
-                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Database Schema Health
+                <h2 className="text-base font-bold text-white uppercase tracking-wider">
+                  Database Health
                 </h2>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Continuous pre-deployment schema drift verification comparing Prisma models against live database tables.
+                Automated continuous schema drift detection and deployment verification across Prisma models and live tables.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {/* Schema Status Badge */}
-              <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-700/70 text-xs">
-                <span className="text-slate-400 font-bold text-[10px] uppercase">Schema Status:</span>
-                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                  schemaData?.isHealthy
-                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
-                    : 'bg-rose-950/80 text-rose-300 border border-rose-800'
-                }`}>
-                  ● {schemaData?.schemaStatus || 'Healthy'}
-                </span>
-              </div>
-
-              {/* Migration Status Badge */}
-              <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-700/70 text-xs">
-                <span className="text-slate-400 font-bold text-[10px] uppercase">Migration Status:</span>
-                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                  schemaData?.migrationStatus === 'Up To Date'
-                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
-                    : 'bg-amber-950/80 text-amber-300 border border-amber-800'
-                }`}>
-                  ● {schemaData?.migrationStatus || 'Up To Date'}
-                </span>
-              </div>
-
-              {/* Last Verification Timestamp */}
-              <div className="text-[10px] text-slate-400 font-mono">
-                Last Verification:{' '}
-                <strong className="text-slate-200">
-                  {schemaData?.lastVerification ? new Date(schemaData.lastVerification).toLocaleTimeString() : 'Just now'}
-                </strong>
-              </div>
-
-              {/* Actions */}
               <button
                 onClick={handleVerifySchema}
                 disabled={verifyingSchema}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border border-slate-600 disabled:opacity-50 cursor-pointer"
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border border-slate-600 disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 <RefreshCw className={`h-3 w-3 ${verifyingSchema ? 'animate-spin' : ''}`} />
                 <span>Verify Schema</span>
@@ -621,11 +593,70 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
                     setTimeout(() => setCopiedSchema(false), 2000);
                   }
                 }}
-                className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 {copiedSchema ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
                 <span>{copiedSchema ? 'Copied' : 'Copy Report'}</span>
               </button>
+            </div>
+          </div>
+
+          {/* 5 Core Health Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+            {/* 1. Schema Status */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Schema Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${schemaData?.isHealthy ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`} />
+                <span className={`text-sm font-black uppercase ${schemaData?.isHealthy ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {schemaData?.schemaStatus || 'Healthy'}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Migration Status */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Migration Status</span>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${schemaData?.migrationStatus === 'Up To Date' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className={`text-sm font-black uppercase ${schemaData?.migrationStatus === 'Up To Date' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {schemaData?.migrationStatus || 'Up To Date'}
+                </span>
+              </div>
+            </div>
+
+            {/* 3. Missing Columns */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Missing Columns</span>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className={`text-xl font-black ${(schemaData?.missingColumnsCount || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {schemaData?.missingColumnsCount ?? 0}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {(schemaData?.missingColumnsCount || 0) === 0 ? 'None' : 'Detected'}
+                </span>
+              </div>
+            </div>
+
+            {/* 4. Missing Tables */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Missing Tables</span>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className={`text-xl font-black ${(schemaData?.missingTablesCount || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {schemaData?.missingTablesCount ?? 0}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {(schemaData?.missingTablesCount || 0) === 0 ? 'None' : 'Detected'}
+                </span>
+              </div>
+            </div>
+
+            {/* 5. Last Verification Time */}
+            <div className="bg-slate-900/70 border border-slate-700/70 p-4 rounded-xl col-span-2 md:col-span-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Last Verification Time</span>
+              <div className="mt-2 text-xs font-mono text-slate-200">
+                {schemaData?.lastVerification ? new Date(schemaData.lastVerification).toLocaleTimeString() : 'Just now'}
+              </div>
             </div>
           </div>
 

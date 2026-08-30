@@ -71,7 +71,7 @@ export function classifyAuthError(err: any, responseStatus?: number): Classified
   ) {
     return {
       category: 'BACKEND_ERROR',
-      userMessage: 'Database schema mismatch detected.',
+      userMessage: 'Database schema mismatch detected. Administrator attention required.',
       actionHint: 'A database migration is required. Please verify database schema health.',
       isRetryable: false,
       technicalDetails: rawMsg

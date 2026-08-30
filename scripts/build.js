@@ -55,6 +55,10 @@ try {
   // Compile Next.js project
   execSync('npx next build', { stdio: 'inherit' });
 
+  // Execute Automated Post-Deployment Database Verification Gate
+  console.log('\n[Post-Build Gate] Enforcing Automated Post-Deployment Verification...');
+  execSync('node scripts/post-deploy-verify.js', { stdio: 'inherit' });
+
 
 
 

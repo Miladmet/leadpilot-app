@@ -18,9 +18,14 @@ export interface SchemaVerificationResult {
   lastVerification: string;
   totalModelsChecked: number;
   missingItemsCount: number;
+  missingTablesCount: number;
+  missingColumnsCount: number;
+  missingTables: string[];
+  missingColumns: string[];
   missingItems: Array<{ model: string; type: 'TABLE' | 'COLUMN'; name: string }>;
   models: ModelVerificationReport[];
   reportText: string;
+  driftBlockedText: string | null;
 }
 
 export async function runSchemaVerification(): Promise<SchemaVerificationResult> {
@@ -28,3 +33,4 @@ export async function runSchemaVerification(): Promise<SchemaVerificationResult>
 }
 
 export const EXPECTED_MODELS = core.EXPECTED_MODELS;
+export const formatDriftBlockedReport = core.formatDriftBlockedReport;
