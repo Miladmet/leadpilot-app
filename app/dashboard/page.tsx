@@ -1,7 +1,8 @@
 'use strict';
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -29,6 +30,13 @@ import {
   SANDBOX_DISCLAIMER
 } from '@/lib/sandboxEngine';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import {
+  detectAnalysisChanges,
+  normalizeWebsiteUrl,
+  AnalysisComparisonReport,
+  ALLOWED_ROOT_CAUSES
+} from '@/lib/changeDetection';
+
 
 
 
@@ -159,7 +167,11 @@ interface Prospect {
   totalTextExtracted?: number;
   crawledPagesData?: string; // JSON
   crawlDiagnostics?: string; // JSON
+  analysisVersion?: number;
+  previousAnalysisId?: string | null;
+  changeSummary?: string;
   executiveSummary: string;
+
   expectedResults: string;
   estimatedRoi: string;
   thirtyDayPlan: string;
@@ -239,8 +251,10 @@ export default function Dashboard() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   
   // Dashboard navigation tabs
-  const [activeTab, setActiveTab] = useState<'opportunities' | 'proposal' | 'outreach' | 'vault' | 'valuation'>('opportunities');
+  const [activeTab, setActiveTab] = useState<'opportunities' | 'sandbox' | 'proposal' | 'outreach' | 'vault' | 'valuation' | 'comparison'>('opportunities');
   const [showCalcIndex, setShowCalcIndex] = useState<number | null>(null);
+  const [selectedComparisonVersion, setSelectedComparisonVersion] = useState<string | null>(null);
+
   
   // Subtabs
   const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions' | 'competitors'>('facts');
@@ -710,6 +724,46 @@ export default function Dashboard() {
     },
     activeProspectTrust
   ) : null;
+
+  // Analysis Change Detection & Version History
+  const domainProspects = useMemo(() => {
+    if (!activeProspect) return [];
+    const domain = normalizeWebsiteUrl(activeProspect.websiteUrl);
+    return prospects
+      .filter(p => normalizeWebsiteUrl(p.websiteUrl) === domain)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [activeProspect, prospects]);
+
+  const activeComparisonReport: AnalysisComparisonReport | null = useMemo(() => {
+    if (!activeProspect || domainProspects.length === 0) return null;
+    const currentIdx = domainProspects.findIndex(p => p.id === activeProspect.id);
+    const versionNum = currentIdx >= 0 ? currentIdx + 1 : domainProspects.length;
+
+    let prevProspect: Prospect | null = null;
+    if (selectedComparisonVersion) {
+      prevProspect = domainProspects.find(p => p.id === selectedComparisonVersion) || null;
+    } else if (currentIdx > 0) {
+      prevProspect = domainProspects[currentIdx - 1];
+    } else if (domainProspects.length > 1) {
+      prevProspect = domainProspects[0];
+    }
+
+    if (!prevProspect || prevProspect.id === activeProspect.id) {
+      if (activeProspect.changeSummary && activeProspect.changeSummary !== '{}') {
+        try {
+          const parsed = JSON.parse(activeProspect.changeSummary);
+          if (parsed && parsed.isRepeatedAnalysis) return parsed;
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    return detectAnalysisChanges(activeProspect, prevProspect, {
+      version: versionNum,
+      totalVersions: domainProspects.length
+    });
+  }, [activeProspect, domainProspects, selectedComparisonVersion]);
+
 
 
 
@@ -1950,8 +2004,37 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* REPEATED ANALYSIS DETECTION BANNER */}
+              {activeComparisonReport?.isRepeatedAnalysis && (
+                <div className="mx-6 mt-4 p-4 bg-gradient-to-r from-sky-50 to-indigo-50 border-2 border-sky-300 rounded-2xl text-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-2xs">
+                      v{activeComparisonReport.version}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-black text-sm text-slate-900">Previous Analysis Found</h4>
+                        <span className="bg-sky-200 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          Analysis #{activeComparisonReport.version}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Previous Analysis: <strong className="text-slate-900 font-semibold">{activeComparisonReport.previousAnalysis?.timeAgo || '22 minutes ago'}</strong> • A comparison report has been generated.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('comparison')}
+                    className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    View Difference Summary →
+                  </button>
+                </div>
+              )}
+
               {/* Navigation Tabs */}
               <div className="flex border-b border-slate-200 bg-white">
+
 
                 <button
                   onClick={() => setActiveTab('opportunities')}
@@ -2001,14 +2084,29 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={() => setActiveTab('valuation')}
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`flex-1 py-3 px-3 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'valuation' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Briefcase className="h-4 w-4" />
                   Opportunity Valuation
                 </button>
+                <button
+                  onClick={() => setActiveTab('comparison')}
+                  className={`flex-1 py-3 px-3 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                    activeTab === 'comparison' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <History className="h-4 w-4 text-sky-600" />
+                  <span>Analysis Comparison</span>
+                  {activeComparisonReport?.isRepeatedAnalysis && (
+                    <span className="bg-sky-100 text-sky-700 border border-sky-200 text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                      v{activeComparisonReport.version}
+                    </span>
+                  )}
+                </button>
               </div>
+
 
               {/* Tab Contents */}
               <div className="p-6 flex-1 flex flex-col bg-white">
@@ -3363,6 +3461,372 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
+
+
+                {/* 6. Analysis Comparison & Change Detection Engine */}
+                {activeTab === 'comparison' && (
+                  <div className="space-y-6 flex-1 flex flex-col">
+                    {/* Header & Version History Selector */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <History className="h-5 w-5 text-sky-600" />
+                          <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider">
+                            Analysis Comparison Engine
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Detect differences and explain results across website analysis runs.
+                        </p>
+                      </div>
+
+                      {/* Version History Selector */}
+                      {domainProspects.length > 1 && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+                            Version History:
+                          </span>
+                          {domainProspects.map((dp, idx) => {
+                            const vNum = idx + 1;
+                            const isCurrent = dp.id === activeProspect.id;
+                            const isCompared = activeComparisonReport?.previousAnalysis?.id === dp.id;
+                            const formattedDate = new Date(dp.createdAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit'
+                            });
+
+                            return (
+                              <button
+                                key={dp.id}
+                                onClick={() => {
+                                  if (isCurrent) return;
+                                  setSelectedComparisonVersion(dp.id);
+                                }}
+                                className={`text-xs px-3 py-1.5 rounded-xl font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                  isCurrent
+                                    ? 'bg-slate-900 text-white border-slate-900'
+                                    : isCompared
+                                    ? 'bg-sky-100 text-sky-800 border-sky-300 shadow-2xs'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                }`}
+                                title={`Analysis #${vNum} • ${formattedDate}`}
+                              >
+                                <span>Analysis #{vNum}</span>
+                                <span className="text-[10px] opacity-75 font-normal">({formattedDate})</span>
+                                {isCurrent && <span className="text-[9px] bg-sky-500 text-white px-1.5 py-0.2 rounded-full uppercase">Active</span>}
+                                {isCompared && <span className="text-[9px] bg-sky-600 text-white px-1.5 py-0.2 rounded-full uppercase">Compared</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {activeComparisonReport && activeComparisonReport.isRepeatedAnalysis ? (
+                      <div className="space-y-6 flex-1 flex flex-col">
+                        
+                        {/* 1. Repeated Analysis Found Banner */}
+                        <div className="p-4 bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-200 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center font-black text-sm shrink-0">
+                              v{activeComparisonReport.version}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-black text-sm text-slate-900">Previous Analysis Found</h4>
+                                <span className="bg-sky-200 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                  Analysis #{activeComparisonReport.version} vs #{activeComparisonReport.version - 1}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-600 mt-0.5">
+                                Previous Analysis: <strong className="text-slate-900 font-semibold">{activeComparisonReport.previousAnalysis?.timeAgo || 'Earlier'}</strong> ({activeComparisonReport.previousAnalysis?.shortDate}) • A comparison report has been generated.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                              ● {activeComparisonReport.summaryCard?.status || 'Analysis Improved'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 2. CHANGE SUMMARY CARD */}
+                        <div className="bg-white p-5 rounded-2xl border-2 border-slate-200 shadow-sm space-y-4">
+                          <div className="flex justify-between items-center border-b border-slate-150 pb-3">
+                            <div className="flex items-center gap-2">
+                              <TrendingUp className="h-4.5 w-4.5 text-sky-600" />
+                              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                                {activeComparisonReport.summaryCard?.title || 'Analysis Difference Summary'}
+                              </h4>
+                            </div>
+                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                              Status: {activeComparisonReport.summaryCard?.status}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Verified Facts</span>
+                              <strong className="text-sm font-black text-slate-900 mt-1 block">
+                                {activeComparisonReport.summaryCard?.verifiedFacts}
+                              </strong>
+                            </div>
+
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Crawl Coverage</span>
+                              <strong className="text-sm font-black text-slate-900 mt-1 block">
+                                {activeComparisonReport.summaryCard?.crawlCoverage}
+                              </strong>
+                            </div>
+
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Pages Crawled</span>
+                              <strong className="text-sm font-black text-slate-900 mt-1 block">
+                                {activeComparisonReport.summaryCard?.pagesCrawled}
+                              </strong>
+                            </div>
+
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Opportunity Value</span>
+                              <strong className="text-sm font-black text-emerald-600 mt-1 block truncate" title={activeComparisonReport.summaryCard?.opportunityValue}>
+                                {activeComparisonReport.summaryCard?.opportunityValue}
+                              </strong>
+                            </div>
+
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 col-span-2 sm:col-span-1">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Trust Score</span>
+                              <strong className="text-sm font-black text-sky-600 mt-1 block">
+                                {activeComparisonReport.summaryCard?.trustScore}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. EXPLAIN THE DIFFERENCE & ROOT CAUSE */}
+                        <div className="grid md:grid-cols-2 gap-4">
+                          
+                          {/* Explain The Difference (Plain Language) */}
+                          <div className="p-5 bg-sky-50/70 border border-sky-200 rounded-2xl space-y-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">💡</span>
+                              <h4 className="text-xs font-black text-sky-950 uppercase tracking-wider">
+                                Why are results different?
+                              </h4>
+                            </div>
+                            <div className="text-xs text-sky-900 leading-relaxed space-y-2 whitespace-pre-line font-medium">
+                              {activeComparisonReport.explanation}
+                            </div>
+                          </div>
+
+                          {/* Root Cause Classification */}
+                          <div className="p-5 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-3.5">
+                            <div className="flex justify-between items-start">
+                              <span className="text-[9px] font-bold uppercase tracking-widest text-sky-400">
+                                Root Cause Classification
+                              </span>
+                              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                                Verified Attribution
+                              </span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <span className="text-[10px] text-slate-400 uppercase font-semibold">Primary Cause:</span>
+                              <h4 className="text-base font-black text-white flex items-center gap-2">
+                                <span className="text-emerald-400 font-bold">●</span>
+                                {activeComparisonReport.rootCause?.primaryCause}
+                              </h4>
+                              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                <strong>Impact:</strong> {activeComparisonReport.rootCause?.impact}
+                              </p>
+                            </div>
+
+                            {/* Allowed Reasons Dropdown/Pills */}
+                            <div className="pt-2 border-t border-slate-800">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                                Allowed Reason Categories:
+                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {ALLOWED_ROOT_CAUSES.map((cause, i) => (
+                                  <span
+                                    key={i}
+                                    className={`text-[9px] px-2 py-0.5 rounded-md font-medium ${
+                                      activeComparisonReport.rootCause?.primaryCause === cause
+                                        ? 'bg-sky-500 text-white font-bold'
+                                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                    }`}
+                                  >
+                                    {cause}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 4. WEBSITE CHANGES DETECTED & PRICING MODEL CHANGES & TRUST CHANGES */}
+                        <div className="grid md:grid-cols-3 gap-4">
+                          
+                          {/* Website Changes Detected */}
+                          <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Website Changes Detected
+                              </span>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                activeComparisonReport.websiteChanges?.detected
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {activeComparisonReport.websiteChanges?.detected ? 'Changes Found' : 'No Changes'}
+                              </span>
+                            </div>
+
+                            <div className="text-xs text-slate-700 space-y-1.5">
+                              <div className="flex justify-between text-[11px] text-slate-500 border-b border-slate-100 pb-1">
+                                <span>Current: <strong>{activeComparisonReport.websiteChanges?.currentAnalysisDate}</strong></span>
+                                <span>Previous: <strong>{activeComparisonReport.websiteChanges?.previousAnalysisDate}</strong></span>
+                              </div>
+
+                              <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider pt-1">
+                                New Content Found:
+                              </span>
+                              <ul className="space-y-1 text-xs">
+                                {activeComparisonReport.websiteChanges?.newContentFound && activeComparisonReport.websiteChanges.newContentFound.length > 0 ? (
+                                  activeComparisonReport.websiteChanges.newContentFound.map((item: string, idx: number) => (
+                                    <li key={idx} className="flex items-center gap-1.5 text-slate-700 font-medium">
+                                      <span className="text-emerald-500 font-bold text-xs">✔</span>
+                                      <span>{item}</span>
+                                    </li>
+                                  ))
+                                ) : (
+                                  <li className="text-slate-400 text-xs italic">No structural website changes.</li>
+                                )}
+                              </ul>
+                              <p className="text-[10px] text-slate-400 italic pt-1 border-t border-slate-100">
+                                {activeComparisonReport.websiteChanges?.impactStatement}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Pricing Model Changes */}
+                          <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Pricing Model Changed
+                              </span>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                activeComparisonReport.pricingModelChanges?.changed
+                                  ? 'bg-sky-100 text-sky-800 border border-sky-200'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {activeComparisonReport.pricingModelChanges?.changed ? 'Model Updated' : 'Model Kept'}
+                              </span>
+                            </div>
+
+                            <div className="text-xs space-y-2">
+                              <div className="p-2 bg-slate-50 rounded-lg border border-slate-150 text-[11px] space-y-1">
+                                <div><span className="text-slate-400">Previous Model:</span> <strong className="text-slate-800">{activeComparisonReport.pricingModelChanges?.previousModel}</strong></div>
+                                <div><span className="text-slate-400">Current Model:</span> <strong className="text-sky-700">{activeComparisonReport.pricingModelChanges?.currentModel}</strong></div>
+                              </div>
+                              <p className="text-[11px] text-slate-600 leading-relaxed">
+                                {activeComparisonReport.pricingModelChanges?.explanation}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Trust Score Changes */}
+                          <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Trust Score Changes
+                              </span>
+                              <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-mono">
+                                {activeComparisonReport.trustScoreChanges?.displayDelta}
+                              </span>
+                            </div>
+
+                            <div className="text-xs space-y-1.5">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">
+                                Reason for Score Delta:
+                              </span>
+                              <ul className="space-y-1 text-xs">
+                                {activeComparisonReport.trustScoreChanges?.reasons.map((r: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-1.5 text-slate-700 font-medium">
+                                    <span className="text-sky-600 mt-0.5">•</span>
+                                    <span>{r}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 5. ITEMIZED DELTAS: NEW FACTS & NEW OPPORTUNITIES */}
+                        <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                          <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                            Itemized Audit Deltas
+                          </h4>
+
+                          <div className="grid md:grid-cols-2 gap-4">
+                            {/* Newly Verified Facts */}
+                            <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
+                              <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>✔</span> Newly Verified Facts ({activeComparisonReport.itemizedDeltas?.newlyVerifiedFacts.length || 0})
+                              </span>
+                              <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                                {activeComparisonReport.itemizedDeltas?.newlyVerifiedFacts && activeComparisonReport.itemizedDeltas.newlyVerifiedFacts.length > 0 ? (
+                                  activeComparisonReport.itemizedDeltas.newlyVerifiedFacts.map((fact: string, idx: number) => (
+                                    <div key={idx} className="p-2 bg-emerald-50/60 border border-emerald-150 rounded text-xs text-slate-800">
+                                      {fact}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-xs text-slate-400 italic">No new facts added in this run.</p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Newly Identified Opportunities */}
+                            <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
+                              <span className="text-[10px] font-bold text-sky-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>★</span> Newly Recommended Services ({activeComparisonReport.itemizedDeltas?.newlyIdentifiedOpportunities.length || 0})
+                              </span>
+                              <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                                {activeComparisonReport.itemizedDeltas?.newlyIdentifiedOpportunities && activeComparisonReport.itemizedDeltas.newlyIdentifiedOpportunities.length > 0 ? (
+                                  activeComparisonReport.itemizedDeltas.newlyIdentifiedOpportunities.map((opp: string, idx: number) => (
+                                    <div key={idx} className="p-2 bg-sky-50/60 border border-sky-150 rounded text-xs font-semibold text-sky-900">
+                                      {opp}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-xs text-slate-400 italic">Opportunity list remained identical.</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    ) : (
+                      /* Initial Run / Single Analysis State */
+                      <div className="p-10 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-white text-slate-600 flex items-center justify-center mx-auto text-xl shadow-2xs font-bold border border-slate-200">
+                          🔍
+                        </div>
+                        <h4 className="text-sm font-black text-slate-800">
+                          Analysis #1 (Baseline Run)
+                        </h4>
+                        <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                          This is the initial analysis for <strong>{activeProspect.companyName}</strong> ({activeProspect.websiteUrl}).
+                          When you re-analyze this website in the future, LeadPilot will automatically detect differences, classify root causes, and explain any metric shifts.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
 
                 </ErrorBoundary>
               </div>

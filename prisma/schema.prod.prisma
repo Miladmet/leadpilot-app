@@ -75,6 +75,11 @@ model Prospect {
   crawledPagesData     String   @default("[]") // JSON of Array<{ url, title, category, depth, status, textLength }>
   crawlDiagnostics     String   @default("{}") // JSON of { pagesDiscovered, pagesCrawled, pagesSkipped, crawlDurationMs, textExtractedBytes, warningMessage }
 
+  // 3c. Analysis Versioning & Change Detection
+  analysisVersion      Int      @default(1)
+  previousAnalysisId   String?
+  changeSummary        String   @default("{}") // JSON string of change detection & explanation
+
 
   // 4. Proposal Builder
   executiveSummary    String

@@ -4,6 +4,8 @@ import { getUserIdFromRequest } from '@/lib/auth';
 import { crawlWebsite } from '@/lib/scraper';
 import { analyzeCompany } from '@/lib/gemini';
 import { withTimeout, withRetry, TIMEOUT_LIMITS } from '@/lib/stability';
+import { normalizeWebsiteUrl, detectAnalysisChanges } from '@/lib/changeDetection';
+
 
 function pruneHtmlContent(content: string): string {
   if (!content) return '';
@@ -127,7 +129,42 @@ export async function POST(req: NextRequest) {
         dateDiscovered: new Date().toLocaleDateString()
       }));
 
-    // 4. Save to Database with new client acquisition layout
+    // 4. Repeated Analysis Detection & Version History
+    const cleanCurrentUrl = normalizeWebsiteUrl(crawlData.websiteUrl);
+    const existingProspects = await prisma.prospect.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const previousProspects = existingProspects.filter(p => normalizeWebsiteUrl(p.websiteUrl) === cleanCurrentUrl);
+    const versionNumber = previousProspects.length + 1;
+    const previousProspect = previousProspects.length > 0 ? previousProspects[0] : null;
+
+    let changeSummaryPayload: any = {};
+    if (previousProspect) {
+      const currentDraft = {
+        id: 'current-draft',
+        createdAt: new Date().toISOString(),
+        verifiedFacts: JSON.stringify(aiAnalysis.verifiedFacts),
+        recommendations: JSON.stringify(aiAnalysis.recommendations),
+        opportunityRange: aiAnalysis.opportunityRange,
+        revenueAssumptions: aiAnalysis.revenueAssumptions,
+        pagesCrawledCount: crawlData.diagnostics.pagesCrawled,
+        crawlCoveragePercent: crawlData.diagnostics.coveragePercentage,
+        totalTextExtracted: crawlData.diagnostics.totalTextExtracted,
+        crawledPagesData: JSON.stringify(crawlData.discoveredPages),
+        evidenceQuality: aiAnalysis.evidenceQuality,
+        verificationPassRate: aiAnalysis.verificationPassRate,
+        findingReliability: aiAnalysis.findingReliability
+      };
+
+      changeSummaryPayload = detectAnalysisChanges(currentDraft, previousProspect, {
+        version: versionNumber,
+        totalVersions: versionNumber
+      });
+    }
+
+    // 5. Save to Database with new client acquisition layout
     const prospect = await prisma.prospect.create({
       data: {
         userId: user.id,
@@ -170,6 +207,11 @@ export async function POST(req: NextRequest) {
         crawledPagesData: JSON.stringify(crawlData.discoveredPages),
         crawlDiagnostics: JSON.stringify(crawlData.diagnostics),
 
+        // NEW: Versioning & Change Detection
+        analysisVersion: versionNumber,
+        previousAnalysisId: previousProspect ? previousProspect.id : null,
+        changeSummary: JSON.stringify(changeSummaryPayload),
+
         executiveSummary: aiAnalysis.executiveSummary,
         expectedResults: aiAnalysis.expectedResults,
         estimatedRoi: aiAnalysis.estimatedRoi,
@@ -184,6 +226,7 @@ export async function POST(req: NextRequest) {
         meetingAgenda: aiAnalysis.meetingAgenda,
       },
     });
+
 
     // 4b. Create relational customer records for multi-tenant protection
     try {
@@ -261,7 +304,8 @@ export async function POST(req: NextRequest) {
 
 
 
-    return NextResponse.json({ success: true, prospect });
+    return NextResponse.json({ success: true, prospect, changeReport: changeSummaryPayload });
+
   } catch (error: any) {
     console.error('Analyze API Error:', error);
     const errorMsg = error?.message || '';

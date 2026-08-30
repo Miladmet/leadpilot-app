@@ -36,8 +36,13 @@ try {
   console.log('[Build Gate] Enforcing Production Stability Framework Gate...');
   execSync('node scripts/test-stability-framework.js', { stdio: 'inherit' });
 
+  // Execute the Analysis Change Detection & Explanation Gate
+  console.log('[Build Gate] Enforcing Analysis Change Detection & Explanation Engine Gate...');
+  execSync('node scripts/test-change-detection.js', { stdio: 'inherit' });
+
   // Compile Next.js project
   execSync('npx next build', { stdio: 'inherit' });
+
 
 
 
