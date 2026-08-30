@@ -76,9 +76,35 @@ interface StorageSecurityData {
   timestamp: string;
 }
 
+interface ModelVerificationReport {
+  modelName: string;
+  tableName: string;
+  tableExists: boolean;
+  allColumnsPresent: boolean;
+  missingColumns: string[];
+  existingColumns: string[];
+  status: 'HEALTHY' | 'MISSING_COLUMNS' | 'MISSING_TABLE';
+}
+
+interface SchemaHealthData {
+  success: boolean;
+  isHealthy: boolean;
+  schemaStatus: 'Healthy' | 'Drift Detected';
+  migrationStatus: 'Up To Date' | 'Pending Migration';
+  lastVerification: string;
+  totalModelsChecked: number;
+  missingItemsCount: number;
+  missingItems: Array<{ model: string; type: 'TABLE' | 'COLUMN'; name: string }>;
+  models: ModelVerificationReport[];
+  reportText: string;
+}
+
 export default function AdminSecurityDashboard() {
   const [data, setData] = useState<SecurityData | null>(null);
   const [storageData, setStorageData] = useState<StorageSecurityData | null>(null);
+  const [schemaData, setSchemaData] = useState<SchemaHealthData | null>(null);
+  const [verifyingSchema, setVerifyingSchema] = useState(false);
+  const [copiedSchema, setCopiedSchema] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -88,9 +114,10 @@ export default function AdminSecurityDashboard() {
     setLoading(true);
     setError('');
     try {
-      const [resDb, resStorage] = await Promise.all([
+      const [resDb, resStorage, resSchema] = await Promise.all([
         fetch('/api/admin/security/status'),
-        fetch('/api/admin/security/storage')
+        fetch('/api/admin/security/storage'),
+        fetch('/api/admin/security/schema-health')
       ]);
 
       if (!resDb.ok) {
@@ -104,10 +131,30 @@ export default function AdminSecurityDashboard() {
         const jsonStorage = await resStorage.json();
         setStorageData(jsonStorage);
       }
+
+      if (resSchema.ok) {
+        const jsonSchema = await resSchema.json();
+        setSchemaData(jsonSchema);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifySchema = async () => {
+    setVerifyingSchema(true);
+    try {
+      const res = await fetch('/api/admin/security/schema-health');
+      if (res.ok) {
+        const json = await res.json();
+        setSchemaData(json);
+      }
+    } catch (err) {
+      console.error('Failed to run live schema verification:', err);
+    } finally {
+      setVerifyingSchema(false);
     }
   };
 
@@ -505,6 +552,125 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        {/* ---------------- DATABASE SCHEMA HEALTH SECTION ---------------- */}
+        <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm space-y-4 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/70 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-sky-400" />
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Database Schema Health
+                </h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Continuous pre-deployment schema drift verification comparing Prisma models against live database tables.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Schema Status Badge */}
+              <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-700/70 text-xs">
+                <span className="text-slate-400 font-bold text-[10px] uppercase">Schema Status:</span>
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                  schemaData?.isHealthy
+                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                    : 'bg-rose-950/80 text-rose-300 border border-rose-800'
+                }`}>
+                  ● {schemaData?.schemaStatus || 'Healthy'}
+                </span>
+              </div>
+
+              {/* Migration Status Badge */}
+              <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-700/70 text-xs">
+                <span className="text-slate-400 font-bold text-[10px] uppercase">Migration Status:</span>
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                  schemaData?.migrationStatus === 'Up To Date'
+                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                    : 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                }`}>
+                  ● {schemaData?.migrationStatus || 'Up To Date'}
+                </span>
+              </div>
+
+              {/* Last Verification Timestamp */}
+              <div className="text-[10px] text-slate-400 font-mono">
+                Last Verification:{' '}
+                <strong className="text-slate-200">
+                  {schemaData?.lastVerification ? new Date(schemaData.lastVerification).toLocaleTimeString() : 'Just now'}
+                </strong>
+              </div>
+
+              {/* Actions */}
+              <button
+                onClick={handleVerifySchema}
+                disabled={verifyingSchema}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 border border-slate-600 disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`h-3 w-3 ${verifyingSchema ? 'animate-spin' : ''}`} />
+                <span>Verify Schema</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (schemaData?.reportText) {
+                    navigator.clipboard.writeText(schemaData.reportText);
+                    setCopiedSchema(true);
+                    setTimeout(() => setCopiedSchema(false), 2000);
+                  }
+                }}
+                className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                {copiedSchema ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
+                <span>{copiedSchema ? 'Copied' : 'Copy Report'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Model Verification Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
+            {schemaData?.models.map((m) => (
+              <div
+                key={m.modelName}
+                className={`p-4 rounded-xl border transition-all ${
+                  m.status === 'HEALTHY'
+                    ? 'bg-slate-900/60 border-slate-700/60'
+                    : 'bg-rose-950/30 border-rose-800/80'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-bold text-white text-xs block">{m.modelName}</span>
+                  <span className="text-[10px] font-mono text-slate-400">table: {m.tableName}</span>
+                </div>
+
+                {m.status === 'HEALTHY' ? (
+                  <div className="space-y-1">
+                    <span className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      <span>All Columns Present</span>
+                    </span>
+                    <p className="text-[10px] text-slate-400">
+                      {m.existingColumns.length} columns verified
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <span className="text-rose-400 font-bold text-xs flex items-center gap-1.5">
+                      <XCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>Schema Drift Detected</span>
+                    </span>
+                    <div className="text-[10px] text-rose-300 bg-rose-950/80 p-2 rounded-lg border border-rose-800/60 font-mono">
+                      <span className="font-bold block text-rose-200">Missing Column:</span>
+                      {m.missingColumns.map((col) => (
+                        <div key={col}>- {col}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 

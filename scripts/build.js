@@ -48,6 +48,10 @@ try {
   console.log('[Build Gate] Enforcing Authentication Reliability & Diagnostics Gate...');
   execSync('node scripts/test-auth-diagnostics.js', { stdio: 'inherit' });
 
+  // Execute Database Schema Verification Gate (Model & Column Drift Detection)
+  console.log('[Build Gate] Enforcing Database Schema Verification Gate...');
+  execSync('node scripts/verify-schema-drift.js', { stdio: 'inherit' });
+
   // Compile Next.js project
   execSync('npx next build', { stdio: 'inherit' });
 

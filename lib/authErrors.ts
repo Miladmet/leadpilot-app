@@ -62,6 +62,22 @@ export function classifyAuthError(err: any, responseStatus?: number): Classified
     };
   }
 
+  // 2b. Schema Mismatch Errors (Prisma P2021 / P2022)
+  if (
+    lowerMsg.includes('p2021') || 
+    lowerMsg.includes('p2022') || 
+    lowerMsg.includes('schema mismatch') || 
+    lowerMsg.includes('does not exist in the current database')
+  ) {
+    return {
+      category: 'BACKEND_ERROR',
+      userMessage: 'Database schema mismatch detected.',
+      actionHint: 'A database migration is required. Please verify database schema health.',
+      isRetryable: false,
+      technicalDetails: rawMsg
+    };
+  }
+
   // 3. Backend / Database / Server Errors (HTTP 500)
   if (responseStatus === 500 || lowerMsg.includes('internal server error') || lowerMsg.includes('prisma') || lowerMsg.includes('database')) {
     return {
