@@ -93,8 +93,8 @@ async function main() {
       const storage = validateStorageSecurity();
       assert.strictEqual(rls.passed, true);
       assert.strictEqual(storage.passed, true);
-      assert.strictEqual(storage.totalBuckets, 9);
-      assert.strictEqual(storage.protectedBuckets, 6);
+      assert.strictEqual(storage.totalBuckets, 10);
+      assert.strictEqual(storage.protectedBuckets, 7);
     });
 
     // 8. Full Validation Engine Run and History Ledger

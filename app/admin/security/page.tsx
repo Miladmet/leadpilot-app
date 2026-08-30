@@ -150,6 +150,40 @@ interface InfraData {
   alerts: Array<{ id: string; severity: string; type: string; message: string; details: any }>;
 }
 
+interface StorageMalwareDashboardData {
+  metrics: {
+    filesScanned: number;
+    malwareDetected: number;
+    quarantinedFiles: number;
+    failedUploads: number;
+  };
+  alerts: Array<{
+    id: string;
+    severity: string;
+    type: string;
+    fileName: string;
+    fileId: string;
+    userId: string;
+    organizationId: string;
+    reason: string;
+    timestamp: string;
+    status: string;
+  }>;
+  auditLogs: Array<{
+    id: string;
+    timestamp: string;
+    action: string;
+    userId: string;
+    organizationId: string;
+    fileId: string;
+    fileName: string;
+    bucket: string;
+    scanResult: string;
+    quarantineReason?: string;
+    details?: string;
+  }>;
+}
+
 interface DeploymentHistoryItem {
   id: string;
   timestamp: string;
@@ -169,6 +203,7 @@ export default function AdminSecurityDashboard() {
   const [storageData, setStorageData] = useState<StorageSecurityData | null>(null);
   const [schemaData, setSchemaData] = useState<SchemaHealthData | null>(null);
   const [infraData, setInfraData] = useState<InfraData | null>(null);
+  const [malwareData, setMalwareData] = useState<StorageMalwareDashboardData | null>(null);
   const [deployHistory, setDeployHistory] = useState<DeploymentHistoryItem[]>([]);
   const [validatingDeploy, setValidatingDeploy] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
@@ -186,12 +221,13 @@ export default function AdminSecurityDashboard() {
     setLoading(true);
     setError('');
     try {
-      const [resDb, resStorage, resSchema, resInfra, resHistory] = await Promise.all([
+      const [resDb, resStorage, resSchema, resInfra, resHistory, resMalware] = await Promise.all([
         fetch('/api/admin/security/status'),
         fetch('/api/admin/security/storage'),
         fetch('/api/admin/security/schema-health'),
         fetch('/api/admin/infra/status'),
-        fetch('/api/admin/deployments/history')
+        fetch('/api/admin/deployments/history'),
+        fetch('/api/admin/storage/dashboard')
       ]);
 
       if (!resDb.ok) {
@@ -221,6 +257,11 @@ export default function AdminSecurityDashboard() {
         if (jsonHistory.history) {
           setDeployHistory(jsonHistory.history);
         }
+      }
+
+      if (resMalware.ok) {
+        const jsonMalware = await resMalware.json();
+        setMalwareData(jsonMalware);
       }
     } catch (err: any) {
       setError(err.message);
@@ -1193,6 +1234,181 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* ---------------- STORAGE MALWARE PROTECTION DASHBOARD ---------------- */}
+        <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl overflow-hidden shadow-sm space-y-5 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/70 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-rose-400" />
+                <h2 className="text-base font-bold text-white uppercase tracking-wider">
+                  Storage Malware Protection & Security Audit Logs
+                </h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Continuous pre-storage virus inspection, magic-byte verification, quarantine containment, and zero-trust download gates.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                Active Protection Shield
+              </span>
+            </div>
+          </div>
+
+          {/* Active Security Alerts */}
+          {malwareData?.alerts && malwareData.alerts.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Security Alerts ({malwareData.alerts.length} Detected)
+              </span>
+              <div className="space-y-2">
+                {malwareData.alerts.slice(0, 3).map((al) => (
+                  <div
+                    key={al.id}
+                    className="p-3 bg-rose-950/70 border border-rose-800/80 rounded-xl text-xs text-rose-200 flex items-start gap-3"
+                  >
+                    <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold font-mono text-rose-300">[{al.type}] {al.fileName}</span>
+                        <span className="text-[10px] text-rose-400 font-mono">{new Date(al.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <p className="text-[11px] text-rose-300/90 mt-0.5">{al.reason}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 4 Required Metric Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* 1. Files Scanned */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-4 rounded-xl shadow-xs">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Files Scanned</span>
+                <ShieldCheck className="h-4 w-4 text-sky-400" />
+              </div>
+              <div className="mt-2 text-2xl font-black text-white">
+                {malwareData?.metrics.filesScanned ?? 0}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Pre-storage verified</p>
+            </div>
+
+            {/* 2. Malware Detected */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-4 rounded-xl shadow-xs">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Malware Detected</span>
+                <AlertTriangle className="h-4 w-4 text-rose-400" />
+              </div>
+              <div className={`mt-2 text-2xl font-black ${(malwareData?.metrics.malwareDetected || 0) > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {malwareData?.metrics.malwareDetected ?? 0}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Viruses & exploits blocked</p>
+            </div>
+
+            {/* 3. Quarantined Files */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-4 rounded-xl shadow-xs">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quarantined Files</span>
+                <Lock className="h-4 w-4 text-amber-400" />
+              </div>
+              <div className="mt-2 text-2xl font-black text-amber-400">
+                {malwareData?.metrics.quarantinedFiles ?? 0}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Isolated in quarantine bucket</p>
+            </div>
+
+            {/* 4. Failed Uploads */}
+            <div className="bg-slate-900/80 border border-slate-700/70 p-4 rounded-xl shadow-xs">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Failed Uploads</span>
+                <XCircle className="h-4 w-4 text-slate-400" />
+              </div>
+              <div className="mt-2 text-2xl font-black text-slate-200">
+                {malwareData?.metrics.failedUploads ?? 0}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Policy & security rejections</p>
+            </div>
+          </div>
+
+          {/* Security Audit Logs Table */}
+          <div className="space-y-2 pt-2">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Terminal className="h-3.5 w-3.5 text-indigo-400" />
+                Security Audit Logs
+              </span>
+              <span className="text-[10px] text-slate-400">
+                Real-Time Event Stream
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900/80 text-slate-400 border-b border-slate-700/70 text-[10px] font-bold uppercase tracking-wider">
+                    <th className="p-3">Timestamp</th>
+                    <th className="p-3">Action</th>
+                    <th className="p-3">File Name</th>
+                    <th className="p-3">User / Org</th>
+                    <th className="p-3">Bucket</th>
+                    <th className="p-3">Scan Status</th>
+                    <th className="p-3">Security Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50 text-slate-200">
+                  {!malwareData?.auditLogs || malwareData.auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-4 text-center text-slate-400">
+                        No storage security events recorded yet. Upload a file to generate telemetry.
+                      </td>
+                    </tr>
+                  ) : (
+                    malwareData.auditLogs.slice(0, 8).map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-700/30 transition-colors">
+                        <td className="p-3 text-slate-400 font-mono text-[10px] whitespace-nowrap">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                            log.action === 'FILE_UPLOAD_VERIFIED'
+                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                              : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                          }`}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono text-slate-300 font-medium">{log.fileName}</td>
+                        <td className="p-3 text-slate-400 text-[11px] font-mono">
+                          {log.userId?.slice(0, 8) || 'anon'} / {log.organizationId || 'global'}
+                        </td>
+                        <td className="p-3 font-mono text-slate-400">{log.bucket}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            log.scanResult === 'Safe'
+                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                              : log.scanResult === 'Suspicious'
+                              ? 'bg-amber-950/80 text-amber-400 border border-amber-800'
+                              : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                          }`}>
+                            {log.scanResult}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-400 text-[11px] max-w-xs truncate" title={log.details || log.quarantineReason}>
+                          {log.details || log.quarantineReason || '—'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

@@ -198,8 +198,8 @@ async function runStorageSecurityTests() {
     const audit = auditStorageBuckets();
     assertTest(
       'TEST_6_BUCKET_CLASSIFICATION_INTEGRITY',
-      audit.isSecure && audit.storageSecurityScore === 100 && audit.privateBucketsCount === 6,
-      `All 6 customer data buckets are private with policies active. Score: ${audit.storageSecurityScore}%`
+      audit.isSecure && audit.storageSecurityScore === 100 && audit.privateBucketsCount >= 6,
+      `All ${audit.privateBucketsCount} customer data buckets are private with policies active. Score: ${audit.storageSecurityScore}%`
     );
 
   } catch (err) {

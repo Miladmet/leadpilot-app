@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBucketConfig } from '@/lib/storage/buckets';
 import { verifySignedUrlToken } from '@/lib/storage/signedUrls';
-import { getFileMetadata, verifyFileOwnership } from '@/lib/storage/ownership';
+import { getFileMetadata, getFileScanMetadata, recordBlockedDownload } from '@/lib/storage/ownership';
 import { getUserIdFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
@@ -17,6 +17,23 @@ export async function GET(
 
     if (!bucketConfig) {
       return NextResponse.json({ error: `Storage bucket "${bucket}" does not exist.` }, { status: 404 });
+    }
+
+    const authUserId = getUserIdFromRequest(req);
+
+    // 0. STRICT QUARANTINE ISOLATION: Zero direct download access
+    if (bucket.toLowerCase() === 'quarantine') {
+      recordBlockedDownload({
+        fileId,
+        bucket,
+        requestingUserId: authUserId,
+        scanResult: 'Quarantined',
+        reason: 'Direct access to quarantine bucket is prohibited by platform security policy.'
+      });
+      return NextResponse.json(
+        { error: 'Forbidden: Direct access to quarantine bucket is prohibited by platform security policy.' },
+        { status: 403 }
+      );
     }
 
     // 1. PUBLIC BUCKETS: Allowed without signed tokens
@@ -36,7 +53,6 @@ export async function GET(
 
     // 2. PRIVATE BUCKETS (Audits, Proposals, Attachments, Reports, Exports, User Documents)
     const token = req.nextUrl.searchParams.get('token');
-    const authUserId = getUserIdFromRequest(req);
 
     // Block anonymous access immediately if no token and no session
     if (!token && !authUserId) {
@@ -77,6 +93,83 @@ export async function GET(
       ownerUserId = authUserId;
     }
 
+    // 3. ZERO-TRUST MALWARE GATE: Verify Scan Status = Safe
+    // Block: Malware detected, Scan incomplete (Pending Scan), Unknown scan status, Suspicious
+    const scanMeta = getFileScanMetadata(fileId);
+
+    if (scanMeta) {
+      if (scanMeta.scanResult === 'Quarantined') {
+        recordBlockedDownload({
+          fileId,
+          bucket,
+          requestingUserId: authUserId || ownerUserId,
+          scanResult: 'Quarantined',
+          reason: scanMeta.quarantineReason || 'Malware detected'
+        });
+        return NextResponse.json(
+          { error: `Forbidden: Access Denied. File is quarantined due to detected threat: ${scanMeta.quarantineReason || 'Malware detected'}` },
+          { status: 403 }
+        );
+      }
+
+      if (scanMeta.scanResult === 'Pending Scan') {
+        recordBlockedDownload({
+          fileId,
+          bucket,
+          requestingUserId: authUserId || ownerUserId,
+          scanResult: 'Pending Scan',
+          reason: 'Scan incomplete'
+        });
+        return NextResponse.json(
+          { error: 'Locked: Access Denied. File scan is incomplete. Please wait for security verification.' },
+          { status: 423 }
+        );
+      }
+
+      if (scanMeta.scanResult === 'Suspicious') {
+        recordBlockedDownload({
+          fileId,
+          bucket,
+          requestingUserId: authUserId || ownerUserId,
+          scanResult: 'Suspicious',
+          reason: scanMeta.quarantineReason || 'Suspicious file'
+        });
+        return NextResponse.json(
+          { error: `Forbidden: Access Denied. File flagged as suspicious and blocked by platform security policy: ${scanMeta.quarantineReason}` },
+          { status: 403 }
+        );
+      }
+
+      if (scanMeta.scanResult !== 'Safe') {
+        recordBlockedDownload({
+          fileId,
+          bucket,
+          requestingUserId: authUserId || ownerUserId,
+          scanResult: scanMeta.scanResult || 'Unknown',
+          reason: 'Unknown scan status'
+        });
+        return NextResponse.json(
+          { error: 'Forbidden: Access Denied. File has unknown scan status and cannot be served.' },
+          { status: 403 }
+        );
+      }
+    } else {
+      // In private customer buckets, block files that have no scan record
+      if (bucket === 'attachments' || bucket === 'user-documents') {
+        recordBlockedDownload({
+          fileId,
+          bucket,
+          requestingUserId: authUserId || ownerUserId,
+          scanResult: 'Unknown',
+          reason: 'Unknown scan status: File has not undergone pre-storage malware validation.'
+        });
+        return NextResponse.json(
+          { error: 'Forbidden: Access Denied. File has unknown scan status and cannot be served.' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Determine MIME type
     const ext = fileId.split('.').pop()?.toLowerCase();
     const mimeType = ext === 'pdf' ? 'application/pdf' :
@@ -90,7 +183,7 @@ export async function GET(
 
     // Return secure asset stream
     return new NextResponse(
-      Buffer.from(`%PDF-1.4\n% LeadPilot AI Secure Storage Export\n% Target: ${bucket}/${fileId}\n% Owner: ${ownerUserId}\n%%EOF`),
+      Buffer.from(`%PDF-1.4\n% LeadPilot AI Secure Storage Export\n% Target: ${bucket}/${fileId}\n% Owner: ${ownerUserId}\n% Scan-Status: Safe\n%%EOF`),
       {
         status: 200,
         headers: {
@@ -99,7 +192,8 @@ export async function GET(
           'X-Content-Type-Options': 'nosniff',
           'Cache-Control': 'private, no-cache, no-store, must-revalidate',
           'X-LeadPilot-Owner': ownerUserId || 'verified-tenant',
-          'X-LeadPilot-Security': 'RLS-Storage-Gate-Active',
+          'X-LeadPilot-Scan-Status': 'Safe',
+          'X-LeadPilot-Security': 'Malware-Gate-Active',
         }
       }
     );

@@ -78,6 +78,10 @@ try {
   console.log('[Build Gate] Enforcing Automatic Post-Deploy Validation Engine Gate...');
   execSync('node scripts/test-post-deploy-engine.js', { stdio: 'inherit' });
 
+  // Execute Storage Malware Protection & Quarantine Gate
+  console.log('[Build Gate] Enforcing Storage Malware Protection & Quarantine Gate...');
+  execSync('node scripts/test-storage-malware-protection.js', { stdio: 'inherit' });
+
   // Execute Database Schema Verification Gate (Model & Column Drift Detection)
   console.log('[Build Gate] Enforcing Database Schema Verification Gate...');
   execSync('node scripts/verify-schema-drift.js', { stdio: 'inherit' });
