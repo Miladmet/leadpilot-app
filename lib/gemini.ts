@@ -120,7 +120,7 @@ export async function analyzeCompany(combinedText: string, companyName: string):
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const candidateModels = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+  const candidateModels = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
 
 
   const isFallback = combinedText.includes('crawling_failed');

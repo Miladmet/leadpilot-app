@@ -312,20 +312,54 @@ export async function POST(req: NextRequest) {
     
     if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('limit') || errorMsg.includes('Requests')) {
       return NextResponse.json(
-        { error: 'Gemini API Rate Limit/Quota Exceeded. Please retry in 30-60 seconds or verify your Google AI Studio billing plan.' },
+        { 
+          error: 'Gemini API Rate Limit/Quota Exceeded. Please retry in 30-60 seconds or verify your Google AI Studio billing plan.',
+          reason: 'API Rate Limit',
+          diagnostics: { failureType: 'AI_RATE_LIMIT', details: errorMsg }
+        },
         { status: 429 }
       );
     }
     
     if (errorMsg.includes('key') || errorMsg.includes('API_KEY') || errorMsg.includes('API key') || errorMsg.includes('403')) {
       return NextResponse.json(
-        { error: 'Invalid Google Gemini API key. Please check the GEMINI_API_KEY value inside your environment setup.' },
+        { 
+          error: 'Invalid Google Gemini API key. Please check the GEMINI_API_KEY value inside your environment setup.',
+          reason: 'Authentication Error',
+          diagnostics: { failureType: 'AI_AUTH_ERROR', details: errorMsg }
+        },
         { status: 403 }
       );
     }
 
+    if (errorMsg.includes('Prisma') || errorMsg.includes('database') || errorMsg.includes('EPERM') || errorMsg.includes('UNIQUE constraint')) {
+      return NextResponse.json(
+        { 
+          error: 'Database operation failed while recording analysis. Please retry the analysis.',
+          reason: 'Database Lock/Constraint Error',
+          diagnostics: { failureType: 'DATABASE_ERROR', details: errorMsg }
+        },
+        { status: 500 }
+      );
+    }
+
+    if (errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('timeout')) {
+      return NextResponse.json(
+        {
+          error: 'The website took too long to respond. The host may be slow or blocking automated traffic.',
+          reason: 'Network Timeout',
+          diagnostics: { failureType: 'NETWORK_TIMEOUT', details: errorMsg }
+        },
+        { status: 504 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Opportunity analysis failed. The website may have strong scraping protections or rate limits.' },
+      { 
+        error: 'Opportunity analysis failed. The website may have strong scraping protections or rate limits.',
+        reason: errorMsg || 'Unspecified analysis pipeline failure',
+        diagnostics: { failureType: 'GENERAL_ANALYSIS_ERROR', details: errorMsg }
+      },
       { status: 500 }
     );
   }
