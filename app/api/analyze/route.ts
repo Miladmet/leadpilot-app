@@ -7,6 +7,9 @@ import { withTimeout, withRetry, TIMEOUT_LIMITS } from '@/lib/stability';
 import { normalizeWebsiteUrl, detectAnalysisChanges } from '@/lib/changeDetection';
 import { classifyAnalysisError } from '@/lib/analysisErrors';
 
+export const maxDuration = 60; // 60s maximum execution duration on Vercel
+export const dynamic = 'force-dynamic';
+
 
 function pruneHtmlContent(content: string): string {
   if (!content) return '';

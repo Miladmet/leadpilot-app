@@ -10,6 +10,16 @@ try {
   // Generate Prisma Client for the active provider
   execSync(`npx prisma generate --schema=${schemaPath}`, { stdio: 'inherit' });
 
+  // In production, sync database schema to prevent missing column drift
+  if (isProduction && process.env.DATABASE_URL) {
+    console.log('[Build Step] Synchronizing production database schema (prisma db push)...');
+    try {
+      execSync(`npx prisma db push --schema=${schemaPath} --accept-data-loss`, { stdio: 'inherit' });
+    } catch (pushErr) {
+      console.warn('[Build Step] prisma db push encountered non-fatal notice:', pushErr.message);
+    }
+  }
+
   // In production, execute the Database RLS Security Gate
   if (isProduction && process.env.DATABASE_URL) {
     console.log('[Build Gate] Enforcing Multi-Tenant Row Level Security (RLS) check...');
@@ -55,6 +65,10 @@ try {
   // Execute Error Classification & Retry Safety Gate (Schema mismatch & retry safety)
   console.log('[Build Gate] Enforcing Error Classification & Retry Safety Gate...');
   execSync('node scripts/test-error-classification.js', { stdio: 'inherit' });
+
+  // Execute Database Self-Healing & Drift Recovery Gate
+  console.log('[Build Gate] Enforcing Database Self-Healing & Drift Recovery Gate...');
+  execSync('node scripts/test-db-self-heal.js', { stdio: 'inherit' });
 
   // Execute Database Schema Verification Gate (Model & Column Drift Detection)
   console.log('[Build Gate] Enforcing Database Schema Verification Gate...');

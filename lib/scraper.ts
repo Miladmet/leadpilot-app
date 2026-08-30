@@ -55,7 +55,7 @@ const AXIOS_CONFIG = {
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache'
   },
-  timeout: 8000,
+  timeout: 4500,
   maxRedirects: 5,
   validateStatus: () => true
 };

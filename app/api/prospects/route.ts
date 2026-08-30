@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 import { getTenantPrisma } from '@/lib/tenantPrisma';
 import { getUserIdFromRequest } from '@/lib/auth';
+import { 
+  selfHealDatabaseSchema, 
+  SAFE_CORE_PROSPECT_SELECT, 
+  normalizeProspectDefaults 
+} from '@/lib/dbSelfHeal';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,9 +16,36 @@ export async function GET(req: NextRequest) {
     }
 
     const tenantDb = getTenantPrisma(userId);
-    const prospects = await tenantDb.prospect.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    let prospects: any[] = [];
+
+    try {
+      prospects = await tenantDb.prospect.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (dbErr: any) {
+      const errMsg = dbErr?.message || '';
+      if (dbErr?.code === 'P2022' || errMsg.includes('analysisVersion') || errMsg.includes('does not exist')) {
+        console.warn('[Prospects Route] Schema drift P2022 detected. Invoking automatic self-healing...');
+        await selfHealDatabaseSchema(prisma);
+
+        // Retry findMany after auto-heal
+        try {
+          prospects = await tenantDb.prospect.findMany({
+            orderBy: { createdAt: 'desc' },
+          });
+        } catch (retryErr) {
+          // If auto-heal cannot alter table, safely query core columns and normalize defaults
+          console.warn('[Prospects Route] Querying with safe core selection fallback...');
+          const rawRecords = await tenantDb.prospect.findMany({
+            select: SAFE_CORE_PROSPECT_SELECT,
+            orderBy: { createdAt: 'desc' },
+          });
+          prospects = rawRecords.map(normalizeProspectDefaults);
+        }
+      } else {
+        throw dbErr;
+      }
+    }
 
     return NextResponse.json({ success: true, prospects });
   } catch (error: any) {

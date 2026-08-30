@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 import { getTenantPrisma } from '@/lib/tenantPrisma';
 import { getUserIdFromRequest } from '@/lib/auth';
+import { 
+  selfHealDatabaseSchema, 
+  SAFE_CORE_PROSPECT_SELECT, 
+  normalizeProspectDefaults 
+} from '@/lib/dbSelfHeal';
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,11 +43,35 @@ export async function GET(req: NextRequest) {
       take: 10,
     });
 
-    // 4. Get recent prospects
-    const recentProspects = await tenantDb.prospect.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
+    // 4. Get recent prospects (resilient to schema drift)
+    let recentProspects: any[] = [];
+    try {
+      recentProspects = await tenantDb.prospect.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      });
+    } catch (dbErr: any) {
+      const errMsg = dbErr?.message || '';
+      if (dbErr?.code === 'P2022' || errMsg.includes('analysisVersion') || errMsg.includes('does not exist')) {
+        console.warn('[Dashboard Stats Route] P2022 detected on recentProspects. Invoking auto-heal...');
+        await selfHealDatabaseSchema(prisma);
+        try {
+          recentProspects = await tenantDb.prospect.findMany({
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          });
+        } catch (retryErr) {
+          const rawRecent = await tenantDb.prospect.findMany({
+            select: SAFE_CORE_PROSPECT_SELECT,
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          });
+          recentProspects = rawRecent.map(normalizeProspectDefaults);
+        }
+      } else {
+        throw dbErr;
+      }
+    }
 
 
     return NextResponse.json({
