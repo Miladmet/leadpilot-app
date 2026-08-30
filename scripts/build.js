@@ -28,8 +28,13 @@ try {
   console.log('[Build Gate] Enforcing Opportunity Calculation Engine Gate...');
   execSync('node scripts/test-opportunity-engine.js', { stdio: 'inherit' });
 
+  // Execute the Solution Sandbox Gate (Safety, Evidence & Concept Models)
+  console.log('[Build Gate] Enforcing Solution Sandbox Safety & Model Gate...');
+  execSync('node scripts/test-sandbox-engine.js', { stdio: 'inherit' });
+
   // Compile Next.js project
   execSync('npx next build', { stdio: 'inherit' });
+
 
 
 
