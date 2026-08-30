@@ -318,6 +318,27 @@ ${combinedText}
     cleanedText = cleanedText.trim();
     const auditedData = JSON.parse(cleanedText);
 
+    const sanitizeInt = (val: any, fallback: number = 0): number => {
+      if (typeof val === 'number' && !isNaN(val)) return Math.round(val);
+      if (typeof val === 'string') {
+        const cleaned = val.replace(/[^0-9.-]/g, '');
+        const parsed = parseInt(cleaned, 10);
+        if (!isNaN(parsed)) return parsed;
+      }
+      return fallback;
+    };
+
+    const sanitizeString = (val: any, fallback: string = ''): string => {
+      if (typeof val === 'string') return val;
+      if (Array.isArray(val)) {
+        return val.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n');
+      }
+      if (val && typeof val === 'object') {
+        return JSON.stringify(val);
+      }
+      return fallback;
+    };
+
     const verifiedRecommendations = (auditedData.recommendations || []).filter(
       (r: any) => typeof r.confidence === 'number' && r.confidence >= 70 && r.status !== 'Suppressed'
     );
@@ -325,58 +346,60 @@ ${combinedText}
     // Strictly limit recommendations to top 3 opportunities
     const top3Recommendations = verifiedRecommendations.slice(0, 3);
 
-    const activePipelineValue = top3Recommendations.reduce((acc: number, r: any) => acc + (r.estimatedValue || 0), 0);
+    const activePipelineValue = top3Recommendations.reduce((acc: number, r: any) => acc + (sanitizeInt(r.estimatedValue, 0)), 0);
 
-    const isSpeculative = (auditedData.verificationPassRate < 60 || (auditedData.verifiedFacts || []).filter((f: any) => f.status === 'Verified').length === 0);
+    const isSpeculative = (sanitizeInt(auditedData.verificationPassRate, 100) < 60 || (auditedData.verifiedFacts || []).filter((f: any) => f.status === 'Verified').length === 0);
     const proposalStatus = isSpeculative ? 'Speculative' : 'Ready';
 
     return {
-      companyName: auditedData.companyName || companyName,
-      verifiedFacts: auditedData.verifiedFacts || [],
-      aiInferences: auditedData.aiInferences || [],
+      companyName: sanitizeString(auditedData.companyName, companyName),
+      verifiedFacts: Array.isArray(auditedData.verifiedFacts) ? auditedData.verifiedFacts : [],
+      aiInferences: Array.isArray(auditedData.aiInferences) ? auditedData.aiInferences : [],
       recommendations: top3Recommendations,
-      competitorGaps: auditedData.competitorGaps || [],
+      competitorGaps: Array.isArray(auditedData.competitorGaps) ? auditedData.competitorGaps : [],
       scoreExplanations: auditedData.scoreExplanations || {
         opportunityScore: { score: 50, explanation: 'Default.', breakdown: [], evidence: [] },
         buyingSignalScore: { score: 50, explanation: 'Default.', breakdown: [], evidence: [] }
       },
       
-      opportunityScore: auditedData.opportunityScore || 50,
-      buyingSignalScore: auditedData.buyingSignalScore || 50,
-      potentialRevenue: activePipelineValue,
-      closingProbability: auditedData.closingProbability || 50,
-      problemSeverity: auditedData.problemSeverity || 'Medium',
-      leadQuality: auditedData.leadQuality || 'Warm',
+      opportunityScore: sanitizeInt(auditedData.opportunityScore, 50),
+      buyingSignalScore: sanitizeInt(auditedData.buyingSignalScore, 50),
+      potentialRevenue: activePipelineValue || sanitizeInt(auditedData.potentialRevenue, 10000),
+      closingProbability: sanitizeInt(auditedData.closingProbability, 50),
+      problemSeverity: ['High', 'Medium', 'Low'].includes(auditedData.problemSeverity) ? auditedData.problemSeverity : 'Medium',
+      leadQuality: ['Hot', 'Warm', 'Cold'].includes(auditedData.leadQuality) ? auditedData.leadQuality : 'Warm',
       proposalStatus,
 
-      evidenceQuality: auditedData.evidenceQuality || 90,
-      verificationPassRate: auditedData.verificationPassRate || 95,
-      findingReliability: auditedData.findingReliability || 92,
+      evidenceQuality: sanitizeInt(auditedData.evidenceQuality, 90),
+      verificationPassRate: sanitizeInt(auditedData.verificationPassRate, 95),
+      findingReliability: sanitizeInt(auditedData.findingReliability, 92),
 
-      factsVerifiedCount: auditedData.factsVerifiedCount || 0,
-      claimsRejectedCount: auditedData.claimsRejectedCount || 0,
-      lowConfidenceCount: auditedData.lowConfidenceCount || 0,
-      suppressedRecsCount: auditedData.suppressedRecsCount || 0,
+      factsVerifiedCount: sanitizeInt(auditedData.factsVerifiedCount, 0),
+      claimsRejectedCount: sanitizeInt(auditedData.claimsRejectedCount, 0),
+      lowConfidenceCount: sanitizeInt(auditedData.lowConfidenceCount, 0),
+      suppressedRecsCount: sanitizeInt(auditedData.suppressedRecsCount, 0),
 
-      opportunityRange: auditedData.opportunityRange || '$10,000 - $25,000',
-      revenueAssumptions: JSON.stringify(auditedData.revenueAssumptions || {
-        assumptions: ['Standard local service prices'],
-        pricingModel: 'Fixed retainer pricing.',
-        disclaimer: 'Revenue estimates represent potential contract values.'
-      }),
+      opportunityRange: sanitizeString(auditedData.opportunityRange, '$10,000 - $25,000'),
+      revenueAssumptions: typeof auditedData.revenueAssumptions === 'string' 
+        ? auditedData.revenueAssumptions 
+        : JSON.stringify(auditedData.revenueAssumptions || {
+            assumptions: ['Standard local service prices'],
+            pricingModel: 'Fixed retainer pricing.',
+            disclaimer: 'Revenue estimates represent potential contract values.'
+          }),
 
-      executiveSummary: auditedData.executiveSummary || '',
-      expectedResults: auditedData.expectedResults || '',
-      estimatedRoi: auditedData.estimatedRoi || '',
-      thirtyDayPlan: auditedData.thirtyDayPlan || '',
-      ninetyDayPlan: auditedData.ninetyDayPlan || '',
-      pricingRecommendation: auditedData.pricingRecommendation || '',
+      executiveSummary: sanitizeString(auditedData.executiveSummary),
+      expectedResults: sanitizeString(auditedData.expectedResults),
+      estimatedRoi: sanitizeString(auditedData.estimatedRoi),
+      thirtyDayPlan: sanitizeString(auditedData.thirtyDayPlan),
+      ninetyDayPlan: sanitizeString(auditedData.ninetyDayPlan),
+      pricingRecommendation: sanitizeString(auditedData.pricingRecommendation),
 
-      coldEmail: auditedData.coldEmail || '',
-      linkedInMessage: auditedData.linkedInMessage || '',
-      discoveryScript: auditedData.discoveryScript || '',
-      followUpSequence: auditedData.followUpSequence || '',
-      meetingAgenda: auditedData.meetingAgenda || ''
+      coldEmail: sanitizeString(auditedData.coldEmail),
+      linkedInMessage: sanitizeString(auditedData.linkedInMessage),
+      discoveryScript: sanitizeString(auditedData.discoveryScript),
+      followUpSequence: sanitizeString(auditedData.followUpSequence),
+      meetingAgenda: sanitizeString(auditedData.meetingAgenda)
     };
   } catch (error: any) {
     console.error('Single-Call Self-Auditor Parse Crash:', error);
