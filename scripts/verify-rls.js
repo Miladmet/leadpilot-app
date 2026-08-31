@@ -21,10 +21,20 @@ async function verifyRLS() {
   console.log('  [SECURITY GATE] Auditing Database Row Level Security (RLS)    ');
   console.log('----------------------------------------------------------------');
 
-  const databaseUrl = process.env.DATABASE_URL;
+  let databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     console.error('❌ [SECURITY VIOLATION] DATABASE_URL is not set. Deployment blocked.');
     process.exit(1);
+  }
+
+  // Sanitize any accidental prefix or quotes
+  databaseUrl = databaseUrl.trim();
+  if ((databaseUrl.startsWith('"') && databaseUrl.endsWith('"')) || (databaseUrl.startsWith("'") && databaseUrl.endsWith("'"))) {
+    databaseUrl = databaseUrl.slice(1, -1).trim();
+  }
+  const match = databaseUrl.match(/(?:postgres(?:ql)?:\/\/.*)/i);
+  if (match) {
+    databaseUrl = match[0].trim();
   }
 
   // If local SQLite is used in a non-production test, pass with notice

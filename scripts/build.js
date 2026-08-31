@@ -4,6 +4,26 @@ const { execSync } = require('child_process');
 const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
 const schemaPath = isProduction ? 'prisma/schema.prod.prisma' : 'prisma/schema.prisma';
 
+function sanitizeDbUrl(raw) {
+  if (!raw) return raw;
+  let clean = String(raw).trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  const match = clean.match(/(?:postgres(?:ql)?:\/\/.*)/i);
+  if (match) {
+    clean = match[0].trim();
+  }
+  return clean;
+}
+
+if (process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = sanitizeDbUrl(process.env.DATABASE_URL);
+}
+if (process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = sanitizeDbUrl(process.env.DIRECT_URL);
+}
+
 // Ensure DIRECT_URL fallback exists so Prisma doesn't error if DIRECT_URL is unset on Vercel
 if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
   process.env.DIRECT_URL = process.env.DATABASE_URL;

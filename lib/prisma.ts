@@ -4,6 +4,15 @@ function getNormalizedDatabaseUrl(): string | undefined {
   let url = process.env.DATABASE_URL;
   if (!url) return undefined;
 
+  url = url.trim();
+  if ((url.startsWith('"') && url.endsWith('"')) || (url.startsWith("'") && url.endsWith("'"))) {
+    url = url.slice(1, -1).trim();
+  }
+  const match = url.match(/(?:postgres(?:ql)?:\/\/.*)/i);
+  if (match) {
+    url = match[0].trim();
+  }
+
   const isPostgres = url.startsWith('postgres://') || url.startsWith('postgresql://');
   const isSupabase = url.includes('supabase.co') || url.includes('supabase.com') || url.includes('pooler');
 
