@@ -2,7 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #f8fafc;
-  color: #0f172a;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  /* Prevent iOS zoom on input focus by maintaining minimum 16px font */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    select,
+    textarea {
+      font-size: 0.875rem; /* 14px */
+    }
+  }
+
+  button, a {
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  /* Smooth momentum scrolling on iOS */
+  .touch-momentum {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Safe area utility classes for devices with notches / home indicators */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 1rem);
+  }
+
+  /* Comfortable touch tap target sizing */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }

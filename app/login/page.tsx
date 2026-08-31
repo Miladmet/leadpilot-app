@@ -133,8 +133,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50 relative">
       {/* ---------------- DIAGNOSTICS MODAL ---------------- */}
       {showDiagnostics && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 sm:p-7 shadow-2xl border border-slate-200 space-y-5 max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-start border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-sky-600" />

@@ -313,6 +313,7 @@ export default function Dashboard() {
   const [selectedSandboxType, setSelectedSandboxType] = useState<string>('websiteRedesign');
   const [showSandboxEvidenceModal, setShowSandboxEvidenceModal] = useState(false);
   const [selectedSandboxEvidence, setSelectedSandboxEvidence] = useState<SandboxEvidence | null>(null);
+  const [showMobileProspectDrawer, setShowMobileProspectDrawer] = useState(false);
 
 
 
@@ -827,10 +828,59 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 relative">
       
+      {/* ---------------- MOBILE CLIENT SWITCHER DRAWER ---------------- */}
+      {showMobileProspectDrawer && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl max-h-[85vh] flex flex-col animate-in slide-in-from-bottom duration-200">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-sky-600" />
+                <h3 className="font-bold text-slate-900 text-sm">Select Client Prospect ({prospects.length})</h3>
+              </div>
+              <button
+                onClick={() => setShowMobileProspectDrawer(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 divide-y divide-slate-100 space-y-1 pr-1">
+              {prospects.map((p) => (
+                <div
+                  key={p.id}
+                  onClick={() => {
+                    setActiveProspect(p);
+                    setShowMobileProspectDrawer(false);
+                  }}
+                  className={`p-3 rounded-xl flex justify-between items-center cursor-pointer transition-colors ${
+                    activeProspect?.id === p.id ? 'bg-sky-50 border border-sky-200' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="overflow-hidden mr-2">
+                    <p className="text-xs font-bold text-slate-800 truncate">{p.companyName}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{p.websiteUrl}</p>
+                  </div>
+                  <span className="text-[9px] font-bold text-emerald-700 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 shrink-0">
+                    {p.opportunityRange || 'N/A'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowMobileProspectDrawer(false)}
+              className="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2.5 rounded-xl transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ---------------- SECTION 7: SHOW ME WHY MODAL DRAWER ---------------- */}
       {showWhyModal && modalContent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-slide-in">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-end bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white w-full sm:max-w-md h-[90vh] sm:h-full shadow-2xl p-4 sm:p-6 rounded-t-2xl sm:rounded-none flex flex-col justify-between overflow-y-auto animate-slide-in">
             <div>
               <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <h3 className="font-black text-slate-900 flex items-center gap-1.5 text-xs uppercase tracking-wider">
@@ -908,8 +958,8 @@ export default function Dashboard() {
 
       {/* ---------------- PLATFORM TRUST BREAKDOWN MODAL DRAWER ---------------- */}
       {showTrustModal && selectedTrustBreakdown && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-lg h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-slide-in">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-end bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full sm:max-w-lg h-[90vh] sm:h-full shadow-2xl p-4 sm:p-6 rounded-t-2xl sm:rounded-none flex flex-col justify-between overflow-y-auto animate-slide-in">
             <div className="space-y-5">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -1017,8 +1067,8 @@ export default function Dashboard() {
 
       {/* ---------------- SECTION: TRUST DIAGNOSTICS PANEL DRAWER ---------------- */}
       {showDiagnosticsModal && diagnosticsData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-lg h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-slide-in">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-end bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full sm:max-w-lg h-[90vh] sm:h-full shadow-2xl p-4 sm:p-6 rounded-t-2xl sm:rounded-none flex flex-col justify-between overflow-y-auto animate-slide-in">
             <div className="space-y-5">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -1179,8 +1229,8 @@ export default function Dashboard() {
 
       {/* ---------------- SECTION: OPPORTUNITY CALCULATION BREAKDOWN MODAL DRAWER ---------------- */}
       {showOpportunityCalcModal && (selectedOpportunityCalc || selectedPortfolioCalc) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-xl h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-slide-in">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-end bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full sm:max-w-xl h-[90vh] sm:h-full shadow-2xl p-4 sm:p-6 rounded-t-2xl sm:rounded-none flex flex-col justify-between overflow-y-auto animate-slide-in">
             <div className="space-y-5">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -1432,8 +1482,8 @@ export default function Dashboard() {
 
       {/* ---------------- SECTION: SOLUTION SANDBOX EVIDENCE MODAL DRAWER ---------------- */}
       {showSandboxEvidenceModal && selectedSandboxEvidence && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-lg h-full shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-slide-in">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-end bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full sm:max-w-lg h-[90vh] sm:h-full shadow-2xl p-4 sm:p-6 rounded-t-2xl sm:rounded-none flex flex-col justify-between overflow-y-auto animate-slide-in">
             <div className="space-y-5">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -1593,23 +1643,22 @@ export default function Dashboard() {
       )}
 
       {/* Top Navbar */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-4">
-          <span className="text-xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
-            LeadPilot AI
-          </span>
-          <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-full text-xs font-semibold text-slate-600 border border-slate-200">
-            <span>Platform:</span>
+      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 sm:py-3.5 flex justify-between items-center shadow-xs">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Link href="/dashboard" className="text-lg sm:text-xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent shrink-0">
+            LeadPilot
+          </Link>
+          <span className="hidden xs:inline-flex items-center bg-slate-100 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold text-slate-600 border border-slate-200 truncate">
             <span className="text-sky-600 font-bold uppercase">{user.subscriptionTier}</span>
-          </div>
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex flex-col items-end gap-1">
-            <span className="text-xs text-slate-500 font-medium">
-              Quota Used: {user.analysesUsed} / {user.subscriptionTier === 'AGENCY' ? '∞' : user.analysesLimit}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="hidden lg:flex flex-col items-end gap-1">
+            <span className="text-[11px] text-slate-500 font-medium">
+              Quota: {user.analysesUsed} / {user.subscriptionTier === 'AGENCY' ? '∞' : user.analysesLimit}
             </span>
-            <div className="w-36 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+            <div className="w-28 bg-slate-200 rounded-full h-1.5 overflow-hidden">
               <div 
                 className="bg-sky-600 h-1.5 rounded-full" 
                 style={{ width: `${user.subscriptionTier === 'AGENCY' ? 100 : Math.min((user.analysesUsed / user.analysesLimit) * 100, 100)}%` }}
@@ -1619,38 +1668,58 @@ export default function Dashboard() {
 
           <button
             onClick={() => setShowReferralModal(true)}
-            className="flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
+            className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 sm:px-3 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer min-h-[36px]"
             title="Refer Agencies & Earn Rewards"
           >
-            <span>🎁 Refer & Earn</span>
+            <span>🎁</span>
+            <span className="hidden sm:inline">Refer & Earn</span>
           </button>
 
           <Link
             href="/admin/security"
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-sky-600 bg-slate-50 hover:bg-sky-50 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors shadow-2xs"
+            className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-600 hover:text-sky-600 bg-slate-50 hover:bg-sky-50 border border-slate-200 px-2 sm:px-3 py-1.5 rounded-lg transition-colors shadow-2xs min-h-[36px]"
             title="Multi-Tenant RLS Security Dashboard"
           >
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            <span className="hidden sm:inline">RLS Security</span>
+            <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span className="hidden md:inline">RLS Security</span>
           </Link>
 
-
-          <div className="border-l border-slate-200 pl-4 flex items-center gap-3">
-            <span className="text-sm text-slate-700 font-semibold flex items-center gap-1">
-              <UserIcon className="h-4 w-4 text-slate-400" />
-              {user.email}
+          <div className="border-l border-slate-200 pl-2 sm:pl-3 flex items-center gap-1 sm:gap-2">
+            <span className="text-xs text-slate-700 font-semibold hidden md:flex items-center gap-1 max-w-[130px] truncate" title={user.email}>
+              <UserIcon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span className="truncate">{user.email}</span>
             </span>
 
             <button 
               onClick={handleLogout}
-              className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+              className="text-slate-400 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
               title="Logout"
+              aria-label="Logout"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
       </header>
+
+      {/* Mobile Client Switcher Bar (Mobile phones only) */}
+      {prospects.length > 0 && (
+        <div className="lg:hidden bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between shadow-xs sticky top-[49px] z-30">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest shrink-0">Client:</span>
+            <span className="text-xs font-bold text-white truncate">
+              {activeProspect?.companyName || 'Select a Prospect'}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowMobileProspectDrawer(true)}
+            className="text-[11px] font-bold text-sky-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-lg shrink-0 flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <span>Switch ({prospects.length})</span>
+            <Filter className="h-3 w-3" />
+          </button>
+        </div>
+      )}
 
       {/* Main SaaS panel */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid lg:grid-cols-3 gap-6">
@@ -1804,29 +1873,29 @@ export default function Dashboard() {
             </p>
 
 
-            <form onSubmit={handleAnalyze} className="mt-4 flex gap-2">
+            <form onSubmit={handleAnalyze} className="mt-4 flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 required
                 placeholder="e.g. stripe.com or https://company.com"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="flex-1 pl-3 pr-4 py-3 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 text-sm shadow-sm"
+                className="flex-1 pl-3.5 pr-4 py-3 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm shadow-2xs min-h-[44px]"
                 disabled={analyzing}
               />
               <button
                 type="submit"
                 disabled={analyzing}
-                className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 cursor-pointer"
               >
                 {analyzing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Running auditor checks...
+                    <span>Running auditor checks...</span>
                   </>
                 ) : (
                   <>
-                    Analyze Website
+                    <span>Analyze Website</span>
                   </>
                 )}
               </button>
@@ -2247,72 +2316,69 @@ export default function Dashboard() {
               )}
 
               {/* Navigation Tabs */}
-              <div className="flex border-b border-slate-200 bg-white">
-
-
+              <div className="flex border-b border-slate-200 bg-white overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap px-1 py-0.5">
                 <button
                   onClick={() => setActiveTab('opportunities')}
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`shrink-0 py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'opportunities' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Search className="h-4 w-4" />
-                  Audited Solutions
+                  <span>Audited Solutions</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('sandbox')}
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`shrink-0 py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'sandbox' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Sparkles className="h-4 w-4 text-amber-500" />
-                  Solution Sandbox
+                  <span>Solution Sandbox</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('proposal')}
-
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`shrink-0 py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'proposal' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <FileText className="h-4 w-4" />
-                  Proposal Generator
+                  <span>Proposal Generator</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('outreach')}
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`shrink-0 py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'outreach' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Mail className="h-4 w-4" />
-                  Outreach Center
+                  <span>Outreach Center</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('vault')}
-                  className={`flex-1 py-3 px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`shrink-0 py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'vault' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Layers className="h-4 w-4" />
-                  Evidence Vault
+                  <span>Evidence Vault</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('valuation')}
-                  className={`flex-1 py-3 px-3 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`shrink-0 py-2.5 sm:py-3 px-3 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'valuation' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Briefcase className="h-4 w-4" />
-                  Opportunity Valuation
+                  <span>Valuation</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('comparison')}
-                  className={`flex-1 py-3 px-3 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`shrink-0 py-2.5 sm:py-3 px-3 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'comparison' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <History className="h-4 w-4 text-sky-600" />
-                  <span>Analysis Comparison</span>
+                  <span>Comparison</span>
                   {activeComparisonReport?.isRepeatedAnalysis && (
                     <span className="bg-sky-100 text-sky-700 border border-sky-200 text-[9px] font-black px-1.5 py-0.2 rounded-full">
                       v{activeComparisonReport.version}
@@ -2393,22 +2459,22 @@ export default function Dashboard() {
                         </div>
 
                         {/* Horizontal Sandbox Type Selector */}
-                        <div className="flex flex-wrap gap-1.5 border-b border-slate-100 pb-3">
+                        <div className="flex overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap gap-1.5 border-b border-slate-100 pb-3 py-1">
                           {[
-                            { id: 'websiteRedesign', label: '1. Website Redesign' },
-                            { id: 'seoContent', label: '2. SEO Content' },
-                            { id: 'leadGeneration', label: '3. Lead Generation' },
-                            { id: 'aiAutomation', label: '4. AI Automation' },
+                            { id: 'websiteRedesign', label: '1. Redesign' },
+                            { id: 'seoContent', label: '2. SEO' },
+                            { id: 'leadGeneration', label: '3. Leads' },
+                            { id: 'aiAutomation', label: '4. AI' },
                             { id: 'conversionOptimization', label: '5. Conversion' },
-                            { id: 'pricingLicensing', label: '6. Licensing & Pricing' },
-                            { id: 'competitorGap', label: '7. Competitor Gap' }
+                            { id: 'pricingLicensing', label: '6. Pricing' },
+                            { id: 'competitorGap', label: '7. Gaps' }
                           ].map(t => (
                             <button
                               key={t.id}
                               onClick={() => setSelectedSandboxType(t.id)}
-                              className={`text-xs px-3 py-1.5 rounded-full font-bold transition-all ${
+                              className={`shrink-0 text-xs px-3.5 py-2 rounded-full font-bold transition-all min-h-[36px] cursor-pointer ${
                                 selectedSandboxType === t.id
-                                  ? 'bg-slate-900 text-white shadow-sm'
+                                  ? 'bg-slate-900 text-white shadow-xs'
                                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                               }`}
                             >

@@ -1,30 +1,38 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { SEO_KEYWORDS } from '@/lib/seoKeywords';
 import { CASE_STUDIES } from '@/lib/caseStudies';
+import { Menu, X } from 'lucide-react';
 
 export default function Home() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const keywordList = Object.values(SEO_KEYWORDS);
   const caseStudyList = Object.values(CASE_STUDIES);
 
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <header className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-2xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
+      <header className="px-4 sm:px-6 py-3 sm:py-4 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-40 shadow-xs">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link href="/" className="text-xl sm:text-2xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
             LeadPilot AI
           </Link>
-          <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold">Agency Suite</span>
+          <span className="hidden xs:inline-block bg-sky-100 text-sky-700 text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold">
+            Agency Suite
+          </span>
         </div>
-        <div className="flex items-center gap-4 sm:gap-6">
-          <Link href="/tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden md:inline">
+
+        {/* Desktop Nav */}
+        <div className="hidden md:flex items-center gap-6">
+          <Link href="/tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
             Solutions
           </Link>
-          <Link href="/free-tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden sm:inline">
+          <Link href="/free-tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
             Free Tools
           </Link>
-          <Link href="/case-studies" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden sm:inline">
+          <Link href="/case-studies" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
             Case Studies
           </Link>
           <Link href="/login" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
@@ -37,7 +45,74 @@ export default function Home() {
             Get Started Free
           </Link>
         </div>
+
+        {/* Mobile Header Actions */}
+        <div className="flex md:hidden items-center gap-2">
+          <Link
+            href="/register"
+            className="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition-all shadow-2xs"
+          >
+            Get Started
+          </Link>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+            aria-label="Toggle Navigation Menu"
+          >
+            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </header>
+
+      {/* Mobile Slide-Down Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white border-b border-slate-200 px-4 py-4 space-y-3 shadow-lg animate-in slide-in-from-top duration-200 z-30 sticky top-[53px]">
+          <Link
+            href="/tools"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block py-2 text-sm font-semibold text-slate-700 hover:text-sky-600 border-b border-slate-100"
+          >
+            Solutions Directory
+          </Link>
+          <Link
+            href="/free-tools"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block py-2 text-sm font-semibold text-slate-700 hover:text-sky-600 border-b border-slate-100"
+          >
+            Free Tools & Calculators
+          </Link>
+          <Link
+            href="/case-studies"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block py-2 text-sm font-semibold text-slate-700 hover:text-sky-600 border-b border-slate-100"
+          >
+            Agency Case Studies
+          </Link>
+          <Link
+            href="/audit/sample-audit"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block py-2 text-sm font-semibold text-slate-700 hover:text-sky-600 border-b border-slate-100"
+          >
+            Sample Evidence Audit
+          </Link>
+          <div className="pt-2 flex gap-2">
+            <Link
+              href="/login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex-1 text-center py-2.5 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl"
+            >
+              Log In
+            </Link>
+            <Link
+              href="/register"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex-1 text-center py-2.5 text-xs font-bold text-white bg-sky-600 rounded-xl"
+            >
+              Create Account
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1">
@@ -58,14 +133,14 @@ export default function Home() {
         </div>
 
         {/* Hero Section with Exact Required Headline & CTAs */}
-        <section className="py-16 md:py-24 px-6 max-w-5xl mx-auto text-center">
-          <div className="inline-block bg-sky-50 border border-sky-200 text-sky-700 text-xs font-bold px-3 py-1 rounded-full mb-6 uppercase tracking-wider">
+        <section className="py-10 sm:py-16 md:py-24 px-4 sm:px-6 max-w-5xl mx-auto text-center">
+          <div className="inline-block bg-sky-50 border border-sky-200 text-sky-700 text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full mb-4 sm:mb-6 uppercase tracking-wider">
             Evidence-Backed Agency Acceleration
           </div>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 leading-tight tracking-tight max-w-4xl mx-auto">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-slate-900 leading-tight tracking-tight max-w-4xl mx-auto">
             Turn Any Company Website Into a Client Proposal in Under 60 Seconds.
           </h1>
-          <p className="mt-6 text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto font-medium leading-relaxed">
+          <p className="mt-4 sm:mt-6 text-sm sm:text-xl text-slate-600 max-w-3xl mx-auto font-medium leading-relaxed">
             LeadPilot helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
           </p>
 

@@ -398,7 +398,7 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-6 md:p-12">
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-3 sm:p-6 md:p-12">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Top Header */}
@@ -406,25 +406,25 @@ ${storageData?.buckets.map(b => `| **${b.name}** | ${b.visibility} | ${b.contain
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors shrink-0"
               title="Back to Dashboard"
             >
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <ShieldCheck className="h-7 w-7 text-emerald-400" />
-                <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">
+                <ShieldCheck className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-400 shrink-0" />
+                <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white">
                   Multi-Tenant Security Dashboard
                 </h1>
               </div>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
                 Real-time Row Level Security (RLS) coverage and cross-account data isolation monitor.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               onClick={handleAutoHealSchema}
               disabled={healingSchema}
