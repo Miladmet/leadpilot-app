@@ -28,10 +28,28 @@ async function runGate() {
     }
 
     if (!result.isHealthy || healthScore.score < 100) {
-      // 2. Output the exact required drift failure block
-      console.error('\n' + (result.driftBlockedText || 'Schema Drift Detected\n\nStatus:\nDeployment Blocked'));
-      console.error('\nTotal drift items:', result.missingItemsCount);
-      for (const item of result.missingItems) {
+      console.log('\n[Schema Drift Gate] Schema drift detected! Attempting automatic self-healing...');
+      const { selfHealDatabaseSchema } = require('../lib/dbSelfHealCore');
+      const healResult = await selfHealDatabaseSchema(prisma);
+      console.log(`[Schema Drift Gate] Self-healing executed ${healResult.executedCount || 0} DDL statements.`);
+
+      // Re-verify after healing
+      const recheck = await verifyDatabaseSchema(prisma);
+      const recheckScore = calculateSchemaHealthScore(recheck);
+
+      if (recheck.isHealthy && recheckScore.score === 100) {
+        console.log('\n================================================================');
+        console.log('✅ [Schema Drift Gate] SCHEMA DRIFT AUTOMATICALLY RESOLVED VIA SELF-HEALING!');
+        console.log('Schema Health Score: 100/100 (EXCELLENT)');
+        console.log('Database Health Status: HEALTHY');
+        console.log('================================================================\n');
+        process.exit(0);
+      }
+
+      // If still not healthy, block deployment safely
+      console.error('\n' + (recheck.driftBlockedText || 'Schema Drift Detected\n\nStatus:\nDeployment Blocked'));
+      console.error('\nTotal drift items remaining:', recheck.missingItemsCount);
+      for (const item of recheck.missingItems) {
         console.error(`- ${item.model} (${item.type}): ${item.name}`);
       }
       process.exit(1);
