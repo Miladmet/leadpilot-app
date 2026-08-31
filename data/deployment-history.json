@@ -1,5 +1,18 @@
 [
   {
+    "id": "DEPLOY_1788143446631",
+    "timestamp": "2026-08-31T02:30:46.576Z",
+    "commitId": "test-commit-sha",
+    "overallHealth": "HEALTHY",
+    "schemaStatus": "Healthy",
+    "apiStatus": "Healthy",
+    "securityStatus": "Healthy",
+    "trustStatus": "Healthy",
+    "storageStatus": "Healthy",
+    "missingColumnsCount": 0,
+    "missingTablesCount": 0
+  },
+  {
     "id": "DEPLOY_1788141353304",
     "timestamp": "2026-08-31T01:55:53.235Z",
     "commitId": "test-commit-sha",

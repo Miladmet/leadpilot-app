@@ -4,6 +4,11 @@ const { execSync } = require('child_process');
 const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
 const schemaPath = isProduction ? 'prisma/schema.prod.prisma' : 'prisma/schema.prisma';
 
+// Ensure DIRECT_URL fallback exists so Prisma doesn't error if DIRECT_URL is unset on Vercel
+if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
+  process.env.DIRECT_URL = process.env.DATABASE_URL;
+}
+
 console.log(`[Build Setup] Detected production=${isProduction}. Using schema: ${schemaPath}`);
 
 try {
