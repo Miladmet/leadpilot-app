@@ -2,33 +2,61 @@ import React from 'react';
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { CASE_STUDIES } from '@/lib/caseStudies';
-import { ArrowRight, TrendingUp } from 'lucide-react';
+import { ArrowRight, TrendingUp, Sparkles, AlertCircle, ShieldCheck } from 'lucide-react';
+import { BreadcrumbJsonLd } from '@/components/seo/JsonLd';
 
 export const metadata: Metadata = {
-  title: 'Agency Case Studies & ROI Breakdowns | LeadPilot AI',
-  description: 'Explore real case studies showing how digital agencies, SEO consultants, and web designers turn 60-second website audits into high-ticket client retainers.'
+  title: 'Agency Case Studies & ROI Breakdowns | LeadPilot Software',
+  description:
+    'Explore real case studies showing how digital agencies, SEO consultants, and web designers use LeadPilot Software to turn 60-second website audits into high-ticket client retainers.',
+  alternates: {
+    canonical: 'https://leadpilotsoftware.com/case-studies'
+  },
+  openGraph: {
+    title: 'LeadPilot Software Agency Case Studies',
+    description: 'Real client acquisition breakthroughs: How agencies uncover opportunities and win retainers.',
+    url: 'https://leadpilotsoftware.com/case-studies',
+    siteName: 'LeadPilot Software'
+  }
 };
 
 export default function CaseStudiesIndexPage() {
-  const studies = Object.values(CASE_STUDIES);
+  // Only display unique primary case studies
+  const primarySlugs = [
+    'watermark-resize-studio',
+    'dental-practice-audit',
+    'law-firm-client-acquisition',
+    'marketing-agency-retainer-expansion'
+  ];
+  const studies = primarySlugs.map((slug) => CASE_STUDIES[slug]).filter(Boolean);
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Home', url: 'https://leadpilotsoftware.com' },
+          { name: 'Case Studies', url: 'https://leadpilotsoftware.com/case-studies' }
+        ]}
+      />
+
       {/* Header */}
       <header className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-2xs">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-2xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
-            LeadPilot AI
+            LeadPilot Software
           </Link>
-          <span className="bg-indigo-100 text-indigo-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
+          <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
             Case Studies
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/free-tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
-            Free Tools
+          <Link href="/about" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden sm:inline">
+            About
           </Link>
-          <Link href="/tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
+          <Link href="/blog" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden sm:inline">
+            Blog
+          </Link>
+          <Link href="/tools" className="text-slate-600 hover:text-slate-900 font-medium text-sm hidden sm:inline">
             Solutions
           </Link>
           <Link href="/login" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
@@ -49,73 +77,98 @@ export default function CaseStudiesIndexPage() {
           <span className="text-xs font-bold text-sky-600 uppercase tracking-wider block">
             Agency Success Stories
           </span>
-          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 leading-tight">
-            How Agencies Win High-Ticket Deals with LeadPilot
+          <h1 className="text-3xl sm:text-5xl font-black text-slate-900 leading-tight">
+            How Agencies Win High-Ticket Deals with LeadPilot Software
           </h1>
-          <p className="text-sm text-slate-600 font-medium">
-            Explore verified case studies breaking down how agencies uncover opportunities, pitch evidence-backed solutions, and close retainers.
+          <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+            Explore verified case studies breaking down how agencies uncover opportunities, pitch evidence-backed solutions, and close high-margin retainers.
           </p>
         </div>
 
         {/* Case Studies Grid */}
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 gap-6">
           {studies.map((study) => (
-            <Link
+            <div
               key={study.slug}
-              href={`/case-studies/${study.slug}`}
-              className="bg-white p-6 rounded-3xl border border-slate-200 hover:border-sky-300 hover:shadow-md transition-all flex flex-col justify-between group space-y-4"
+              className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-6"
             >
-              <div className="space-y-3">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="bg-sky-50 text-sky-700 font-bold px-2.5 py-0.5 rounded-full text-[10px] uppercase">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
                     {study.industry}
                   </span>
-                  <span className="text-emerald-700 font-black bg-emerald-50 px-2 py-0.5 rounded-md text-xs">
-                    {study.opportunityValue} Value
+                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    <span>{study.potentialValueRange || study.opportunityValue} Value</span>
                   </span>
                 </div>
-                <h2 className="text-base font-black text-slate-900 group-hover:text-sky-600 transition-colors leading-snug">
+
+                <h2 className="text-xl font-black text-slate-900 leading-snug">
                   {study.title}
                 </h2>
-                <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
+
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
                   {study.summary}
                 </p>
+
+                {/* Structured Breakdown: Problem, Evidence, Opportunity, Solution */}
+                <div className="pt-2 space-y-2 border-t border-slate-100 text-xs">
+                  {study.problem && (
+                    <div className="bg-rose-50/60 p-2.5 rounded-xl border border-rose-100">
+                      <strong className="text-rose-800 block text-[10px] uppercase font-black">Problem</strong>
+                      <p className="text-slate-700 text-[11px] mt-0.5 line-clamp-2">{study.problem}</p>
+                    </div>
+                  )}
+
+                  {study.evidence && (
+                    <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
+                      <strong className="text-amber-800 block text-[10px] uppercase font-black">Verified Evidence</strong>
+                      <p className="text-slate-700 text-[11px] mt-0.5 line-clamp-2">{study.evidence}</p>
+                    </div>
+                  )}
+
+                  {study.solution && (
+                    <div className="bg-sky-50/60 p-2.5 rounded-xl border border-sky-100">
+                      <strong className="text-sky-800 block text-[10px] uppercase font-black">Solution & Delivery</strong>
+                      <p className="text-slate-700 text-[11px] mt-0.5 line-clamp-2">{study.solution}</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-medium">{study.agencyRoi.closedRetainer.split(' ')[0]} Retainer</span>
-                <span className="text-sky-600 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                  <span>Read Breakdown</span>
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Deal Size Won</span>
+                  <strong className="text-sm font-black text-slate-900">{study.agencyRoi.closedRetainer}</strong>
+                </div>
+                <Link
+                  href={`/case-studies/${study.slug}`}
+                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-1.5"
+                >
+                  <span>View Case Study</span>
                   <ArrowRight className="h-3.5 w-3.5" />
-                </span>
+                </Link>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
 
-        {/* CTA Box */}
-        <div className="bg-slate-900 text-white p-8 rounded-3xl text-center space-y-4">
-          <h3 className="text-2xl font-black">
-            Want to audit your next prospect in 60 seconds?
-          </h3>
-          <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto">
-            Scan target websites, verify evidence, and export client-ready proposal decks.
+        {/* Bottom CTA Banner */}
+        <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-8 rounded-3xl text-center space-y-4 shadow-md">
+          <h3 className="text-2xl font-black">Ready to Uncover Similar Opportunities for Your Prospects?</h3>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto font-medium">
+            Run a 60-second deep website crawl with LeadPilot Software, extract verified evidence, and generate high-converting client proposals on demand.
           </p>
           <div className="pt-2">
             <Link
               href="/register"
-              className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-md inline-block"
+              className="bg-sky-500 hover:bg-sky-400 text-slate-900 font-black text-sm px-6 py-3 rounded-xl transition-all shadow-md inline-block"
             >
-              Create Free Account →
+              Analyze Your First Client Website Free →
             </Link>
           </div>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="py-8 px-6 bg-white border-t border-slate-200 text-center text-xs text-slate-500">
-        <p suppressHydrationWarning>© {new Date().getFullYear()} LeadPilot AI. Evidence-backed agency client acquisition.</p>
-      </footer>
     </div>
   );
 }

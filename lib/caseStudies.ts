@@ -6,9 +6,14 @@ export interface CaseStudyData {
   companyName: string;
   industry: string;
   opportunityValue: string;
+  potentialValueRange?: string;
   auditDuration: string;
   agencyType: string;
   summary: string;
+  problem?: string;
+  evidence?: string;
+  opportunity?: string;
+  solution?: string;
   problemsFound: string[];
   opportunitiesFound: string[];
   suggestedSolutions: string[];
