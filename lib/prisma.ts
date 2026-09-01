@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import path from 'path';
 
 function getNormalizedDatabaseUrl(): string | undefined {
   let url = process.env.DATABASE_URL;
@@ -11,6 +12,12 @@ function getNormalizedDatabaseUrl(): string | undefined {
   const match = url.match(/(?:postgres(?:ql)?:\/\/.*)/i);
   if (match) {
     url = match[0].trim();
+  }
+
+  // If local SQLite relative path, resolve to absolute path so Next.js route handlers always open dev.db
+  if (url.startsWith('file:.')) {
+    const relativePath = url.replace('file:', '');
+    url = `file:${path.resolve(process.cwd(), relativePath)}`;
   }
 
   const isPostgres = url.startsWith('postgres://') || url.startsWith('postgresql://');
