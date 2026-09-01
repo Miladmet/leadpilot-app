@@ -22,7 +22,7 @@ export default function SearchConsoleChecklistPage() {
       step: 2,
       title: 'Verify Ownership',
       description: 'Verify ownership via DNS TXT record or HTML verification meta tag.',
-      verificationDetails: 'The HTML verification meta tag is already included in app/layout.tsx: <meta name="google-site-verification" content="google6d2d4ba6b8465c71" />',
+      verificationDetails: 'The HTML verification meta tag is installed in app/layout.tsx: <meta name="google-site-verification" content="cYzYtD7leKZVNWP-bOlfdOIIsveWRz0HtPRooh1mZZo" />',
       status: 'Tag Installed'
     },
     {

@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     creator: '@leadpilotsoftware'
   },
   verification: {
-    google: 'google6d2d4ba6b8465c71'
+    google: 'cYzYtD7leKZVNWP-bOlfdOIIsveWRz0HtPRooh1mZZo'
   }
 };
 
@@ -62,7 +62,7 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth">
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <meta name="google-site-verification" content="google6d2d4ba6b8465c71" />
+        <meta name="google-site-verification" content="cYzYtD7leKZVNWP-bOlfdOIIsveWRz0HtPRooh1mZZo" />
         <GlobalJsonLd />
       </head>
       <body className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden w-full selection:bg-sky-500 selection:text-white">
