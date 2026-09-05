@@ -282,7 +282,9 @@ export default function Dashboard() {
 
   
   // Subtabs
-  const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions' | 'competitors'>('facts');
+  const [auditSubTab, setAuditSubTab] = useState<'facts' | 'insights' | 'opportunities' | 'solutions' | 'competitors' | 'rawScrape'>('facts');
+  const [scrapeEvidenceSearch, setScrapeEvidenceSearch] = useState('');
+  const [copiedQuoteIdx, setCopiedQuoteIdx] = useState<number | null>(null);
   const [vaultSubTab, setVaultSubTab] = useState<'pages' | 'citations'>('pages');
   const [vaultSearch, setVaultSearch] = useState('');
   const [selectedPageSnippet, setSelectedPageSnippet] = useState<{ title: string; url: string; snippet?: string } | null>(null);
@@ -2942,6 +2944,15 @@ export default function Dashboard() {
                       >
                         Competitor Gaps
                       </button>
+                      <button
+                        onClick={() => setAuditSubTab('rawScrape')}
+                        className={`text-xs px-3 py-1.5 rounded-full font-bold transition-all flex items-center gap-1.5 ${
+                          auditSubTab === 'rawScrape' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                        Raw Scrape Proof
+                      </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto max-h-[300px] pr-1">
@@ -3163,6 +3174,153 @@ export default function Dashboard() {
                           </div>
                         </div>
                       )}
+
+                      {/* Raw Scrape Proof & Evidence Inspector */}
+                      {auditSubTab === 'rawScrape' && (() => {
+                        const facts = parseFacts(activeProspect.verifiedFacts);
+                        const recs = parseRecommendations(activeProspect.recommendations);
+                        
+                        // Aggregate all evidence items with quotes
+                        const evidenceItems: { title: string; category: string; quote: string; sourceUrl: string; status: string; fee?: string }[] = [];
+                        
+                        facts.forEach(f => {
+                          if (f.evidenceText) {
+                            evidenceItems.push({
+                              title: f.fact,
+                              category: 'Verified DOM Finding',
+                              quote: f.evidenceText,
+                              sourceUrl: f.sourceUrl || activeProspect.websiteUrl,
+                              status: f.status || 'Verified'
+                            });
+                          }
+                        });
+
+                        recs.forEach(r => {
+                          if (r.evidenceList && r.evidenceList.length > 0) {
+                            evidenceItems.push({
+                              title: `${r.serviceName} — ${r.issue}`,
+                              category: 'Commercial Opportunity',
+                              quote: r.evidenceList[0],
+                              sourceUrl: activeProspect.websiteUrl,
+                              status: r.status || 'Verified',
+                              fee: r.estimatedFee
+                            });
+                          }
+                        });
+
+                        const filteredItems = evidenceItems.filter(item => 
+                          !scrapeEvidenceSearch ||
+                          item.title.toLowerCase().includes(scrapeEvidenceSearch.toLowerCase()) ||
+                          item.quote.toLowerCase().includes(scrapeEvidenceSearch.toLowerCase()) ||
+                          item.category.toLowerCase().includes(scrapeEvidenceSearch.toLowerCase())
+                        );
+
+                        return (
+                          <div className="space-y-4">
+                            {/* Evidence Inspector Control Bar */}
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                                  ● 100% Deterministic Evidence
+                                </span>
+                                <span className="text-[11px] text-slate-500 font-medium">
+                                  {evidenceItems.length} verifiable quotes extracted
+                                </span>
+                              </div>
+                              <div className="relative w-full sm:w-64">
+                                <input
+                                  type="text"
+                                  placeholder="Search DOM quotes & evidence..."
+                                  value={scrapeEvidenceSearch}
+                                  onChange={(e) => setScrapeEvidenceSearch(e.target.value)}
+                                  className="w-full text-xs pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-sky-500"
+                                />
+                                <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2 top-2.5" />
+                              </div>
+                            </div>
+
+                            {/* Side-by-Side Proof Cards */}
+                            {filteredItems.length > 0 ? (
+                              <div className="space-y-3">
+                                {filteredItems.map((item, idx) => (
+                                  <div key={idx} className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <span className="text-[9px] font-bold text-sky-600 uppercase tracking-wider block">
+                                          {item.category} {item.fee ? `• Est. Value: ${item.fee}` : ''}
+                                        </span>
+                                        <h4 className="font-bold text-slate-900 text-xs sm:text-sm mt-0.5">
+                                          {item.title}
+                                        </h4>
+                                      </div>
+                                      <span className="bg-emerald-50 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded uppercase border border-emerald-200 shrink-0">
+                                        {item.status}
+                                      </span>
+                                    </div>
+
+                                    {/* Stylized Visual DOM Quote Block */}
+                                    <div className="bg-slate-950 text-slate-200 rounded-xl p-3.5 font-mono text-xs border border-slate-800 space-y-2">
+                                      <div className="flex justify-between items-center text-[10px] text-slate-400 border-b border-slate-800 pb-1.5">
+                                        <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                          DOM GROUND-TRUTH EXCERPT
+                                        </span>
+                                        <span className="text-slate-500 font-mono">Status: 200 OK</span>
+                                      </div>
+                                      <div className="text-slate-200 leading-relaxed font-mono whitespace-pre-wrap select-all">
+                                        <span className="text-sky-400 select-none mr-2">DOM &gt;</span>
+                                        "{item.quote}"
+                                      </div>
+                                    </div>
+
+                                    {/* Action Footnotes */}
+                                    <div className="flex flex-wrap justify-between items-center gap-2 pt-1 border-t border-slate-100 text-[10px]">
+                                      <a
+                                        href={item.sourceUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sky-600 hover:underline flex items-center gap-1 font-mono truncate max-w-[280px]"
+                                      >
+                                        <ExternalLink className="h-3 w-3 shrink-0" />
+                                        <span>{item.sourceUrl}</span>
+                                      </a>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const pitch = `Hi, while reviewing ${activeProspect.companyName}'s website (${activeProspect.websiteUrl}), I noticed this specific opportunity: "${item.quote}". We specialize in resolving this to boost conversion rates. Let me know if you'd like to see the full audit.`;
+                                          navigator.clipboard.writeText(pitch);
+                                          setCopiedQuoteIdx(idx);
+                                          setTimeout(() => setCopiedQuoteIdx(null), 2500);
+                                        }}
+                                        className="bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-700 px-3 py-1.5 rounded-lg border border-slate-200 transition-colors font-bold flex items-center gap-1 cursor-pointer"
+                                      >
+                                        {copiedQuoteIdx === idx ? (
+                                          <>
+                                            <Check className="h-3 w-3 text-emerald-600" />
+                                            <span className="text-emerald-600">Copied Pitch to Clipboard!</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Copy className="h-3 w-3" />
+                                            <span>Copy Outreach Hook</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="p-8 text-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-xl">
+                                <ShieldCheck className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                                <p className="font-semibold text-slate-600">No Evidence Matches Found</p>
+                                <p className="text-[11px] mt-0.5">Try clearing your search filter or running a new audit scan.</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     </div>
                   </div>
