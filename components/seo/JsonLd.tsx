@@ -16,13 +16,6 @@ export function GlobalJsonLd() {
       priceCurrency: 'USD',
       category: 'Free Tier Available'
     },
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.9',
-      ratingCount: '128',
-      bestRating: '5',
-      worstRating: '1'
-    },
     author: {
       '@type': 'Organization',
       name: 'LeadPilot Software',
