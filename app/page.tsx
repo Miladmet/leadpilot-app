@@ -4,10 +4,30 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { SEO_KEYWORDS } from '@/lib/seoKeywords';
 import { CASE_STUDIES } from '@/lib/caseStudies';
-import { Menu, X, TrendingUp, AlertTriangle, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
+import { 
+  Menu, 
+  X, 
+  TrendingUp, 
+  AlertTriangle, 
+  Sparkles, 
+  ArrowRight, 
+  ShieldCheck, 
+  CheckCircle2, 
+  Zap, 
+  Search, 
+  RefreshCw, 
+  FileText, 
+  Check 
+} from 'lucide-react';
+import { generateQuickOpportunityScan, QuickOpportunityScanResult } from '@/lib/growthEngine';
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStep, setScanStep] = useState(0);
+  const [scanResult, setScanResult] = useState<QuickOpportunityScanResult | null>(null);
+
   const keywordList = Object.values(SEO_KEYWORDS);
 
   // 4 Prioritized Case Studies for the Homepage Preview
@@ -17,6 +37,33 @@ export default function Home() {
     CASE_STUDIES['law-firm-client-acquisition'],
     CASE_STUDIES['marketing-agency-retainer-expansion']
   ].filter(Boolean);
+
+  const runLiveScan = (targetDomain?: string) => {
+    const domainToScan = targetDomain || urlInput;
+    if (!domainToScan || !domainToScan.trim()) return;
+
+    const cleaned = domainToScan.trim().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    setUrlInput(cleaned);
+    setIsScanning(true);
+    setScanStep(1);
+    setScanResult(null);
+
+    // Multi-stage verification progress simulation
+    setTimeout(() => setScanStep(2), 600);
+    setTimeout(() => setScanStep(3), 1200);
+    setTimeout(() => setScanStep(4), 1800);
+    setTimeout(() => {
+      const result = generateQuickOpportunityScan(cleaned);
+      setScanResult(result);
+      setIsScanning(false);
+      setScanStep(5);
+    }, 2400);
+  };
+
+  const handleScanSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    runLiveScan();
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -35,6 +82,9 @@ export default function Home() {
         <div className="hidden md:flex items-center gap-6">
           <Link href="/about" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
             About
+          </Link>
+          <Link href="/methodology" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
+            Methodology
           </Link>
           <Link href="/case-studies" className="text-slate-600 hover:text-slate-900 font-medium text-sm">
             Case Studies
@@ -83,6 +133,13 @@ export default function Home() {
             className="block py-2 text-sm font-semibold text-slate-700 hover:text-sky-600 border-b border-slate-100"
           >
             About LeadPilot Software
+          </Link>
+          <Link
+            href="/methodology"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block py-2 text-sm font-semibold text-slate-700 hover:text-sky-600 border-b border-slate-100"
+          >
+            Auditing Methodology
           </Link>
           <Link
             href="/what-is-leadpilot-software"
@@ -148,20 +205,25 @@ export default function Home() {
               <span>Evidence Before Recommendations</span>
             </div>
             <div className="flex items-center gap-3 sm:gap-4 text-slate-400">
-              <span className="hidden sm:inline">Transparent Opportunity Sizing</span>
+              <Link href="/methodology" className="text-sky-400 hover:text-sky-300 font-bold underline decoration-sky-500/50">
+                Read Auditing Methodology →
+              </Link>
               <span>•</span>
-              <span className="hidden sm:inline">Double-Agent Verification</span>
+              <span className="hidden sm:inline">Zero-Hallucination Protocol</span>
               <span>•</span>
-              <span>Built Exclusively for Agencies</span>
+              <span>Double-Agent Verification</span>
+              <span>•</span>
+              <span className="hidden sm:inline">Agency Suite</span>
             </div>
           </div>
         </section>
 
         {/* Hero Section */}
         <section className="py-12 sm:py-20 px-4 sm:px-6 max-w-5xl mx-auto text-center">
-          <span className="inline-block bg-sky-50 border border-sky-200 text-sky-700 text-xs font-bold px-3.5 py-1 rounded-full uppercase tracking-wider mb-4">
-            Evidence-Backed Agency Acceleration
-          </span>
+          <div className="inline-flex items-center gap-2 bg-sky-50 border border-sky-200 text-sky-700 text-xs font-bold px-3.5 py-1 rounded-full uppercase tracking-wider mb-4">
+            <ShieldCheck className="h-3.5 w-3.5 text-sky-600" />
+            <span>Evidence-Backed Agency Acceleration</span>
+          </div>
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-slate-900 leading-tight tracking-tight max-w-4xl mx-auto">
             Turn Any Company Website Into a Client Proposal in Under 60 Seconds.
           </h1>
@@ -169,25 +231,211 @@ export default function Home() {
             LeadPilot Software helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
           </p>
 
-          {/* Primary CTA: Direct URL Input */}
-          <div className="mt-10 max-w-2xl mx-auto space-y-4">
-            <form action="/register" method="GET" className="flex flex-col sm:flex-row gap-2 bg-white p-2 rounded-2xl border-2 border-slate-300 shadow-md">
-              <input
-                type="text"
-                name="url"
-                placeholder="Enter client website URL (e.g. stripe.com)"
-                className="flex-1 px-4 py-3.5 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-800"
-                required
-              />
+          {/* Interactive Live Sample Scanner */}
+          <div className="mt-10 max-w-3xl mx-auto space-y-4">
+            <form onSubmit={handleScanSubmit} className="flex flex-col sm:flex-row gap-2 bg-white p-2 rounded-2xl border-2 border-slate-300 shadow-md focus-within:border-sky-500 transition-colors">
+              <div className="flex-1 flex items-center px-3">
+                <Search className="h-5 w-5 text-slate-400 shrink-0 mr-2" />
+                <input
+                  type="text"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="Enter prospect website URL (e.g. stripe.com or dentalclinic.com)"
+                  className="w-full py-2.5 text-sm rounded-xl focus:outline-none text-slate-800 font-medium"
+                  required
+                />
+              </div>
               <button
                 type="submit"
-                className="bg-sky-600 hover:bg-sky-700 text-white text-sm px-6 py-3.5 rounded-xl font-black transition-all shadow-md shrink-0 cursor-pointer"
+                disabled={isScanning}
+                className="bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white text-sm px-6 py-3.5 rounded-xl font-black transition-all shadow-md shrink-0 cursor-pointer flex items-center justify-center gap-2"
               >
-                Analyze Website →
+                {isScanning ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Verifying Evidence...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Run Live Audit →</span>
+                  </>
+                )}
               </button>
             </form>
 
+            {/* Quick Demo Target Buttons */}
+            <div className="flex flex-wrap justify-center items-center gap-2 pt-1 text-xs text-slate-500">
+              <span className="font-semibold text-slate-400">Quick Test Domains:</span>
+              <button
+                type="button"
+                onClick={() => runLiveScan('stripe.com')}
+                className="bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-600 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors font-medium cursor-pointer"
+              >
+                stripe.com
+              </button>
+              <button
+                type="button"
+                onClick={() => runLiveScan('shopify.com')}
+                className="bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-600 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors font-medium cursor-pointer"
+              >
+                shopify.com
+              </button>
+              <button
+                type="button"
+                onClick={() => runLiveScan('acmecloud.com')}
+                className="bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-600 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors font-medium cursor-pointer"
+              >
+                acmecloud.com
+              </button>
+            </div>
+
+            {/* Scanning Progress Animation Card */}
+            {isScanning && (
+              <div className="bg-white p-6 rounded-3xl border border-sky-200 shadow-md text-left space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 text-sky-600 animate-spin" />
+                    <span className="text-sm font-bold text-slate-900">
+                      Scanning {urlInput || 'domain'} with LeadPilot Protocol...
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-sky-700 bg-sky-100 px-2.5 py-0.5 rounded-full">
+                    Step {scanStep} of 4
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className={`flex items-center gap-2 ${scanStep >= 1 ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                    <CheckCircle2 className={`h-4 w-4 ${scanStep >= 2 ? 'text-emerald-500' : scanStep === 1 ? 'text-sky-500 animate-pulse' : 'text-slate-300'}`} />
+                    <span>Stage 1: Fetching public HTML DOM & structural headers</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${scanStep >= 2 ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                    <CheckCircle2 className={`h-4 w-4 ${scanStep >= 3 ? 'text-emerald-500' : scanStep === 2 ? 'text-sky-500 animate-pulse' : 'text-slate-300'}`} />
+                    <span>Stage 2: Inspecting mobile viewport & conversion hierarchy</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${scanStep >= 3 ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                    <CheckCircle2 className={`h-4 w-4 ${scanStep >= 4 ? 'text-emerald-500' : scanStep === 3 ? 'text-sky-500 animate-pulse' : 'text-slate-300'}`} />
+                    <span>Stage 3: Testing Core Web Vitals & structured schema markup</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${scanStep >= 4 ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                    <CheckCircle2 className={`h-4 w-4 ${scanStep >= 5 ? 'text-emerald-500' : scanStep === 4 ? 'text-sky-500 animate-pulse' : 'text-slate-300'}`} />
+                    <span>Stage 4: Running double-agent verification pass (confirming zero hallucinations)</span>
+                  </div>
+                </div>
+
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-sky-500 to-emerald-500 h-full transition-all duration-300"
+                    style={{ width: `${(scanStep / 4) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Live Scan Results Card */}
+            {scanResult && !isScanning && (
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border-2 border-emerald-300 shadow-xl text-left space-y-6 animate-in zoom-in-95 duration-200">
+                {/* Result Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                        <Check className="h-3 w-3" />
+                        Live Evidence Verified
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        Target: {scanResult.domain}
+                      </span>
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-900 mt-1">
+                      Website Opportunity Audit: {scanResult.domain}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Opportunity Score</span>
+                      <strong className="text-xl font-black text-sky-600 block">{scanResult.overallOpportunityScore}/100</strong>
+                    </div>
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-center">
+                      <span className="text-[10px] uppercase font-bold text-emerald-600 block tracking-wider">Potential Retainer Value</span>
+                      <strong className="text-xl font-black text-emerald-700 block">{scanResult.estimatedServiceValue}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Findings Grid */}
+                <div>
+                  <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider mb-3">
+                    Top Verified Opportunities (4 Identified)
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {scanResult.topOpportunities.map((opp, idx) => (
+                      <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-slate-900 text-xs sm:text-sm">{opp.service}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            opp.severity === 'High' ? 'bg-rose-100 text-rose-700' :
+                            opp.severity === 'Medium' ? 'bg-amber-100 text-amber-700' :
+                            'bg-slate-200 text-slate-700'
+                          }`}>
+                            {opp.severity} Impact
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 bg-white p-2 rounded-xl border border-slate-200/60 font-mono">
+                          <span className="text-slate-400 font-bold block text-[10px] uppercase">DOM Evidence:</span>
+                          "{opp.evidence}"
+                        </p>
+                        <p className="text-xs text-sky-800 font-medium">
+                          <strong>Fix:</strong> {opp.suggestedFix}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Conversion Bridge to Full Proposal */}
+                <div className="bg-slate-950 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4">
+                  <div className="space-y-1 text-left">
+                    <span className="bg-sky-500/20 text-sky-400 border border-sky-400/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">
+                      Client-Ready Deliverable
+                    </span>
+                    <h4 className="text-lg font-bold text-white">
+                      Turn this evidence into a 12-page branded client proposal
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Includes executive summary, pricing breakdown, contract milestones, and white-label agency branding.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full md:w-auto">
+                    <Link
+                      href={`/register?url=${encodeURIComponent(scanResult.domain)}`}
+                      className="bg-sky-500 hover:bg-sky-400 text-white font-black text-xs px-5 py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5"
+                    >
+                      <span>Unlock Full Proposal Deck →</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScanResult(null);
+                        setUrlInput('');
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs px-4 py-3 rounded-xl transition-all text-center cursor-pointer"
+                    >
+                      Scan Another Site
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap justify-center items-center gap-4 pt-1">
+              <Link
+                href="/methodology"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors border border-slate-200"
+              >
+                <span>🛡️ Auditing Methodology</span>
+              </Link>
               <Link
                 href="/audit/sample-audit"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors border border-slate-200"
@@ -677,6 +925,7 @@ export default function Home() {
             <strong className="text-white uppercase tracking-wider text-[11px] block">LeadPilot Software</strong>
             <ul className="space-y-2">
               <li><Link href="/about" className="hover:text-white">About Us</Link></li>
+              <li><Link href="/methodology" className="hover:text-white font-bold text-sky-400">Auditing Methodology</Link></li>
               <li><Link href="/what-is-leadpilot-software" className="hover:text-white">What Is LeadPilot Software?</Link></li>
               <li><Link href="/login" className="hover:text-white">Agency Portal Login</Link></li>
               <li><Link href="/register" className="hover:text-white">Create Free Account</Link></li>

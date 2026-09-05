@@ -12,8 +12,8 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
-    title: `Public Website Opportunity Audit | LeadPilot AI`,
-    description: `Evidence-backed website audit and opportunity summary powered by LeadPilot AI. Generate your own audit in under 60 seconds.`
+    title: `Public Website Opportunity Audit | LeadPilot Software`,
+    description: `Evidence-backed website audit and opportunity summary powered by LeadPilot Software. Generate your own audit in under 60 seconds.`
   };
 }
 
@@ -74,7 +74,7 @@ export default async function PublicAuditPage({ params }: Props) {
           <span className="bg-sky-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
             Public Audit
           </span>
-          <span>This evidence-backed audit was generated with LeadPilot AI in under 60 seconds.</span>
+          <span>This evidence-backed audit was generated with LeadPilot Software in under 60 seconds.</span>
         </div>
         <Link
           href="/register"
@@ -88,7 +88,7 @@ export default async function PublicAuditPage({ params }: Props) {
       <header className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-2xs">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-2xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
-            LeadPilot AI
+            LeadPilot Software
           </Link>
           <span className="hidden sm:inline bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
             Audit Deliverable
@@ -236,7 +236,7 @@ export default async function PublicAuditPage({ params }: Props) {
             Want to Deliver Audits Like This to Your Own Prospects?
           </h2>
           <p className="text-slate-300 text-sm max-w-lg mx-auto leading-relaxed">
-            LeadPilot helps digital agencies turn any prospective client website into an evidence-backed audit and proposal deck in under 60 seconds.
+            LeadPilot Software helps digital agencies turn any prospective client website into an evidence-backed audit and proposal deck in under 60 seconds.
           </p>
 
           <div className="pt-2 flex flex-wrap justify-center gap-4">
@@ -262,7 +262,7 @@ export default async function PublicAuditPage({ params }: Props) {
 
       {/* Footer */}
       <footer className="py-8 px-6 bg-white border-t border-slate-200 text-center text-xs text-slate-500">
-        <p>© {new Date().getFullYear()} LeadPilot AI. Evidence-backed agency client acquisition.</p>
+        <p>© {new Date().getFullYear()} LeadPilot Software. Evidence-backed agency client acquisition.</p>
       </footer>
     </div>
   );

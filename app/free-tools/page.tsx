@@ -96,7 +96,7 @@ export default function FreeToolsPage() {
       <header className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-30 shadow-2xs">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-2xl font-black bg-gradient-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
-            LeadPilot AI
+            LeadPilot Software
           </Link>
           <span className="bg-sky-100 text-sky-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
             Free Tools Suite
@@ -692,7 +692,7 @@ export default function FreeToolsPage() {
 
       {/* Footer */}
       <footer className="py-8 px-6 bg-white border-t border-slate-200 text-center text-xs text-slate-500">
-        <p>© {new Date().getFullYear()} LeadPilot AI. Evidence-backed agency client acquisition.</p>
+        <p>© {new Date().getFullYear()} LeadPilot Software. Evidence-backed agency client acquisition.</p>
       </footer>
     </div>
   );

@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const coreRoutes = [
     '',
     '/about',
+    '/methodology',
     '/what-is-leadpilot-software',
     '/case-studies',
     '/blog',
