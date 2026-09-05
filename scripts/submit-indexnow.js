@@ -3,7 +3,7 @@ const { SEO_KEYWORDS } = require('../lib/seoKeywordsCore');
 const { CASE_STUDIES } = require('../lib/caseStudiesCore');
 const { BLOG_ARTICLES } = require('../lib/blogArticlesCore');
 
-const HOST = 'leadpilotsoftware.com';
+const HOST = 'www.leadpilotsoftware.com';
 const BASE_URL = `https://${HOST}`;
 const KEY = 'f739e7196b504df88f4d058547bc2c75';
 const KEY_LOCATION = `${BASE_URL}/${KEY}.txt`;

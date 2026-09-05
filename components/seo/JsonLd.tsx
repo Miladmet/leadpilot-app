@@ -7,7 +7,7 @@ export function GlobalJsonLd() {
     name: 'LeadPilot Software',
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web, Cloud, All Modern Browsers',
-    url: 'https://leadpilotsoftware.com',
+    url: 'https://www.leadpilotsoftware.com',
     description:
       'LeadPilot Software helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.',
     offers: {
@@ -19,7 +19,7 @@ export function GlobalJsonLd() {
     author: {
       '@type': 'Organization',
       name: 'LeadPilot Software',
-      url: 'https://leadpilotsoftware.com'
+      url: 'https://www.leadpilotsoftware.com'
     }
   };
 
@@ -28,8 +28,8 @@ export function GlobalJsonLd() {
     '@type': 'Organization',
     name: 'LeadPilot Software',
     alternateName: ['LeadPilot Software Platform', 'LeadPilot SaaS for Agencies'],
-    url: 'https://leadpilotsoftware.com',
-    logo: 'https://leadpilotsoftware.com/favicon.ico',
+    url: 'https://www.leadpilotsoftware.com',
+    logo: 'https://www.leadpilotsoftware.com/favicon.ico',
     description:
       'LeadPilot Software is an independent B2B SaaS platform built exclusively for agencies, consultants, and web studios to extract verified client opportunities and deliver proposals.',
     sameAs: [
@@ -41,10 +41,10 @@ export function GlobalJsonLd() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'LeadPilot Software',
-    url: 'https://leadpilotsoftware.com',
+    url: 'https://www.leadpilotsoftware.com',
     potentialAction: {
       '@type': 'SearchAction',
-      target: 'https://leadpilotsoftware.com/tools?query={search_term_string}',
+      target: 'https://www.leadpilotsoftware.com/tools?query={search_term_string}',
       'query-input': 'required name=search_term_string'
     }
   };

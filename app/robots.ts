@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/api/', '/dashboard/', '/proposal/'],
       },
     ],
-    sitemap: 'https://leadpilotsoftware.com/sitemap.xml',
+    sitemap: 'https://www.leadpilotsoftware.com/sitemap.xml',
   };
 }

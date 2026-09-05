@@ -4,7 +4,7 @@ import { BLOG_ARTICLES } from '@/lib/blogArticles';
 import { SEO_KEYWORDS } from '@/lib/seoKeywords';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://leadpilotsoftware.com';
+  const baseUrl = 'https://www.leadpilotsoftware.com';
   const now = new Date();
 
   // Core Pages

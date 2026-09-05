@@ -16,7 +16,7 @@ export function LandingPageTemplate({ data, canonicalPath }: Props) {
     name: `LeadPilot Software - ${data.keyword}`,
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web, Cloud',
-    url: `https://leadpilotsoftware.com${canonicalPath}`,
+    url: `https://www.leadpilotsoftware.com${canonicalPath}`,
     description: data.metaDescription,
     offers: {
       '@type': 'Offer',
@@ -26,7 +26,7 @@ export function LandingPageTemplate({ data, canonicalPath }: Props) {
     author: {
       '@type': 'Organization',
       name: 'LeadPilot Software',
-      url: 'https://leadpilotsoftware.com'
+      url: 'https://www.leadpilotsoftware.com'
     }
   };
 
@@ -38,8 +38,8 @@ export function LandingPageTemplate({ data, canonicalPath }: Props) {
       />
       <BreadcrumbJsonLd
         items={[
-          { name: 'Home', url: 'https://leadpilotsoftware.com' },
-          { name: data.keyword, url: `https://leadpilotsoftware.com${canonicalPath}` }
+          { name: 'Home', url: 'https://www.leadpilotsoftware.com' },
+          { name: data.keyword, url: `https://www.leadpilotsoftware.com${canonicalPath}` }
         ]}
       />
 

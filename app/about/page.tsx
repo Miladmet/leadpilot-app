@@ -9,12 +9,12 @@ export const metadata: Metadata = {
   description:
     'Learn how LeadPilot Software helps digital agencies, SEO consultants, and web studios uncover verified website opportunities and win high-margin client retainers.',
   alternates: {
-    canonical: 'https://leadpilotsoftware.com/about'
+    canonical: 'https://www.leadpilotsoftware.com/about'
   },
   openGraph: {
     title: 'About LeadPilot Software',
     description: 'The evidence-backed agency acceleration platform: How LeadPilot Software works, who it helps, and our mission.',
-    url: 'https://leadpilotsoftware.com/about',
+    url: 'https://www.leadpilotsoftware.com/about',
     siteName: 'LeadPilot Software'
   }
 };
@@ -24,8 +24,8 @@ export default function AboutPage() {
     <div className="flex flex-col min-h-screen bg-slate-50">
       <BreadcrumbJsonLd
         items={[
-          { name: 'Home', url: 'https://leadpilotsoftware.com' },
-          { name: 'About', url: 'https://leadpilotsoftware.com/about' }
+          { name: 'Home', url: 'https://www.leadpilotsoftware.com' },
+          { name: 'About', url: 'https://www.leadpilotsoftware.com/about' }
         ]}
       />
 

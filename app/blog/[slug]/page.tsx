@@ -27,12 +27,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${article.title} | LeadPilot Software`,
     description: article.description,
     alternates: {
-      canonical: `https://leadpilotsoftware.com/blog/${article.slug}`
+      canonical: `https://www.leadpilotsoftware.com/blog/${article.slug}`
     },
     openGraph: {
       title: article.title,
       description: article.description,
-      url: `https://leadpilotsoftware.com/blog/${article.slug}`,
+      url: `https://www.leadpilotsoftware.com/blog/${article.slug}`,
       siteName: 'LeadPilot Software',
       type: 'article',
       publishedTime: article.publishedDate,
@@ -62,16 +62,16 @@ export default function BlogArticleDetailPage({ params }: Props) {
     author: {
       '@type': 'Organization',
       name: article.author,
-      url: 'https://leadpilotsoftware.com'
+      url: 'https://www.leadpilotsoftware.com'
     },
     publisher: {
       '@type': 'Organization',
       name: 'LeadPilot Software',
-      url: 'https://leadpilotsoftware.com'
+      url: 'https://www.leadpilotsoftware.com'
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `https://leadpilotsoftware.com/blog/${article.slug}`
+      '@id': `https://www.leadpilotsoftware.com/blog/${article.slug}`
     }
   };
 
@@ -83,9 +83,9 @@ export default function BlogArticleDetailPage({ params }: Props) {
       />
       <BreadcrumbJsonLd
         items={[
-          { name: 'Home', url: 'https://leadpilotsoftware.com' },
-          { name: 'Blog', url: 'https://leadpilotsoftware.com/blog' },
-          { name: article.title, url: `https://leadpilotsoftware.com/blog/${article.slug}` }
+          { name: 'Home', url: 'https://www.leadpilotsoftware.com' },
+          { name: 'Blog', url: 'https://www.leadpilotsoftware.com/blog' },
+          { name: article.title, url: `https://www.leadpilotsoftware.com/blog/${article.slug}` }
         ]}
       />
 

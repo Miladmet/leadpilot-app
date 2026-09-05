@@ -9,12 +9,12 @@ export const metadata: Metadata = {
   description:
     'Discover how LeadPilot Software conducts evidence-backed website audits with zero hallucination, double-agent verification passes, and transparent opportunity sizing.',
   alternates: {
-    canonical: 'https://leadpilotsoftware.com/methodology'
+    canonical: 'https://www.leadpilotsoftware.com/methodology'
   },
   openGraph: {
     title: 'LeadPilot Software Auditing Methodology',
     description: 'The science behind our evidence-first website opportunity audits: crawling ethics, DOM fact extraction, and deterministic verification.',
-    url: 'https://leadpilotsoftware.com/methodology',
+    url: 'https://www.leadpilotsoftware.com/methodology',
     siteName: 'LeadPilot Software'
   }
 };
@@ -24,12 +24,12 @@ export default function MethodologyPage() {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
     name: 'Auditing Methodology & Verification Standards - LeadPilot Software',
-    url: 'https://leadpilotsoftware.com/methodology',
+    url: 'https://www.leadpilotsoftware.com/methodology',
     description: 'The science behind our evidence-first website opportunity audits: crawling ethics, DOM fact extraction, and deterministic verification.',
     publisher: {
       '@type': 'Organization',
       name: 'LeadPilot Software',
-      url: 'https://leadpilotsoftware.com'
+      url: 'https://www.leadpilotsoftware.com'
     }
   };
 
@@ -41,8 +41,8 @@ export default function MethodologyPage() {
       />
       <BreadcrumbJsonLd
         items={[
-          { name: 'Home', url: 'https://leadpilotsoftware.com' },
-          { name: 'Methodology', url: 'https://leadpilotsoftware.com/methodology' }
+          { name: 'Home', url: 'https://www.leadpilotsoftware.com' },
+          { name: 'Methodology', url: 'https://www.leadpilotsoftware.com/methodology' }
         ]}
       />
 

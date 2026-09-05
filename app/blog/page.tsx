@@ -10,12 +10,12 @@ export const metadata: Metadata = {
   description:
     'Authoritative guides on turning website audits into high-ticket client retainers, conducting competitor gap analysis, and scaling agency client acquisition.',
   alternates: {
-    canonical: 'https://leadpilotsoftware.com/blog'
+    canonical: 'https://www.leadpilotsoftware.com/blog'
   },
   openGraph: {
     title: 'LeadPilot Software Agency Growth Blog',
     description: 'Evidence-first strategies for digital agencies, SEO consultants, and web design studios.',
-    url: 'https://leadpilotsoftware.com/blog',
+    url: 'https://www.leadpilotsoftware.com/blog',
     siteName: 'LeadPilot Software'
   }
 };
@@ -27,8 +27,8 @@ export default function BlogIndexPage() {
     <div className="flex flex-col min-h-screen bg-slate-50">
       <BreadcrumbJsonLd
         items={[
-          { name: 'Home', url: 'https://leadpilotsoftware.com' },
-          { name: 'Blog', url: 'https://leadpilotsoftware.com/blog' }
+          { name: 'Home', url: 'https://www.leadpilotsoftware.com' },
+          { name: 'Blog', url: 'https://www.leadpilotsoftware.com/blog' }
         ]}
       />
 

@@ -3,7 +3,7 @@ import './globals.css';
 import { GlobalJsonLd } from '@/components/seo/JsonLd';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://leadpilotsoftware.com'),
+  metadataBase: new URL('https://www.leadpilotsoftware.com'),
   title: {
     default: 'LeadPilot Software | Turn Any Website Into a Client Proposal',
     template: '%s | LeadPilot Software'
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'LeadPilot Software',
     description: 'Turn Any Company Website Into a Client Proposal in Under 60 Seconds.',
-    url: 'https://leadpilotsoftware.com',
+    url: 'https://www.leadpilotsoftware.com',
     siteName: 'LeadPilot Software',
     locale: 'en_US',
     type: 'website'

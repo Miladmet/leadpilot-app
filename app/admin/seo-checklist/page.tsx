@@ -29,20 +29,20 @@ export default function SearchConsoleChecklistPage() {
       step: 3,
       title: 'Submit Dynamic Sitemap',
       description: 'Navigate to "Sitemaps" in Search Console and enter: sitemap.xml',
-      url: 'https://leadpilotsoftware.com/sitemap.xml',
+      url: 'https://www.leadpilotsoftware.com/sitemap.xml',
       actionText: 'Test Live Sitemap',
       verificationDetails: 'Sitemap contains all core routes, 4 case studies, 4 blog posts, and 6 programmatic SEO landing pages.'
     },
     {
       step: 4,
       title: 'Request Homepage Indexing',
-      description: 'In the top URL Inspection bar, paste "https://leadpilotsoftware.com/" and click "Request Indexing".',
+      description: 'In the top URL Inspection bar, paste "https://www.leadpilotsoftware.com/" and click "Request Indexing".',
       verificationDetails: 'Establishes the primary root brand identity for "LeadPilot Software".'
     },
     {
       step: 5,
       title: 'Request About Page Indexing',
-      description: 'Inspect "https://leadpilotsoftware.com/about" and "https://leadpilotsoftware.com/what-is-leadpilot-software" and request indexing.',
+      description: 'Inspect "https://www.leadpilotsoftware.com/about" and "https://www.leadpilotsoftware.com/what-is-leadpilot-software" and request indexing.',
       verificationDetails: 'Teaches Google Knowledge Graph that LeadPilot Software is an independent agency SaaS platform distinct from other tools.'
     },
     {

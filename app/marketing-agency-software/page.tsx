@@ -18,12 +18,12 @@ export const metadata: Metadata = {
   title: DATA.title,
   description: DATA.metaDescription,
   alternates: {
-    canonical: 'https://leadpilotsoftware.com/marketing-agency-software'
+    canonical: 'https://www.leadpilotsoftware.com/marketing-agency-software'
   },
   openGraph: {
     title: DATA.title,
     description: DATA.metaDescription,
-    url: 'https://leadpilotsoftware.com/marketing-agency-software',
+    url: 'https://www.leadpilotsoftware.com/marketing-agency-software',
     siteName: 'LeadPilot Software'
   }
 };

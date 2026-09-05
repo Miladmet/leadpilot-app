@@ -3727,7 +3727,7 @@ export default function Dashboard() {
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                           <div className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-700 flex items-center justify-between shadow-2xs overflow-hidden">
                             <span className="truncate">
-                              {typeof window !== 'undefined' ? window.location.origin : 'https://leadpilotsoftware.com'}/audit/{activeProspect.id}
+                              {typeof window !== 'undefined' ? window.location.origin : 'https://www.leadpilotsoftware.com'}/audit/{activeProspect.id}
                             </span>
                           </div>
 
@@ -3735,7 +3735,7 @@ export default function Dashboard() {
                             <button
                               type="button"
                               onClick={() => {
-                                const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://leadpilotsoftware.com'}/audit/${activeProspect.id}`;
+                                const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://www.leadpilotsoftware.com'}/audit/${activeProspect.id}`;
                                 navigator.clipboard.writeText(publicUrl);
                                 setShareCopied(true);
                                 setTimeout(() => setShareCopied(false), 2500);

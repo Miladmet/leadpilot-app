@@ -27,12 +27,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${study.title} | LeadPilot Software Case Study`,
     description: study.summary,
     alternates: {
-      canonical: `https://leadpilotsoftware.com/case-studies/${study.slug}`
+      canonical: `https://www.leadpilotsoftware.com/case-studies/${study.slug}`
     },
     openGraph: {
       title: `${study.title} | LeadPilot Software`,
       description: study.summary,
-      url: `https://leadpilotsoftware.com/case-studies/${study.slug}`,
+      url: `https://www.leadpilotsoftware.com/case-studies/${study.slug}`,
       siteName: 'LeadPilot Software',
       type: 'article'
     },
@@ -59,16 +59,16 @@ export default function CaseStudyDetailPage({ params }: Props) {
     author: {
       '@type': 'Organization',
       name: 'LeadPilot Software',
-      url: 'https://leadpilotsoftware.com'
+      url: 'https://www.leadpilotsoftware.com'
     },
     publisher: {
       '@type': 'Organization',
       name: 'LeadPilot Software',
-      url: 'https://leadpilotsoftware.com'
+      url: 'https://www.leadpilotsoftware.com'
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `https://leadpilotsoftware.com/case-studies/${study.slug}`
+      '@id': `https://www.leadpilotsoftware.com/case-studies/${study.slug}`
     }
   };
 
@@ -80,9 +80,9 @@ export default function CaseStudyDetailPage({ params }: Props) {
       />
       <BreadcrumbJsonLd
         items={[
-          { name: 'Home', url: 'https://leadpilotsoftware.com' },
-          { name: 'Case Studies', url: 'https://leadpilotsoftware.com/case-studies' },
-          { name: study.companyName, url: `https://leadpilotsoftware.com/case-studies/${study.slug}` }
+          { name: 'Home', url: 'https://www.leadpilotsoftware.com' },
+          { name: 'Case Studies', url: 'https://www.leadpilotsoftware.com/case-studies' },
+          { name: study.companyName, url: `https://www.leadpilotsoftware.com/case-studies/${study.slug}` }
         ]}
       />
 

@@ -10,12 +10,12 @@ export const metadata: Metadata = {
   description:
     'Explore real case studies showing how digital agencies, SEO consultants, and web designers use LeadPilot Software to turn 60-second website audits into high-ticket client retainers.',
   alternates: {
-    canonical: 'https://leadpilotsoftware.com/case-studies'
+    canonical: 'https://www.leadpilotsoftware.com/case-studies'
   },
   openGraph: {
     title: 'LeadPilot Software Agency Case Studies',
     description: 'Real client acquisition breakthroughs: How agencies uncover opportunities and win retainers.',
-    url: 'https://leadpilotsoftware.com/case-studies',
+    url: 'https://www.leadpilotsoftware.com/case-studies',
     siteName: 'LeadPilot Software'
   }
 };
@@ -34,8 +34,8 @@ export default function CaseStudiesIndexPage() {
     <div className="flex flex-col min-h-screen bg-slate-50">
       <BreadcrumbJsonLd
         items={[
-          { name: 'Home', url: 'https://leadpilotsoftware.com' },
-          { name: 'Case Studies', url: 'https://leadpilotsoftware.com/case-studies' }
+          { name: 'Home', url: 'https://www.leadpilotsoftware.com' },
+          { name: 'Case Studies', url: 'https://www.leadpilotsoftware.com/case-studies' }
         ]}
       />
 

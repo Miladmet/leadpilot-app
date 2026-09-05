@@ -9,12 +9,12 @@ export const metadata: Metadata = {
   description:
     'Learn what LeadPilot Software is, how it differs from unrelated products like leadpilot.com or leadpilot.chat, and how digital agencies use it for evidence-backed client proposals.',
   alternates: {
-    canonical: 'https://leadpilotsoftware.com/what-is-leadpilot-software'
+    canonical: 'https://www.leadpilotsoftware.com/what-is-leadpilot-software'
   },
   openGraph: {
     title: 'What Is LeadPilot Software? Brand Guide & Overview',
     description: 'A dedicated SaaS platform for digital agencies. Learn how LeadPilot Software works and how it differs from other tools.',
-    url: 'https://leadpilotsoftware.com/what-is-leadpilot-software',
+    url: 'https://www.leadpilotsoftware.com/what-is-leadpilot-software',
     siteName: 'LeadPilot Software'
   }
 };
@@ -24,8 +24,8 @@ export default function WhatIsLeadPilotSoftwarePage() {
     <div className="flex flex-col min-h-screen bg-slate-50">
       <BreadcrumbJsonLd
         items={[
-          { name: 'Home', url: 'https://leadpilotsoftware.com' },
-          { name: 'What Is LeadPilot Software?', url: 'https://leadpilotsoftware.com/what-is-leadpilot-software' }
+          { name: 'Home', url: 'https://www.leadpilotsoftware.com' },
+          { name: 'What Is LeadPilot Software?', url: 'https://www.leadpilotsoftware.com/what-is-leadpilot-software' }
         ]}
       />
 
@@ -82,7 +82,7 @@ export default function WhatIsLeadPilotSoftwarePage() {
             1. What Is LeadPilot Software?
           </h2>
           <p className="text-sm sm:text-base text-slate-700 leading-relaxed font-medium">
-            <strong>LeadPilot Software</strong> (operating at <Link href="https://leadpilotsoftware.com" className="text-sky-600 font-bold hover:underline">leadpilotsoftware.com</Link>) is a specialized client acquisition and proposal engine for agencies, SEO consultancies, and web design studios.
+            <strong>LeadPilot Software</strong> (operating at <Link href="https://www.leadpilotsoftware.com" className="text-sky-600 font-bold hover:underline">leadpilotsoftware.com</Link>) is a specialized client acquisition and proposal engine for agencies, SEO consultancies, and web design studios.
           </p>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
             Unlike generic web crawlers or email scrapers, LeadPilot Software analyzes target domains through the lens of an agency sales pitch. In under 60 seconds, it discovers high-impact pages (pricing models, service tiers, schema markup, mobile viewport performance), extracts verified facts, benchmarks competitors, and compiles executive proposals with realistic opportunity valuations.
