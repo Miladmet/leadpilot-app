@@ -1862,21 +1862,37 @@ export default function Dashboard() {
             LeadPilot
           </Link>
           <span className="hidden xs:inline-flex items-center bg-slate-100 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold text-slate-600 border border-slate-200 truncate">
-            <span className="text-sky-600 font-bold uppercase">{user.subscriptionTier}</span>
+            <span className="text-sky-600 font-bold uppercase">
+              {user.email?.toLowerCase() === 'admettre@gmail.com' ? 'DEVELOPER (UNLIMITED)' : user.subscriptionTier}
+            </span>
           </span>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <div className="hidden lg:flex flex-col items-end gap-1">
-            <span className="text-[11px] text-slate-500 font-medium">
-              Quota: {user.analysesUsed} / {user.subscriptionTier === 'AGENCY' ? '∞' : user.analysesLimit}
-            </span>
-            <div className="w-28 bg-slate-200 rounded-full h-1.5 overflow-hidden">
-              <div 
-                className="bg-sky-600 h-1.5 rounded-full" 
-                style={{ width: `${user.subscriptionTier === 'AGENCY' ? 100 : Math.min((user.analysesUsed / user.analysesLimit) * 100, 100)}%` }}
-              />
-            </div>
+            {user.email?.toLowerCase() === 'admettre@gmail.com' ? (
+              <>
+                <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                  <span>⚡ Quota: Unlimited</span>
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-black uppercase">Dev</span>
+                </span>
+                <div className="w-28 bg-emerald-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-emerald-500 h-1.5 rounded-full w-full" />
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Quota: {user.analysesUsed} / {user.subscriptionTier === 'AGENCY' ? '∞' : user.analysesLimit}
+                </span>
+                <div className="w-28 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className="bg-sky-600 h-1.5 rounded-full" 
+                    style={{ width: `${user.subscriptionTier === 'AGENCY' ? 100 : Math.min((user.analysesUsed / user.analysesLimit) * 100, 100)}%` }}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <button

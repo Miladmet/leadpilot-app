@@ -64,7 +64,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (user.subscriptionTier !== 'AGENCY' && user.analysesUsed >= user.analysesLimit) {
+    const isDeveloperBypass = user.email?.toLowerCase() === 'admettre@gmail.com';
+
+    if (!isDeveloperBypass && user.subscriptionTier !== 'AGENCY' && user.analysesUsed >= user.analysesLimit) {
       return NextResponse.json(
         { error: 'Monthly analysis limit reached. Please upgrade your plan.' },
         { status: 403 }
@@ -345,18 +347,20 @@ export async function POST(req: NextRequest) {
       console.warn('Failed to insert auxiliary tenant records (non-blocking):', relError);
     }
 
-    // 5. Update user limits (non-blocking)
-    try {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          analysesUsed: {
-            increment: 1,
+    // 5. Update user limits (non-blocking) - Developer account is completely quota-free
+    if (!isDeveloperBypass) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            analysesUsed: {
+              increment: 1,
+            },
           },
-        },
-      });
-    } catch (limitErr) {
-      console.warn('Failed to increment analysesUsed (non-blocking):', limitErr);
+        });
+      } catch (limitErr) {
+        console.warn('Failed to increment analysesUsed (non-blocking):', limitErr);
+      }
     }
 
     // 6. Log Activity (non-blocking)

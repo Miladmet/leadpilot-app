@@ -27,6 +27,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Developer account: exempt from all quotas permanently
+    if (user.email?.toLowerCase() === 'admettre@gmail.com') {
+      user.subscriptionTier = 'AGENCY';
+      user.analysesLimit = 999999;
+      user.analysesUsed = 0;
+    }
+
     return NextResponse.json({ success: true, user });
   } catch (error: any) {
     console.error('Auth Me API Error:', error);
