@@ -87,7 +87,12 @@ import {
   Globe,
   Clock,
   FileCheck,
-  Filter
+  Filter,
+  Eye,
+  RefreshCw,
+  Zap,
+  CheckCircle2,
+  ListOrdered
 } from 'lucide-react';
 
 
@@ -296,6 +301,38 @@ export default function Dashboard() {
   const [syncingCrm, setSyncingCrm] = useState(false);
   const [crmSuccess, setCrmSuccess] = useState(false);
 
+  // Live Proposal Engagement Telemetry State
+  const [proposalTelemetry, setProposalTelemetry] = useState<{
+    totalViews: number;
+    pricingViews: number;
+    hasPricingViewed: boolean;
+    lastViewedAt: string | null;
+    loading: boolean;
+  }>({ totalViews: 0, pricingViews: 0, hasPricingViewed: false, lastViewedAt: null, loading: false });
+
+  // Two-Way CRM Synchronization Feedback State
+  const [crmSyncRecords, setCrmSyncRecords] = useState<Record<string, {
+    status: string;
+    destinations: Array<{ label: string; status: string; url?: string }>;
+    dealName: string;
+    dealStage: string;
+    syncedAt: string;
+  }>>({});
+
+  // Batch Multi-Domain Scanner State
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchUrlsText, setBatchUrlsText] = useState('');
+  const [batchScanning, setBatchScanning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number;
+    total: number;
+    currentDomain: string;
+    results: Array<{ domain: string; status: 'success' | 'failed'; score?: number; value?: string; error?: string }>;
+  } | null>(null);
+
+  // Sorting State for Prospects List
+  const [prospectSortBy, setProspectSortBy] = useState<'opportunity' | 'newest'>('opportunity');
+
 
   const [campaignEmail, setCampaignEmail] = useState('');
   const [campaignSubject, setCampaignSubject] = useState('');
@@ -325,6 +362,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchUserData();
+    if (typeof window !== 'undefined') {
+      try {
+        const savedRecords = localStorage.getItem('leadpilot_crm_sync_records');
+        if (savedRecords) setCrmSyncRecords(JSON.parse(savedRecords));
+      } catch {}
+    }
   }, []);
 
   useEffect(() => {
@@ -337,8 +380,139 @@ export default function Dashboard() {
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
       setScheduledDate(tomorrow.toISOString().slice(0, 16));
+
+      // Retrieve live view & engagement telemetry for this prospect
+      fetchProposalTelemetry(activeProspect.id);
     }
   }, [activeProspect]);
+
+  const fetchProposalTelemetry = async (prospectId: string) => {
+    if (!prospectId) return;
+    setProposalTelemetry(prev => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch(`/api/audit/${prospectId}/track`);
+      if (res.ok) {
+        const data = await res.json();
+        setProposalTelemetry({
+          totalViews: data.totalViews || 0,
+          pricingViews: data.pricingViews || 0,
+          hasPricingViewed: !!data.hasPricingViewed,
+          lastViewedAt: data.lastViewedAt || null,
+          loading: false,
+        });
+      } else {
+        setProposalTelemetry(prev => ({ ...prev, loading: false }));
+      }
+    } catch {
+      setProposalTelemetry(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const formatRelativeTime = (dateString?: string | null): string => {
+    if (!dateString) return 'Never';
+    const diff = Date.now() - new Date(dateString).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  const sortedProspects = useMemo(() => {
+    const list = [...prospects];
+    if (prospectSortBy === 'opportunity') {
+      return list.sort((a, b) => (b.opportunityScore || 0) - (a.opportunityScore || 0));
+    }
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [prospects, prospectSortBy]);
+
+  const handleBatchScan = async () => {
+    const rawLines = batchUrlsText
+      .split(/[\n,]+/)
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
+    const uniqueDomains = Array.from(new Set(rawLines)).slice(0, 10);
+    if (uniqueDomains.length === 0) {
+      setError('Please enter at least one target domain to batch scan.');
+      return;
+    }
+
+    setBatchScanning(true);
+    setError('');
+    const results: Array<{ domain: string; status: 'success' | 'failed'; score?: number; value?: string; error?: string }> = [];
+    setBatchProgress({
+      current: 0,
+      total: uniqueDomains.length,
+      currentDomain: uniqueDomains[0],
+      results,
+    });
+
+    const newlyCreated: Prospect[] = [];
+
+    for (let i = 0; i < uniqueDomains.length; i++) {
+      const target = uniqueDomains[i];
+      setBatchProgress({
+        current: i + 1,
+        total: uniqueDomains.length,
+        currentDomain: target,
+        results: [...results],
+      });
+
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: target }),
+        });
+        const data = await res.json();
+        if (res.ok && data.prospect) {
+          newlyCreated.push(data.prospect);
+          results.push({
+            domain: target,
+            status: 'success',
+            score: data.prospect.opportunityScore,
+            value: data.prospect.opportunityRange,
+          });
+        } else {
+          results.push({
+            domain: target,
+            status: 'failed',
+            error: data.error || 'Verification failed',
+          });
+        }
+      } catch (err: any) {
+        results.push({
+          domain: target,
+          status: 'failed',
+          error: err?.message || 'Network error',
+        });
+      }
+
+      setBatchProgress({
+        current: i + 1,
+        total: uniqueDomains.length,
+        currentDomain: target,
+        results: [...results],
+      });
+    }
+
+    if (newlyCreated.length > 0) {
+      setProspects(prev => {
+        const existingIds = new Set(newlyCreated.map(n => n.id));
+        const merged = [...newlyCreated, ...prev.filter(p => !existingIds.has(p.id))];
+        return merged.sort((a, b) => (b.opportunityScore || 0) - (a.opportunityScore || 0));
+      });
+      const topScorer = [...newlyCreated].sort((a, b) => (b.opportunityScore || 0) - (a.opportunityScore || 0))[0];
+      setActiveProspect(topScorer);
+      setBatchUrlsText('');
+      await Promise.all([fetchStats(), fetchUserData()]);
+    }
+
+    setBatchScanning(false);
+  };
 
   const fetchUserData = async () => {
     try {
@@ -486,7 +660,21 @@ export default function Dashboard() {
       const data = await res.json();
       if (res.ok) {
         setCrmSuccess(true);
-        setTimeout(() => setCrmSuccess(false), 3000);
+        const record = {
+          status: data.status || 'Synced',
+          destinations: data.destinations || [{ label: 'CRM', status: 'synced' }],
+          dealName: `${activeProspect.companyName} — LeadPilot Opportunity`,
+          dealStage: 'Appointment Scheduled (Default Pipeline)',
+          syncedAt: new Date().toISOString(),
+        };
+        setCrmSyncRecords(prev => {
+          const updated = { ...prev, [activeProspect.id]: record };
+          if (typeof window !== 'undefined') {
+            try { localStorage.setItem('leadpilot_crm_sync_records', JSON.stringify(updated)); } catch {}
+          }
+          return updated;
+        });
+        setTimeout(() => setCrmSuccess(false), 3500);
       } else {
         alert(data.error || 'Failed to sync to CRM');
       }
@@ -837,18 +1025,41 @@ export default function Dashboard() {
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-sky-600" />
-                <h3 className="font-bold text-slate-900 text-sm">Select Client Prospect ({prospects.length})</h3>
+                <h3 className="font-bold text-slate-900 text-sm">Prospects ({sortedProspects.length})</h3>
               </div>
-              <button
-                onClick={() => setShowMobileProspectDrawer(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setProspectSortBy('opportunity')}
+                    className={`px-2 py-0.5 rounded font-bold transition-all ${
+                      prospectSortBy === 'opportunity' ? 'bg-sky-100 text-sky-800' : 'text-slate-500'
+                    }`}
+                  >
+                    $ Value
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setProspectSortBy('newest')}
+                    className={`px-2 py-0.5 rounded font-bold transition-all ${
+                      prospectSortBy === 'newest' ? 'bg-sky-100 text-sky-800' : 'text-slate-500'
+                    }`}
+                  >
+                    Newest
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowMobileProspectDrawer(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
             <div className="overflow-y-auto flex-1 divide-y divide-slate-100 space-y-1 pr-1">
-              {prospects.map((p) => (
+              {sortedProspects.map((p) => (
                 <div
                   key={p.id}
                   onClick={() => {
@@ -1864,44 +2075,177 @@ export default function Dashboard() {
           </div>
 
 
-          {/* Proposal Scraper trigger form */}
+          {/* Proposal Scraper trigger form & Batch Multi-Domain Scanner */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-              <Sparkles className="h-5 w-5 text-sky-500" />
-              Find Opportunities. Generate Proposals. Win Clients.
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Analyze a website and generate evidence-backed opportunities, solutions, and proposals.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                  <Sparkles className="h-5 w-5 text-sky-500" />
+                  Find Opportunities. Generate Proposals. Win Clients.
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  {batchMode
+                    ? 'Audit up to 10 prospective client websites in batch. High-value opportunities automatically bubble to top.'
+                    : 'Analyze a single website and generate evidence-backed opportunities, solutions, and proposals.'}
+                </p>
+              </div>
 
+              {/* Mode Switcher */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl self-start sm:self-auto shrink-0 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setBatchMode(false)}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    !batchMode ? 'bg-white text-slate-900 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Single Scan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBatchMode(true)}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    batchMode ? 'bg-sky-600 text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Zap className="h-3.5 w-3.5 text-amber-300" />
+                  <span>Batch Scanner (Up to 10)</span>
+                </button>
+              </div>
+            </div>
 
-            <form onSubmit={handleAnalyze} className="mt-4 flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                required
-                placeholder="e.g. stripe.com or https://company.com"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="flex-1 pl-3.5 pr-4 py-3 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm shadow-2xs min-h-[44px]"
-                disabled={analyzing}
-              />
-              <button
-                type="submit"
-                disabled={analyzing}
-                className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 cursor-pointer"
-              >
-                {analyzing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Running auditor checks...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Analyze Website</span>
-                  </>
+            {!batchMode ? (
+              /* Single Domain Form */
+              <form onSubmit={handleAnalyze} className="mt-4 flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. stripe.com or https://company.com"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  className="flex-1 pl-3.5 pr-4 py-3 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm shadow-2xs min-h-[44px]"
+                  disabled={analyzing}
+                />
+                <button
+                  type="submit"
+                  disabled={analyzing}
+                  className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 cursor-pointer"
+                >
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Running auditor checks...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Analyze Website</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* Batch Multi-Domain Form */
+              <div className="mt-4 space-y-3">
+                <div className="space-y-1.5">
+                  <textarea
+                    rows={4}
+                    value={batchUrlsText}
+                    onChange={(e) => setBatchUrlsText(e.target.value)}
+                    placeholder="Paste up to 10 prospective client domains (one per line or comma-separated):&#10;stripe.com&#10;acmecloud.com&#10;dentalcaregroup.com"
+                    disabled={batchScanning}
+                    className="w-full p-3.5 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs font-mono shadow-2xs resize-none"
+                  />
+                  <div className="flex justify-between items-center text-[11px] text-slate-500 px-1">
+                    <span>
+                      {
+                        batchUrlsText
+                          .split(/[\n,]+/)
+                          .map(l => l.trim())
+                          .filter(l => l.length > 0).length
+                      } / 10 target domains entered
+                    </span>
+                    <span className="text-slate-400">Sequential polite crawling to prevent rate-limiting</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 items-center justify-between">
+                  <button
+                    type="button"
+                    disabled={batchScanning || !batchUrlsText.trim()}
+                    onClick={handleBatchScan}
+                    className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+                  >
+                    {batchScanning ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>
+                          Scanning {batchProgress?.current || 0} of {batchProgress?.total || 0}...
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4 text-amber-300" />
+                        <span>Start Sequential Batch Scan</span>
+                      </>
+                    )}
+                  </button>
+
+                  {batchScanning && batchProgress && (
+                    <span className="text-xs font-mono text-slate-600 animate-pulse">
+                      Auditing: <strong>{batchProgress.currentDomain}</strong>
+                    </span>
+                  )}
+                </div>
+
+                {/* Live Batch Progress & Results Table */}
+                {batchProgress && batchProgress.results.length > 0 && (
+                  <div className="mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                      <span>Batch Progress ({batchProgress.results.length} / {batchProgress.total})</span>
+                      {!batchScanning && (
+                        <span className="text-emerald-700 bg-emerald-100 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                          ✓ Batch Complete • Sorted by Opportunity
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Progress bar */}
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-sky-500 h-1.5 transition-all duration-300 rounded-full"
+                        style={{ width: `${Math.min(100, Math.round((batchProgress.current / batchProgress.total) * 100))}%` }}
+                      />
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 divide-y divide-slate-100 pr-1">
+                      {batchProgress.results.map((res, idx) => (
+                        <div key={idx} className="pt-1.5 flex items-center justify-between text-xs">
+                          <span className="font-mono text-slate-800">{res.domain}</span>
+                          <div className="flex items-center gap-2">
+                            {res.status === 'success' ? (
+                              <>
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                  {res.value || 'Opportunity Found'}
+                                </span>
+                                <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded">
+                                  Score: {res.score}
+                                </span>
+                                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[10px] text-rose-600">{res.error || 'Failed'}</span>
+                                <AlertCircle className="h-4 w-4 text-rose-500" />
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </button>
-            </form>
+              </div>
+            )}
 
             {/* STRUCTURED ERROR BANNER & DIAGNOSTICS */}
             {analysisError?.classification === 'SCHEMA_MISMATCH' ? (
@@ -3331,68 +3675,220 @@ export default function Dashboard() {
                   <div className="space-y-4 flex-1 flex flex-col justify-between">
                     <div className="overflow-y-auto max-h-[360px] space-y-4 pr-1">
                       
-                      {/* PDF Print Export Bar */}
+                      {/* 1. Dynamic Client Proposal Link & Live Engagement Tracker */}
+                      <div className="p-4 rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50/70 via-white to-indigo-50/50 shadow-xs space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-sky-100 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="relative flex h-2.5 w-2.5">
+                              {proposalTelemetry.totalViews > 0 && (
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              )}
+                              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${proposalTelemetry.totalViews > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                            </span>
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                Dynamic Client Proposal Link & Live View-Tracking
+                              </h4>
+                              <p className="text-[10px] text-slate-500">
+                                White-label client presentation URL with non-intrusive view telemetry & section analytics.
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => fetchProposalTelemetry(activeProspect.id)}
+                            disabled={proposalTelemetry.loading}
+                            className="text-[10px] text-slate-600 hover:text-sky-700 bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold transition-all cursor-pointer shadow-2xs self-start sm:self-auto"
+                            title="Refresh real-time view telemetry"
+                          >
+                            <RefreshCw className={`h-3 w-3 ${proposalTelemetry.loading ? 'animate-spin text-sky-600' : ''}`} />
+                            <span>Refresh Telemetry</span>
+                          </button>
+                        </div>
+
+                        {/* Proposal Link Bar */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                          <div className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-700 flex items-center justify-between shadow-2xs overflow-hidden">
+                            <span className="truncate">
+                              {typeof window !== 'undefined' ? window.location.origin : 'https://leadpilotsoftware.com'}/audit/{activeProspect.id}
+                            </span>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://leadpilotsoftware.com'}/audit/${activeProspect.id}`;
+                                navigator.clipboard.writeText(publicUrl);
+                                setShareCopied(true);
+                                setTimeout(() => setShareCopied(false), 2500);
+                              }}
+                              className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer shrink-0"
+                              title="Copy dynamic link to send to client"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                              <span>{shareCopied ? '✓ Link Copied!' : 'Copy Proposal Link'}</span>
+                            </button>
+
+                            <a
+                              href={`/audit/${activeProspect.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shadow-2xs transition-colors shrink-0"
+                              title="Open client-facing audit in new tab"
+                            >
+                              <span>Preview</span>
+                              <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Telemetry Engagement Badges Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                          {/* Opens Counter */}
+                          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                            proposalTelemetry.totalViews > 0 
+                              ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900' 
+                              : 'bg-slate-50 border-slate-200 text-slate-600'
+                          }`}>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider block opacity-70">Client Opens</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className={`h-2 w-2 rounded-full ${proposalTelemetry.totalViews > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                                <strong className="text-xs font-black">
+                                  {proposalTelemetry.totalViews > 0 ? `${proposalTelemetry.totalViews} Views Logged` : '0 Views (Awaiting Click)'}
+                                </strong>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {proposalTelemetry.lastViewedAt ? formatRelativeTime(proposalTelemetry.lastViewedAt) : 'Never'}
+                            </span>
+                          </div>
+
+                          {/* Pricing Heat-map View */}
+                          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                            proposalTelemetry.hasPricingViewed 
+                              ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900' 
+                              : 'bg-slate-50 border-slate-200 text-slate-600'
+                          }`}>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider block opacity-70">Pricing & Scope</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <Eye className={`h-3 w-3 ${proposalTelemetry.hasPricingViewed ? 'text-emerald-600' : 'text-slate-400'}`} />
+                                <strong className="text-xs font-black">
+                                  {proposalTelemetry.hasPricingViewed ? 'Pricing Inspected' : 'Not Scrolled Yet'}
+                                </strong>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono opacity-70">
+                              {proposalTelemetry.pricingViews > 0 ? `${proposalTelemetry.pricingViews}x viewed` : 'Pending'}
+                            </span>
+                          </div>
+
+                          {/* Confidence Score */}
+                          <div className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Deliverable Trust</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <ShieldCheck className="h-3.5 w-3.5 text-sky-600" />
+                                <strong className="text-xs font-black text-slate-900">
+                                  {activeProspect.evidenceQuality}% Evidence Pass
+                                </strong>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-bold">
+                              Verified
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. Two-Way CRM Synchronization & Pipeline Status Card */}
                       <div className={`p-3.5 rounded-xl border flex flex-col md:flex-row md:justify-between md:items-center gap-3 ${
-                        activeProspect.proposalStatus === 'Speculative' 
-                          ? 'bg-amber-50 border-amber-200' 
-                          : 'bg-sky-50 border-sky-100'
+                        crmSyncRecords[activeProspect.id]
+                          ? 'bg-emerald-50/60 border-emerald-200'
+                          : activeProspect.proposalStatus === 'Speculative'
+                          ? 'bg-amber-50 border-amber-200'
+                          : 'bg-slate-50 border-slate-200'
                       }`}>
                         <div>
-                          <h4 className="text-xs font-bold text-slate-900">Proposal Exporter & Integrations</h4>
-                          <p className="text-[10px] text-slate-500">
-                            {activeProspect.proposalStatus === 'Speculative' 
-                              ? 'Export caution-stamped consultative proposal.' 
-                              : 'Print client-ready verified proposals or sync to CRM.'}
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-slate-900">
+                              {crmSyncRecords[activeProspect.id] ? '✓ CRM Deal Pipeline Synced' : 'CRM & Proposal Integrations'}
+                            </h4>
+                            {crmSyncRecords[activeProspect.id] && (
+                              <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                                Active Deal
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {crmSyncRecords[activeProspect.id] ? (
+                              <span>
+                                Synced to {crmSyncRecords[activeProspect.id].destinations.map(d => d.label).join(' & ')} • Stage: <strong>{crmSyncRecords[activeProspect.id].dealStage}</strong> ({formatRelativeTime(crmSyncRecords[activeProspect.id].syncedAt)})
+                              </span>
+                            ) : (
+                              <span>
+                                Push deal name, verified findings, and suggested scope directly to HubSpot Deals or Zapier webhooks.
+                              </span>
+                            )}
                           </p>
                         </div>
-                        <div className="flex gap-2 flex-wrap">
+
+                        <div className="flex gap-2 flex-wrap shrink-0">
                           <button
                             disabled={syncingCrm}
                             onClick={handleCrmSync}
-                            className={`font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors border ${
-                              crmSuccess 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            className={`font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors border cursor-pointer ${
+                              crmSuccess || crmSyncRecords[activeProspect.id]
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
                                 : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                             }`}
                           >
-                            {syncingCrm ? '⏳ Syncing...' : crmSuccess ? '✓ Synced to CRM' : '🔗 Sync to CRM'}
+                            {syncingCrm ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Syncing...</span>
+                              </>
+                            ) : crmSuccess ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" />
+                                <span>Synced to CRM!</span>
+                              </>
+                            ) : crmSyncRecords[activeProspect.id] ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <span>Re-sync CRM</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>🔗 Sync to CRM</span>
+                              </>
+                            )}
                           </button>
 
                           <button
                             onClick={handleConfigureWebhook}
                             title="Configure CRM or Zapier Webhook URL"
-                            className="text-xs px-2.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 shadow-sm transition-colors"
+                            className="text-xs px-2.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 shadow-2xs transition-colors cursor-pointer"
                           >
                             ⚙️
                           </button>
-
 
                           <a
                             href={`/proposal/${activeProspect.id}/print`}
                             target="_blank"
                             rel="noreferrer"
-                            className={`font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors ${
+                            className={`font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 shadow-2xs transition-colors cursor-pointer ${
                               activeProspect.proposalStatus === 'Speculative'
                                 ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                : 'bg-sky-600 hover:bg-sky-700 text-white'
+                                : 'bg-slate-900 hover:bg-slate-800 text-white'
                             }`}
                           >
                             📄 Open PDF Proposal
                             <ArrowUpRight className="h-3.5 w-3.5" />
                           </a>
-
-                          <button
-                            onClick={() => {
-                              const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://leadpilot.ai'}/audit/${activeProspect?.id || ''}`;
-                              navigator.clipboard.writeText(publicUrl);
-                              setShareCopied(true);
-                              setTimeout(() => setShareCopied(false), 2500);
-                            }}
-                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                            title="Copy Public Viral Audit Link"
-                          >
-                            <span>{shareCopied ? '✓ Link Copied!' : '🌐 Share Public Audit'}</span>
-                          </button>
                         </div>
                       </div>
 
@@ -4533,14 +5029,43 @@ export default function Dashboard() {
 
           {/* Client Opportunity Ranges History list */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col max-h-[350px]">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 border-b border-slate-100 pb-3">
-              <History className="h-4.5 w-4.5 text-slate-400" />
-              Client Opportunity Ranges
-            </h3>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <History className="h-4.5 w-4.5 text-slate-400" />
+                Client Opportunities ({sortedProspects.length})
+              </h3>
+              <div className="flex items-center gap-1 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setProspectSortBy('opportunity')}
+                  className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                    prospectSortBy === 'opportunity'
+                      ? 'bg-sky-100 text-sky-800'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                  title="Sort by highest potential opportunity value"
+                >
+                  $ Value
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => setProspectSortBy('newest')}
+                  className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                    prospectSortBy === 'newest'
+                      ? 'bg-sky-100 text-sky-800'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                  title="Sort by newest scan date"
+                >
+                  Newest
+                </button>
+              </div>
+            </div>
 
             <div className="mt-2 divide-y divide-slate-100 overflow-y-auto flex-1 pr-1 space-y-1">
-              {prospects.length > 0 ? (
-                prospects.map((p) => (
+              {sortedProspects.length > 0 ? (
+                sortedProspects.map((p) => (
                   <div
                     key={p.id}
                     onClick={() => setActiveProspect(p)}

@@ -5,6 +5,7 @@ import { Metadata } from 'next';
 import prisma from '@/lib/prisma';
 import { sanitizePublicAudit } from '@/lib/growthEngine';
 import { ShieldCheck, TrendingUp, Sparkles, Layers, ArrowRight, CheckCircle2 } from 'lucide-react';
+import AuditTrackingBeacon from '@/components/AuditTrackingBeacon';
 
 interface Props {
   params: { id: string };
@@ -106,6 +107,9 @@ export default async function PublicAuditPage({ params }: Props) {
 
       {/* Main Audit Content */}
       <main className="flex-1 py-10 px-6 max-w-5xl mx-auto space-y-8 w-full">
+        {/* Invisible live proposal view & engagement telemetry beacon */}
+        <AuditTrackingBeacon prospectId={audit.id} />
+
         {/* Title Header */}
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="space-y-1">
@@ -167,7 +171,7 @@ export default async function PublicAuditPage({ params }: Props) {
         </div>
 
         {/* 2. Opportunity Summary Card */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+        <div id="pricing-opportunity-section" className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-sky-600" />
