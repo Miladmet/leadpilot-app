@@ -97,18 +97,31 @@ runTest('CLASSIFY_UNKNOWN', () => {
   assert.strictEqual(result.classification, 'Unknown');
 });
 
-// 9. Coverage Health Tiers
-runTest('COVERAGE_HEALTH_TIERS', () => {
+// 9. Coverage Health Tiers (Updated Brackets: 90-100, 70-89, 40-69, 20-39, 0-19)
+runTest('COVERAGE_HEALTH_TIERS_NEW_BRACKETS', () => {
+  // 90-100% Excellent
   assert.strictEqual(getCoverageHealth(100).health, 'Excellent');
-  assert.strictEqual(getCoverageHealth(92).health, 'Excellent');
-  assert.strictEqual(getCoverageHealth(85).health, 'Good');
+  assert.strictEqual(getCoverageHealth(95).health, 'Excellent');
+  assert.strictEqual(getCoverageHealth(90).health, 'Excellent');
+
+  // 70-89% Good
+  assert.strictEqual(getCoverageHealth(89).health, 'Good');
   assert.strictEqual(getCoverageHealth(75).health, 'Good');
-  assert.strictEqual(getCoverageHealth(60).health, 'Moderate');
-  assert.strictEqual(getCoverageHealth(50).health, 'Moderate');
-  assert.strictEqual(getCoverageHealth(45).health, 'Limited');
-  assert.strictEqual(getCoverageHealth(25).health, 'Limited');
-  assert.strictEqual(getCoverageHealth(24).health, 'Insufficient');
-  assert.strictEqual(getCoverageHealth(5).health, 'Insufficient');
+  assert.strictEqual(getCoverageHealth(70).health, 'Good');
+
+  // 40-69% Moderate
+  assert.strictEqual(getCoverageHealth(69).health, 'Moderate');
+  assert.strictEqual(getCoverageHealth(55).health, 'Moderate');
+  assert.strictEqual(getCoverageHealth(40).health, 'Moderate');
+
+  // 20-39% Limited
+  assert.strictEqual(getCoverageHealth(39).health, 'Limited');
+  assert.strictEqual(getCoverageHealth(30).health, 'Limited');
+  assert.strictEqual(getCoverageHealth(20).health, 'Limited');
+
+  // 0-19% Insufficient
+  assert.strictEqual(getCoverageHealth(19).health, 'Insufficient');
+  assert.strictEqual(getCoverageHealth(10).health, 'Insufficient');
   assert.strictEqual(getCoverageHealth(0).health, 'Insufficient');
 });
 
@@ -161,29 +174,97 @@ runTest('TOP_REASONS_AGGREGATION', () => {
   assert.strictEqual(topReasons[2].percentage, 17);
 });
 
-// 13. Full Diagnostics Report Structure
+// 13. Full Diagnostics Report Structure with Sitemap Telemetry
 runTest('FULL_DIAGNOSTICS_REPORT_INTEGRITY', () => {
   const report = generateCrawlDiagnosticsReport({
-    pagesDiscovered: 15,
-    pagesCrawled: 12,
-    crawlDurationMs: 3400,
-    totalTextExtracted: 25000,
+    pagesDiscovered: 20,
+    pagesCrawled: 16,
+    sitemapDiscoveredCount: 8,
+    crawlDurationMs: 4200,
+    totalTextExtracted: 35000,
     skippedPages: [
       { url: 'https://example.com/admin', statusCode: 403, classification: '403', failureReason: '403 Forbidden' },
       { url: 'https://example.com/dead', statusCode: 404, classification: '404', failureReason: '404 Not Found' },
+      { url: 'https://example.com/private', statusCode: null, classification: 'Robots Blocked', failureReason: 'Robots.txt' },
       { url: 'https://example.com/app', statusCode: 200, classification: 'JavaScript Required', failureReason: 'SPA Shell' }
     ]
   });
 
-  assert.strictEqual(report.pagesDiscovered, 15);
-  assert.strictEqual(report.pagesCrawled, 12);
-  assert.strictEqual(report.pagesSkipped, 3);
+  assert.strictEqual(report.pagesDiscovered, 20);
+  assert.strictEqual(report.pagesCrawled, 16);
+  assert.strictEqual(report.pagesSkipped, 4);
+  assert.strictEqual(report.sitemapDiscoveredCount, 8);
   assert.strictEqual(report.coveragePercentage, 80);
   assert.strictEqual(report.coverageHealth, 'Good');
   assert.strictEqual(report.hasCoverageWarning, false);
   assert.strictEqual(report.isSpeculativeSuppressed, false);
-  assert.strictEqual(report.topFailureReasons.length, 3);
-  assert.strictEqual(report.skippedPages.length, 3);
+  assert.strictEqual(report.topFailureReasons.length, 4);
+  assert.strictEqual(report.skippedPages.length, 4);
+});
+
+// 14. Page Prioritization Hierarchy Verification
+runTest('PAGE_PRIORITIZATION_HIERARCHY', () => {
+  // Test classifying URLs with prioritized weights
+  const { classifyUrl } = require('../lib/crawlDiagnosticsCore');
+  
+  const home = classifyUrl('https://example.com/');
+  const services = classifyUrl('https://example.com/services');
+  const pricing = classifyUrl('https://example.com/pricing');
+  const about = classifyUrl('https://example.com/about-us');
+  const contact = classifyUrl('https://example.com/contact');
+  const caseStudies = classifyUrl('https://example.com/case-studies');
+  const blog = classifyUrl('https://example.com/blog/article-1');
+
+  assert.strictEqual(home.weight, 100, 'Homepage must have weight 100');
+  assert.strictEqual(services.weight, 95, 'Services must have weight 95');
+  assert.strictEqual(pricing.weight, 90, 'Pricing must have weight 90');
+  assert.strictEqual(about.weight, 85, 'About must have weight 85');
+  assert.strictEqual(contact.weight, 80, 'Contact must have weight 80');
+  assert.strictEqual(caseStudies.weight, 75, 'Case Studies must have weight 75');
+  assert.strictEqual(blog.weight, 70, 'Blog must have weight 70');
+
+  // Verify descending order
+  assert.ok(home.weight > services.weight, 'Homepage > Services');
+  assert.ok(services.weight > pricing.weight, 'Services > Pricing');
+  assert.ok(pricing.weight > about.weight, 'Pricing > About');
+  assert.ok(about.weight > contact.weight, 'About > Contact');
+  assert.ok(contact.weight > caseStudies.weight, 'Contact > Case Studies');
+  assert.ok(caseStudies.weight > blog.weight, 'Case Studies > Blog');
+});
+
+// 15. Sitemap XML URL Extraction Verification
+runTest('SITEMAP_XML_EXTRACTION', async () => {
+  const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
+  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url><loc>https://example.com/</loc></url>
+    <url><loc>https://example.com/services</loc></url>
+    <url><loc>https://example.com/pricing</loc></url>
+    <url><loc>https://example.com/about</loc></url>
+    <url><loc>https://example.com/contact</loc></url>
+    <url><loc>https://example.com/case-studies</loc></url>
+    <url><loc>https://example.com/blog</loc></url>
+    <url><loc>https://external-domain.com/out</loc></url>
+    <url><loc>https://example.com/document.pdf</loc></url>
+  </urlset>`;
+
+  const locMatches = sampleXml.matchAll(/<loc>\s*(https?:\/\/[^<\s]+)\s*<\/loc>/gi);
+  const extracted = [];
+  const baseDomain = 'example.com';
+
+  for (const m of locMatches) {
+    const raw = m[1].trim();
+    const parsed = new URL(raw);
+    const domain = parsed.hostname.replace(/^www\./i, '');
+    if (domain === baseDomain && !raw.endsWith('.pdf')) {
+      extracted.push(raw);
+    }
+  }
+
+  assert.strictEqual(extracted.length, 7);
+  assert.ok(extracted.includes('https://example.com/services'));
+  assert.ok(extracted.includes('https://example.com/case-studies'));
+  assert.ok(!extracted.includes('https://external-domain.com/out'));
+  assert.ok(!extracted.includes('https://example.com/document.pdf'));
 });
 
 console.log('================================================================');

@@ -54,6 +54,7 @@ export interface CrawlDiagnosticsReport {
   pagesDiscovered: number;
   pagesCrawled: number;
   pagesSkipped: number;
+  sitemapDiscoveredCount?: number;
   crawlDurationMs: number;
   totalTextExtracted: number;
   coveragePercentage: number;

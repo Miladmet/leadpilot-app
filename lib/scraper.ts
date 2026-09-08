@@ -77,18 +77,17 @@ const AXIOS_CONFIG = {
 
 const PRIORITY_CATEGORIES: { category: string; weight: number; keywords: string[] }[] = [
   { category: 'Homepage', weight: 100, keywords: ['/'] },
-  { category: 'Pricing', weight: 95, keywords: ['pricing', 'price', 'plans', 'plan', 'tier', 'cost', 'subscription', 'rates'] },
-  { category: 'Products', weight: 92, keywords: ['product', 'products', 'app', 'apps', 'tool', 'tools', 'platform', 'software'] },
-  { category: 'Services', weight: 90, keywords: ['service', 'services', 'offering', 'offerings', 'solution', 'solutions', 'consulting'] },
-  { category: 'Features', weight: 88, keywords: ['feature', 'features', 'capability', 'capabilities', 'tech', 'technology', 'how-it-works'] },
-  { category: 'About', weight: 82, keywords: ['about', 'about-us', 'company', 'story', 'mission', 'team', 'who-we-are', 'leadership'] },
-  { category: 'Careers', weight: 78, keywords: ['career', 'careers', 'job', 'jobs', 'hiring', 'join-us', 'work-with-us', 'openings'] },
-  { category: 'FAQ', weight: 75, keywords: ['faq', 'faqs', 'frequently-asked-questions', 'help', 'support', 'q-and-a'] },
+  { category: 'Services', weight: 95, keywords: ['service', 'services', 'offering', 'offerings', 'solution', 'solutions', 'consulting', 'capabilities'] },
+  { category: 'Pricing', weight: 90, keywords: ['pricing', 'price', 'plans', 'plan', 'tier', 'cost', 'subscription', 'rates'] },
+  { category: 'About', weight: 85, keywords: ['about', 'about-us', 'company', 'story', 'mission', 'team', 'who-we-are', 'leadership'] },
+  { category: 'Contact', weight: 80, keywords: ['contact', 'contact-us', 'reach-us', 'book', 'demo', 'get-in-touch', 'talk-to-us', 'schedule'] },
+  { category: 'Case Studies', weight: 75, keywords: ['case-study', 'case-studies', 'case_study', 'customer-stories', 'stories', 'customers', 'portfolio', 'work', 'results'] },
   { category: 'Blog', weight: 70, keywords: ['blog', 'article', 'articles', 'post', 'posts', 'news', 'press', 'insights'] },
-  { category: 'Resources', weight: 68, keywords: ['resource', 'resources', 'guide', 'guides', 'case-study', 'case-studies', 'whitepaper', 'docs', 'documentation'] },
-  { category: 'Contact', weight: 65, keywords: ['contact', 'contact-us', 'reach-us', 'book', 'demo', 'get-in-touch', 'talk-to-us'] },
-  { category: 'Terms', weight: 55, keywords: ['terms', 'terms-of-service', 'tos', 'terms-and-conditions', 'legal'] },
-  { category: 'Privacy', weight: 50, keywords: ['privacy', 'privacy-policy', 'privacy-notice', 'gdpr'] }
+  { category: 'Products', weight: 65, keywords: ['product', 'products', 'app', 'apps', 'tool', 'tools', 'platform', 'software', 'feature', 'features'] },
+  { category: 'FAQ', weight: 60, keywords: ['faq', 'faqs', 'frequently-asked-questions', 'help', 'support', 'q-and-a', 'docs', 'documentation'] },
+  { category: 'Careers', weight: 50, keywords: ['career', 'careers', 'job', 'jobs', 'hiring', 'join-us', 'work-with-us', 'openings'] },
+  { category: 'Terms', weight: 30, keywords: ['terms', 'terms-of-service', 'tos', 'terms-and-conditions', 'legal'] },
+  { category: 'Privacy', weight: 25, keywords: ['privacy', 'privacy-policy', 'privacy-notice', 'gdpr'] }
 ];
 
 const DISALLOWED_EXTENSIONS = [
@@ -164,28 +163,116 @@ function isDisallowedExtension(url: string): boolean {
   }
 }
 
-async function fetchRobotsDisallowedPaths(baseUrl: string): Promise<string[]> {
+export function deriveTitleFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    if (segments.length === 0) return 'Homepage';
+    const last = segments[segments.length - 1];
+    return last
+      .replace(/[-_]/g, ' ')
+      .replace(/\.(html|htm|php|asp|aspx)$/i, '')
+      .replace(/\b\w/g, c => c.toUpperCase()) || url;
+  } catch {
+    return url;
+  }
+}
+
+export interface RobotsInfo {
+  disallowedPaths: string[];
+  sitemapUrls: string[];
+}
+
+export async function fetchRobotsInfo(baseUrl: string): Promise<RobotsInfo> {
+  const disallowedPaths: string[] = [];
+  const sitemapUrls: string[] = [];
+
   try {
     const robotsUrl = new URL('/robots.txt', baseUrl).toString();
     const res = await axios.get(robotsUrl, { ...AXIOS_CONFIG, timeout: 2500 });
     if (res.status === 200 && typeof res.data === 'string') {
       const lines = res.data.split('\n');
-      const disallowed: string[] = [];
       for (const rawLine of lines) {
         const line = rawLine.trim();
         if (/^disallow:\s*/i.test(line)) {
           const pathPart = line.replace(/^disallow:\s*/i, '').trim();
           if (pathPart && pathPart !== '/' && !pathPart.includes('*')) {
-            disallowed.push(pathPart.toLowerCase());
+            disallowedPaths.push(pathPart.toLowerCase());
+          }
+        } else if (/^sitemap:\s*/i.test(line)) {
+          const sitemapUrl = line.replace(/^sitemap:\s*/i, '').trim();
+          if (sitemapUrl && /^https?:\/\//i.test(sitemapUrl)) {
+            sitemapUrls.push(sitemapUrl);
           }
         }
       }
-      return disallowed;
     }
   } catch {
     // Non-blocking fallback if robots.txt unreachable
   }
-  return [];
+
+  // Fallback to https://<domain>/sitemap.xml if no sitemap was declared in robots.txt
+  if (sitemapUrls.length === 0) {
+    try {
+      sitemapUrls.push(new URL('/sitemap.xml', baseUrl).toString());
+    } catch {}
+  }
+
+  return { disallowedPaths, sitemapUrls };
+}
+
+export async function fetchSitemapUrls(
+  sitemapUrls: string[],
+  baseDomain: string,
+  disallowedPaths: string[],
+  maxUrls: number = 50
+): Promise<string[]> {
+  const discovered: Set<string> = new Set();
+  const queue = [...sitemapUrls];
+  const processedSitemaps = new Set<string>();
+
+  while (queue.length > 0 && discovered.size < maxUrls && processedSitemaps.size < 3) {
+    const currentSitemap = queue.shift();
+    if (!currentSitemap || processedSitemaps.has(currentSitemap)) continue;
+    processedSitemaps.add(currentSitemap);
+
+    try {
+      const res = await axios.get(currentSitemap, { ...AXIOS_CONFIG, timeout: 3500 });
+      if (res.status !== 200 || typeof res.data !== 'string') continue;
+
+      const xml = res.data;
+
+      // Extract child sitemaps if this is a sitemapindex (<sitemap><loc>...</loc></sitemap>)
+      const sitemapMatches = xml.matchAll(/<sitemap>[\s\S]*?<loc>\s*(https?:\/\/[^<\s]+)\s*<\/loc>[\s\S]*?<\/sitemap>/gi);
+      for (const m of sitemapMatches) {
+        const subSitemap = m[1].trim();
+        if (!processedSitemaps.has(subSitemap) && queue.length < 3) {
+          queue.push(subSitemap);
+        }
+      }
+
+      // Extract URLs (<loc>...</loc>)
+      const locMatches = xml.matchAll(/<loc>\s*(https?:\/\/[^<\s]+)\s*<\/loc>/gi);
+      for (const m of locMatches) {
+        if (discovered.size >= maxUrls) break;
+        const rawLoc = m[1].trim();
+        try {
+          const parsed = new URL(rawLoc);
+          const domain = parsed.hostname.replace(/^www\./i, '');
+          if (domain === baseDomain) {
+            const normalized = normalizeUrl(rawLoc);
+            if (!isDisallowedExtension(normalized) && !isPathRobotsDisallowed(normalized, disallowedPaths)) {
+              discovered.add(normalized);
+            }
+          }
+        } catch {}
+      }
+    } catch {
+      // Non-blocking if sitemap fetch fails or 404s
+    }
+  }
+
+  return Array.from(discovered);
 }
 
 function isPathRobotsDisallowed(url: string, disallowedPaths: string[]): boolean {
@@ -200,7 +287,8 @@ function isPathRobotsDisallowed(url: string, disallowedPaths: string[]): boolean
 
 export async function scrapeUrlWithDiagnostics(
   url: string,
-  isRobotsBlocked: boolean = false
+  isRobotsBlocked: boolean = false,
+  maxRetries: number = 2
 ): Promise<ScrapeAttemptResult> {
   const normalized = normalizeUrl(url);
 
@@ -217,6 +305,7 @@ export async function scrapeUrlWithDiagnostics(
     };
   }
 
+  // Strictly honor robots.txt: never crawl disallowed pages, 0 retries
   if (isRobotsBlocked) {
     const failure = classifyCrawlFailure({ isRobotsBlocked: true });
     return {
@@ -231,92 +320,140 @@ export async function scrapeUrlWithDiagnostics(
     };
   }
 
-  try {
-    let finalUrl = normalized;
-    let config = { ...AXIOS_CONFIG };
+  let attempt = 0;
 
-    const proxyApiKey = process.env.SCRAPING_PROXY_API_KEY;
-    const proxyService = (process.env.SCRAPING_PROXY_SERVICE || 'scrapingbee').toLowerCase();
+  while (attempt <= maxRetries) {
+    try {
+      // Direct HTTP request - no proxy rotation, no anti-bot evasion
+      const response = await axios.get(normalized, AXIOS_CONFIG);
+      const html = typeof response.data === 'string' ? response.data : '';
 
-    if (proxyApiKey) {
-      if (proxyService === 'scrapingbee') {
-        finalUrl = `https://app.scrapingbee.com/api/v1/?api_key=${proxyApiKey}&url=${encodeURIComponent(normalized)}&render_js=false`;
-        config.timeout = 15000;
-      } else if (proxyService === 'zenrows') {
-        finalUrl = `https://api.zenrows.com/v1/?apikey=${proxyApiKey}&url=${encodeURIComponent(normalized)}`;
-        config.timeout = 15000;
+      // Permanent errors (404 Not Found, 403 Forbidden): Do not retry
+      if (response.status === 404 || response.status === 403) {
+        const failure = classifyCrawlFailure({ statusCode: response.status, html });
+        return {
+          success: false,
+          url: normalized,
+          title: normalized,
+          text: '',
+          html,
+          status: response.status,
+          classification: failure.classification as CrawlClassification,
+          failureReason: failure.failureReason
+        };
       }
-    }
 
-    const response = await axios.get(finalUrl, config);
-    const html = typeof response.data === 'string' ? response.data : '';
+      // Rate limit (429) or server error (5xx): transient retry if attempts remaining (max 2)
+      if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
+        if (attempt < maxRetries) {
+          attempt++;
+          await new Promise(resolve => setTimeout(resolve, attempt * 300));
+          continue;
+        }
+        const failure = classifyCrawlFailure({ statusCode: response.status, html });
+        return {
+          success: false,
+          url: normalized,
+          title: normalized,
+          text: '',
+          html,
+          status: response.status,
+          classification: failure.classification as CrawlClassification,
+          failureReason: failure.failureReason
+        };
+      }
 
-    if (response.status >= 400) {
-      const failure = classifyCrawlFailure({ statusCode: response.status, html });
+      // Other 4xx client errors: no retry
+      if (response.status >= 400) {
+        const failure = classifyCrawlFailure({ statusCode: response.status, html });
+        return {
+          success: false,
+          url: normalized,
+          title: normalized,
+          text: '',
+          html,
+          status: response.status,
+          classification: failure.classification as CrawlClassification,
+          failureReason: failure.failureReason
+        };
+      }
+
+      const text = cleanText(html);
+      const $ = cheerio.load(html || '');
+      const title = $('title').text().trim() || deriveTitleFromUrl(normalized);
+
+      // Check for SPA shells needing JavaScript (Empty initial DOM)
+      if (text.length < 50) {
+        const failure = classifyCrawlFailure({
+          statusCode: response.status,
+          html,
+          textLength: text.length
+        });
+
+        return {
+          success: false,
+          url: normalized,
+          title,
+          text,
+          html,
+          status: response.status,
+          classification: failure.classification as CrawlClassification,
+          failureReason: failure.failureReason
+        };
+      }
+
       return {
-        success: false,
+        success: true,
         url: normalized,
-        title: normalized,
-        text: '',
+        title,
+        text,
         html,
-        status: response.status,
-        classification: failure.classification as CrawlClassification,
-        failureReason: failure.failureReason
+        status: response.status
       };
-    }
+    } catch (error: any) {
+      const statusCode = error.response?.status || null;
+      const responseHtml = typeof error.response?.data === 'string' ? error.response.data : '';
+      const errMsg = error.message || String(error);
 
-    const text = cleanText(html);
-    const $ = cheerio.load(html || '');
-    const title = $('title').text().trim() || new URL(normalized).pathname || normalized;
+      // Check if transient error eligible for retry (timeout, socket hangup, connection reset)
+      const isTransient = !statusCode || statusCode === 429 || (statusCode >= 500 && statusCode < 600) ||
+        /timeout|timed out|etimedout|econnaborted|econnreset/i.test(errMsg);
 
-    // Check for SPA shells needing JavaScript
-    if (text.length < 50) {
+      if (isTransient && attempt < maxRetries) {
+        attempt++;
+        await new Promise(resolve => setTimeout(resolve, attempt * 300));
+        continue;
+      }
+
       const failure = classifyCrawlFailure({
-        statusCode: response.status,
-        html,
-        textLength: text.length
+        statusCode,
+        errorMessage: errMsg,
+        html: responseHtml
       });
 
       return {
         success: false,
         url: normalized,
-        title,
-        text,
-        html,
-        status: response.status,
+        title: normalized,
+        text: '',
+        html: responseHtml,
+        status: statusCode,
         classification: failure.classification as CrawlClassification,
         failureReason: failure.failureReason
       };
     }
-
-    return {
-      success: true,
-      url: normalized,
-      title,
-      text,
-      html,
-      status: response.status
-    };
-  } catch (error: any) {
-    const statusCode = error.response?.status || null;
-    const responseHtml = typeof error.response?.data === 'string' ? error.response.data : '';
-    const failure = classifyCrawlFailure({
-      statusCode,
-      errorMessage: error.message || String(error),
-      html: responseHtml
-    });
-
-    return {
-      success: false,
-      url: normalized,
-      title: normalized,
-      text: '',
-      html: responseHtml,
-      status: statusCode,
-      classification: failure.classification as CrawlClassification,
-      failureReason: failure.failureReason
-    };
   }
+
+  return {
+    success: false,
+    url: normalized,
+    title: normalized,
+    text: '',
+    html: '',
+    status: null,
+    classification: 'Timeout',
+    failureReason: 'Maximum retries (2) exceeded.'
+  };
 }
 
 export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
@@ -379,8 +516,9 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
   const baseDomain = new URL(normalizedBase).hostname.replace(/^www\./i, '');
   const fallbackName = baseDomain.split('.')[0].toUpperCase() || 'Target Company';
 
-  // 0. Pre-fetch robots.txt rules
-  const disallowedPaths = await fetchRobotsDisallowedPaths(normalizedBase);
+  // 0. Pre-fetch robots.txt rules and discover sitemap.xml
+  const { disallowedPaths, sitemapUrls } = await fetchRobotsInfo(normalizedBase);
+  const discoveredSitemapUrls = await fetchSitemapUrls(sitemapUrls, baseDomain, disallowedPaths, 50);
 
   // Tracking containers
   const discoveredMap = new Map<string, {
@@ -410,6 +548,23 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     weight: homeCategory.weight,
     depth: 0,
   });
+
+  // Ingest discovered sitemap URLs with prioritized weights
+  let sitemapDiscoveredCount = 0;
+  for (const sUrl of discoveredSitemapUrls) {
+    if (!discoveredMap.has(sUrl)) {
+      const cls = classifyUrl(sUrl);
+      discoveredMap.set(sUrl, {
+        url: sUrl,
+        title: deriveTitleFromUrl(sUrl),
+        category: cls.category,
+        weight: cls.weight,
+        depth: 1,
+        discoveredFrom: 'sitemap.xml'
+      });
+      sitemapDiscoveredCount++;
+    }
+  }
 
   // 2. Scrape Homepage
   const isHomeBlocked = isPathRobotsDisallowed(normalizedBase, disallowedPaths);
@@ -654,6 +809,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     pagesDiscovered: totalDiscovered,
     pagesCrawled: totalCrawled,
     pagesSkipped: totalSkipped,
+    sitemapDiscoveredCount,
     crawlDurationMs: elapsed,
     totalTextExtracted,
     skippedPages: skippedPagesList

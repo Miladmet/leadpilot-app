@@ -223,6 +223,7 @@ interface CrawlDiagnosticsData {
   pagesDiscovered: number;
   pagesCrawled: number;
   pagesSkipped: number;
+  sitemapDiscoveredCount?: number;
   crawlDurationMs: number;
   totalTextExtracted: number;
   coveragePercentage: number;
@@ -941,6 +942,7 @@ export default function Dashboard() {
       pagesDiscovered: discovered,
       pagesCrawled: crawled,
       pagesSkipped: skipped,
+      sitemapDiscoveredCount: parsed?.sitemapDiscoveredCount ?? 0,
       crawlDurationMs: parsed?.crawlDurationMs ?? p?.crawlDurationMs ?? 0,
       totalTextExtracted: parsed?.totalTextExtracted ?? p?.totalTextExtracted ?? 0,
       coveragePercentage: pct,
@@ -2688,6 +2690,11 @@ export default function Dashboard() {
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${health.badgeClass}`}>
                           {health.label}
                         </span>
+                        {(diag.sitemapDiscoveredCount || 0) > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            ✓ {diag.sitemapDiscoveredCount} via sitemap.xml
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full">
@@ -5327,6 +5334,11 @@ export default function Dashboard() {
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${selectedCrawlReport.healthDetails?.badgeClass || 'bg-slate-700 text-slate-200 border-slate-600'}`}>
                       {selectedCrawlReport.healthDetails?.label || `${selectedCrawlReport.coveragePercentage}% Coverage`}
                     </span>
+                    {(selectedCrawlReport.sitemapDiscoveredCount || 0) > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        ✓ {selectedCrawlReport.sitemapDiscoveredCount} via sitemap.xml
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     Research Engine Analysis for <span className="text-sky-300 font-semibold">{activeProspect?.websiteUrl || 'Target Website'}</span>
@@ -5527,16 +5539,23 @@ export default function Dashboard() {
                           .map((page, idx) => (
                             <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
                               <td className="p-2.5 max-w-[240px]">
-                                <a
-                                  href={page.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-[11px] text-sky-600 hover:underline flex items-center gap-1 truncate font-medium"
-                                  title={page.url}
-                                >
-                                  <ExternalLink className="h-2.5 w-2.5 shrink-0" />
-                                  {page.url}
-                                </a>
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <a
+                                    href={page.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[11px] text-sky-600 hover:underline flex items-center gap-1 truncate font-medium"
+                                    title={page.url}
+                                  >
+                                    <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                                    {page.url}
+                                  </a>
+                                  {page.discoveredFrom === 'sitemap.xml' && (
+                                    <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded shrink-0">
+                                      sitemap.xml
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="p-2.5 whitespace-nowrap">
                                 <span className="font-mono text-[10px] text-slate-600 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
