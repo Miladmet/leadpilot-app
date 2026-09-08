@@ -192,6 +192,36 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // 4b. Enforce Crawl Coverage Protection Gate (<25% Suppresses Speculative Opportunity Values)
+    const crawlCoverage = sanitizeInt(crawlData.diagnostics.coveragePercentage, 100);
+    const isSpeculativeSuppressed = crawlCoverage < 25;
+
+    const finalPotentialRevenue = isSpeculativeSuppressed ? 0 : sanitizeInt(aiAnalysis.potentialRevenue, 15000);
+    const finalOpportunityRange = isSpeculativeSuppressed
+      ? '$0 (Suppressed - Insufficient Coverage < 25%)'
+      : sanitizeString(aiAnalysis.opportunityRange, '$10,000 - $25,000');
+    const finalProposalStatus = isSpeculativeSuppressed ? 'Speculative' : sanitizeString(aiAnalysis.proposalStatus, 'Ready');
+
+    let finalRevenueAssumptions = aiAnalysis.revenueAssumptions;
+    if (isSpeculativeSuppressed) {
+      let assumptionsObj: any = {};
+      try {
+        assumptionsObj = typeof finalRevenueAssumptions === 'string'
+          ? JSON.parse(finalRevenueAssumptions)
+          : (finalRevenueAssumptions || {});
+      } catch {
+        assumptionsObj = { assumptions: [] };
+      }
+      assumptionsObj.disclaimer = 'Speculative pipeline revenue and contract values have been suppressed because crawl coverage is Insufficient (< 25%). Perform a deeper site audit or verify page access before proposing financial ROI.';
+      assumptionsObj.coverageSuppressed = true;
+      assumptionsObj.coveragePercentage = crawlCoverage;
+      finalRevenueAssumptions = JSON.stringify(assumptionsObj);
+    } else {
+      finalRevenueAssumptions = typeof finalRevenueAssumptions === 'string'
+        ? finalRevenueAssumptions
+        : JSON.stringify(finalRevenueAssumptions || {});
+    }
+
     // 5. Save to Database with resilient auto-heal and fallback
     const prospectPayload: any = {
       userId: user.id,
@@ -206,13 +236,13 @@ export async function POST(req: NextRequest) {
       competitorGaps: JSON.stringify(Array.isArray(aiAnalysis.competitorGaps) ? aiAnalysis.competitorGaps : []),
       scoreExplanations: JSON.stringify(aiAnalysis.scoreExplanations || {}),
 
-      opportunityScore: sanitizeInt(aiAnalysis.opportunityScore, 50),
+      opportunityScore: isSpeculativeSuppressed ? Math.min(30, sanitizeInt(aiAnalysis.opportunityScore, 50)) : sanitizeInt(aiAnalysis.opportunityScore, 50),
       buyingSignalScore: sanitizeInt(aiAnalysis.buyingSignalScore, 50),
-      potentialRevenue: sanitizeInt(aiAnalysis.potentialRevenue, 15000),
-      closingProbability: sanitizeInt(aiAnalysis.closingProbability, 50),
+      potentialRevenue: finalPotentialRevenue,
+      closingProbability: isSpeculativeSuppressed ? 20 : sanitizeInt(aiAnalysis.closingProbability, 50),
       problemSeverity: sanitizeString(aiAnalysis.problemSeverity, 'Medium'),
-      leadQuality: sanitizeString(aiAnalysis.leadQuality, 'Warm'),
-      proposalStatus: sanitizeString(aiAnalysis.proposalStatus, 'Ready'),
+      leadQuality: isSpeculativeSuppressed ? 'Cold' : sanitizeString(aiAnalysis.leadQuality, 'Warm'),
+      proposalStatus: finalProposalStatus,
 
       // NEW: Trust Metrics
       evidenceQuality: sanitizeInt(aiAnalysis.evidenceQuality, 90),
@@ -222,10 +252,8 @@ export async function POST(req: NextRequest) {
       claimsRejectedCount: sanitizeInt(aiAnalysis.claimsRejectedCount, 0),
       lowConfidenceCount: sanitizeInt(aiAnalysis.lowConfidenceCount, 0),
       suppressedRecsCount: sanitizeInt(aiAnalysis.suppressedRecsCount, 0),
-      opportunityRange: sanitizeString(aiAnalysis.opportunityRange, '$10,000 - $25,000'),
-      revenueAssumptions: typeof aiAnalysis.revenueAssumptions === 'string'
-        ? aiAnalysis.revenueAssumptions
-        : JSON.stringify(aiAnalysis.revenueAssumptions || {}),
+      opportunityRange: finalOpportunityRange,
+      revenueAssumptions: finalRevenueAssumptions,
 
       // NEW: Crawl Coverage & Diagnostics Metrics
       pagesDiscoveredCount: sanitizeInt(crawlData.diagnostics.pagesDiscovered, 1),

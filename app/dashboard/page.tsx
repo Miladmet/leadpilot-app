@@ -46,6 +46,10 @@ import {
   generateReferralCode,
   getReferralRewardTiers
 } from '@/lib/growthEngine';
+import {
+  getCoverageHealth,
+  CrawlDiagnosticsReport
+} from '@/lib/crawlDiagnostics';
 
 
 
@@ -210,6 +214,9 @@ interface DiscoveredPageItem {
   textLength: number;
   snippet?: string;
   discoveredFrom?: string;
+  statusCode?: number | null;
+  failureReason?: string;
+  classification?: string;
 }
 
 interface CrawlDiagnosticsData {
@@ -219,6 +226,29 @@ interface CrawlDiagnosticsData {
   crawlDurationMs: number;
   totalTextExtracted: number;
   coveragePercentage: number;
+  coverageHealth?: string;
+  healthDetails?: any;
+  hasCoverageWarning?: boolean;
+  coverageWarning?: string | null;
+  isSpeculativeSuppressed?: boolean;
+  suppressionReason?: string | null;
+  topFailureReasons?: Array<{
+    classification: string;
+    label: string;
+    count: number;
+    percentage: number;
+    sampleReason?: string;
+  }>;
+  skippedPages?: Array<{
+    url: string;
+    title?: string;
+    category?: string;
+    depth?: number;
+    statusCode: number | null;
+    failureReason: string;
+    classification: string;
+    discoveredFrom?: string;
+  }>;
   warningMessage?: string;
 }
 
@@ -351,8 +381,14 @@ export default function Dashboard() {
   const [selectedPortfolioCalc, setSelectedPortfolioCalc] = useState<OpportunityPortfolioResult | null>(null);
   const [selectedSandboxType, setSelectedSandboxType] = useState<string>('websiteRedesign');
   const [showSandboxEvidenceModal, setShowSandboxEvidenceModal] = useState(false);
-  const [selectedSandboxEvidence, setSelectedSandboxEvidence] = useState<SandboxEvidence | null>(null);
   const [showMobileProspectDrawer, setShowMobileProspectDrawer] = useState(false);
+  
+  // Crawl Diagnostics Report Modal State
+  const [showCrawlReportModal, setShowCrawlReportModal] = useState(false);
+  const [selectedCrawlReport, setSelectedCrawlReport] = useState<CrawlDiagnosticsData | null>(null);
+  const [crawlReportSearch, setCrawlReportSearch] = useState('');
+  const [crawlReportFilter, setCrawlReportFilter] = useState('ALL');
+  const [copiedDiagnostics, setCopiedDiagnostics] = useState(false);
 
 
 
@@ -840,23 +876,82 @@ export default function Dashboard() {
   };
 
   const parseCrawlDiagnostics = (jsonStr: string | undefined, p?: Prospect | null): CrawlDiagnosticsData => {
+    let parsed: any = null;
     if (jsonStr) {
       try {
-        const parsed = JSON.parse(jsonStr);
-        if (parsed && typeof parsed.pagesDiscovered === 'number') {
-          return parsed;
-        }
+        parsed = JSON.parse(jsonStr);
       } catch { }
     }
-    const discovered = p?.pagesDiscoveredCount ?? 1;
-    const crawled = p?.pagesCrawledCount ?? 1;
+
+    const discovered = parsed?.pagesDiscovered ?? p?.pagesDiscoveredCount ?? 1;
+    const crawled = parsed?.pagesCrawled ?? p?.pagesCrawledCount ?? 1;
+    const skipped = parsed?.pagesSkipped ?? Math.max(0, discovered - crawled);
+    const pct = parsed?.coveragePercentage ?? p?.crawlCoveragePercent ?? (discovered > 0 ? Math.min(100, Math.round((crawled / discovered) * 100)) : 100);
+    const healthInfo = getCoverageHealth(pct);
+
+    // Extract skipped pages from crawledPagesData if not present
+    let skippedPages = parsed?.skippedPages;
+    if (!Array.isArray(skippedPages) && p?.crawledPagesData) {
+      const allPages = parseCrawledPages(p.crawledPagesData);
+      skippedPages = allPages
+        .filter(page => page.status !== 'Crawled')
+        .map(page => ({
+          url: page.url,
+          title: page.title,
+          category: page.category,
+          depth: page.depth,
+          statusCode: page.statusCode ?? null,
+          failureReason: page.failureReason || 'Not crawled',
+          classification: page.classification || 'Unknown',
+          discoveredFrom: page.discoveredFrom
+        }));
+    }
+
+    // Top failure reasons aggregation
+    let topFailureReasons = parsed?.topFailureReasons;
+    if (!Array.isArray(topFailureReasons) && Array.isArray(skippedPages) && skippedPages.length > 0) {
+      const counts: Record<string, number> = {};
+      const sampleReasons: Record<string, string> = {};
+      skippedPages.forEach((page: any) => {
+        const cls = page.classification || 'Unknown';
+        counts[cls] = (counts[cls] || 0) + 1;
+        if (!sampleReasons[cls] && page.failureReason) {
+          sampleReasons[cls] = page.failureReason;
+        }
+      });
+      const totalSkipped = skippedPages.length;
+      topFailureReasons = Object.entries(counts).map(([cls, count]) => ({
+        classification: cls,
+        label: cls === '403' ? '403 Forbidden (Blocked / WAF)'
+          : cls === '404' ? '404 Not Found'
+          : cls === '429' ? '429 Rate Limited'
+          : cls === 'Robots Blocked' ? 'Robots Blocked'
+          : cls === 'Timeout' ? 'Connection Timeout'
+          : cls === 'JavaScript Required' ? 'JavaScript Required (SPA)'
+          : cls === 'Redirect Loop' ? 'Redirect Loop'
+          : cls === 'Capped' ? 'Crawl Budget Cap'
+          : 'Unknown / Unreachable',
+        count,
+        percentage: Math.round((count / totalSkipped) * 100),
+        sampleReason: sampleReasons[cls] || ''
+      })).sort((a, b) => b.count - a.count);
+    }
+
     return {
       pagesDiscovered: discovered,
       pagesCrawled: crawled,
-      pagesSkipped: Math.max(0, discovered - crawled),
-      crawlDurationMs: p?.crawlDurationMs ?? 0,
-      totalTextExtracted: p?.totalTextExtracted ?? 0,
-      coveragePercentage: p?.crawlCoveragePercent ?? 100,
+      pagesSkipped: skipped,
+      crawlDurationMs: parsed?.crawlDurationMs ?? p?.crawlDurationMs ?? 0,
+      totalTextExtracted: parsed?.totalTextExtracted ?? p?.totalTextExtracted ?? 0,
+      coveragePercentage: pct,
+      coverageHealth: healthInfo.health,
+      healthDetails: healthInfo,
+      hasCoverageWarning: pct < 60,
+      coverageWarning: pct < 60 ? `Crawl Coverage Warning: ${pct}% is below 60% threshold.` : null,
+      isSpeculativeSuppressed: pct < 25,
+      suppressionReason: pct < 25 ? 'Speculative opportunity values suppressed (<25% coverage).' : null,
+      topFailureReasons: topFailureReasons || [],
+      skippedPages: skippedPages || [],
       warningMessage: crawled <= 1 ? 'Limited website coverage may reduce analysis quality.' : undefined
     };
   };
@@ -936,8 +1031,9 @@ export default function Dashboard() {
     tenantIsolationPassRate: 100
   }) : null;
 
-  // Transparent Opportunity Portfolio Engine
-  const activeOpportunityPortfolio = activeProspect ? calculateOpportunityPortfolio(
+  // Transparent Opportunity Portfolio Engine (Suppressed when Crawl Coverage < 25%)
+  const isCrawlCoverageInsufficient = (activeProspect?.crawlCoveragePercent ?? 100) < 25;
+  const activeOpportunityPortfolio = (activeProspect && !isCrawlCoverageInsufficient) ? calculateOpportunityPortfolio(
     parseRecommendations(activeProspect.recommendations),
     {
       evidenceQuality: activeProspect.evidenceQuality,
@@ -2577,20 +2673,77 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Crawl Diagnostics Panel (Requirement 12) */}
+              {/* Crawl Diagnostics Panel (Crawl Coverage Diagnostics) */}
               {(() => {
                 const diag = parseCrawlDiagnostics(activeProspect.crawlDiagnostics, activeProspect);
+                const health = diag.healthDetails || getCoverageHealth(diag.coveragePercentage);
                 return (
                   <div className="px-6 py-3 bg-slate-50 border-b border-slate-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <Globe className="h-3.5 w-3.5 text-sky-600" />
-                        Website Research Engine • Crawl Diagnostics
-                      </span>
-                      <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
-                        Coverage: {diag.coveragePercentage}%
-                      </span>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <Globe className="h-3.5 w-3.5 text-sky-600" />
+                          Website Research Engine • Crawl Diagnostics
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${health.badgeClass}`}>
+                          {health.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full">
+                          Coverage: {diag.coveragePercentage}%
+                        </span>
+                        <button
+                          onClick={() => {
+                            setSelectedCrawlReport(diag);
+                            setShowCrawlReportModal(true);
+                          }}
+                          className="text-[11px] font-bold text-sky-700 hover:text-sky-800 bg-white hover:bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                          title="Click to view detailed Crawl Diagnostics Report and skipped pages inventory"
+                        >
+                          <BarChart3 className="h-3.5 w-3.5 text-sky-600" />
+                          View Diagnostics Report
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Coverage warning when below 60% */}
+                    {diag.coveragePercentage < 60 && (
+                      <div className="mb-2.5 p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                          <div>
+                            <span className="font-bold text-xs">Coverage Warning ({diag.coveragePercentage}% &lt; 60%):</span>{' '}
+                            <span className="text-[11px]">Limited website crawl coverage may omit service offerings, pricing structures, or technical stack defects. Recommendations carry reduced certainty.</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedCrawlReport(diag);
+                            setShowCrawlReportModal(true);
+                          }}
+                          className="text-[10px] font-bold text-amber-800 hover:underline shrink-0"
+                        >
+                          Inspect Skipped Pages ➜
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Prevent speculative opportunity values when coverage < 25% */}
+                    {diag.coveragePercentage < 25 && (
+                      <div className="mb-2.5 p-2.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-950 text-xs flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                          <div>
+                            <span className="font-bold text-xs">Speculative Values Suppressed (&lt;25% Coverage):</span>{' '}
+                            <span className="text-[11px]">Crawl coverage is insufficient ({diag.coveragePercentage}%). Revenue projections and contract values have been withheld to protect agency credibility.</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                          Suppressed
+                        </span>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
                       <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
@@ -2621,16 +2774,6 @@ export default function Dashboard() {
                   </div>
                 );
               })()}
-
-              {/* SINGLE PAGE COVERAGE WARNING (Requirement 13) */}
-              {(activeProspect.pagesCrawledCount || 1) <= 1 && (
-                <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center gap-2.5 shadow-2xs">
-                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                  <p className="font-semibold text-xs">
-                    Limited website coverage may reduce analysis quality.
-                  </p>
-                </div>
-              )}
 
 
               {/* SPECULATIVE CAVEAT BANNER IF EVIDENCE IS LOW */}
@@ -4346,7 +4489,8 @@ export default function Dashboard() {
                                   <th className="p-2.5">Page Title & URL</th>
                                   <th className="p-2.5">Category</th>
                                   <th className="p-2.5">Depth</th>
-                                  <th className="p-2.5">Status</th>
+                                  <th className="p-2.5">Crawl Status</th>
+                                  <th className="p-2.5">Diagnostic / Reason</th>
                                   <th className="p-2.5 text-right">Extracted</th>
                                   <th className="p-2.5 text-center">Snippet</th>
                                 </tr>
@@ -4354,7 +4498,7 @@ export default function Dashboard() {
                               <tbody className="divide-y divide-slate-150 bg-white">
                                 {filteredPages.map((page, idx) => (
                                   <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
-                                    <td className="p-2.5 max-w-[240px]">
+                                    <td className="p-2.5 max-w-[220px]">
                                       <span className="font-bold text-slate-800 block truncate" title={page.title}>{page.title || 'Untitled Page'}</span>
                                       <a
                                         href={page.url}
@@ -4377,16 +4521,30 @@ export default function Dashboard() {
                                         Level {page.depth}
                                       </span>
                                     </td>
-                                    <td className="p-2.5">
+                                    <td className="p-2.5 whitespace-nowrap">
                                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                         page.status === 'Crawled'
                                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                           : page.status === 'Failed'
                                           ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                          : 'bg-slate-100 text-slate-500 border-slate-200'
+                                          : 'bg-amber-50 text-amber-700 border-amber-200'
                                       }`}>
-                                        {page.status === 'Crawled' ? '✓ Crawled' : page.status}
+                                        {page.status === 'Crawled' ? `✓ Crawled (${page.statusCode || 200})` : page.status === 'Failed' ? `✗ Failed (${page.statusCode || 'Err'})` : `Skipped`}
                                       </span>
+                                    </td>
+                                    <td className="p-2.5 max-w-[200px]">
+                                      {page.status === 'Crawled' ? (
+                                        <span className="text-[10px] text-emerald-600 font-medium">Fully Parsed</span>
+                                      ) : (
+                                        <div className="space-y-0.5">
+                                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 inline-block">
+                                            {page.classification || 'Unknown'}
+                                          </span>
+                                          <p className="text-[10px] text-slate-500 truncate" title={page.failureReason || 'Skipped link'}>
+                                            {page.failureReason || 'Skipped link'}
+                                          </p>
+                                        </div>
+                                      )}
                                     </td>
                                     <td className="p-2.5 text-right font-mono text-slate-500 text-[10px]">
                                       {page.textLength ? `${(page.textLength / 1024).toFixed(1)} KB` : '—'}
@@ -5150,6 +5308,292 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* ---------------- SECTION: CRAWL DIAGNOSTICS REPORT MODAL ---------------- */}
+      {showCrawlReportModal && selectedCrawlReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-sky-600 text-white">
+                  <Globe className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                      Crawl Diagnostics Report
+                    </h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${selectedCrawlReport.healthDetails?.badgeClass || 'bg-slate-700 text-slate-200 border-slate-600'}`}>
+                      {selectedCrawlReport.healthDetails?.label || `${selectedCrawlReport.coveragePercentage}% Coverage`}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Research Engine Analysis for <span className="text-sky-300 font-semibold">{activeProspect?.websiteUrl || 'Target Website'}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCrawlReportModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-5">
+              {/* Coverage Health Banner Card */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Coverage Health Rating</span>
+                    <h4 className="text-base font-black text-slate-900 mt-0.5 flex items-center gap-2">
+                      <span>{selectedCrawlReport.healthDetails?.health || 'Moderate'} Health</span>
+                      <span className="text-xs font-mono font-bold text-slate-500">({selectedCrawlReport.coveragePercentage}% of discovered pages audited)</span>
+                    </h4>
+                  </div>
+                  <span className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-1 rounded-lg shadow-2xs">
+                    {selectedCrawlReport.pagesCrawled} / {selectedCrawlReport.pagesDiscovered} Pages Crawled
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      selectedCrawlReport.coveragePercentage >= 90 ? 'bg-emerald-500'
+                        : selectedCrawlReport.coveragePercentage >= 75 ? 'bg-teal-500'
+                        : selectedCrawlReport.coveragePercentage >= 50 ? 'bg-amber-500'
+                        : selectedCrawlReport.coveragePercentage >= 25 ? 'bg-orange-500'
+                        : 'bg-rose-500'
+                    }`}
+                    style={{ width: `${Math.max(4, Math.min(100, selectedCrawlReport.coveragePercentage))}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  {selectedCrawlReport.healthDetails?.description || 'Crawl coverage reflects the portion of site architecture audited for agency opportunities.'}
+                </p>
+              </div>
+
+              {/* Coverage Warning when below 60% */}
+              {selectedCrawlReport.coveragePercentage < 60 && (
+                <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-start gap-2.5 shadow-2xs">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="font-bold text-xs uppercase tracking-wider">Coverage Warning: Under 60% Threshold</h5>
+                    <p className="mt-0.5 leading-relaxed text-amber-800 text-[11px]">
+                      {selectedCrawlReport.coverageWarning || 'Limited website coverage may omit service offerings, pricing structures, or technical stack defects. Recommendations carry reduced certainty.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Speculative Opportunity Value Suppression Alert when below 25% */}
+              {selectedCrawlReport.coveragePercentage < 25 && (
+                <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-950 text-xs flex items-start gap-2.5 shadow-2xs">
+                  <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="font-bold text-xs uppercase tracking-wider">Speculative Opportunity Values Suppressed (&lt;25% Coverage)</h5>
+                    <p className="mt-0.5 leading-relaxed text-rose-800 text-[11px]">
+                      Because crawl coverage is Insufficient ({selectedCrawlReport.coveragePercentage}%), speculative revenue calculations and contract ranges have been withheld. This safeguards agency credibility during prospective client discussions.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Crawl Summary Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pages Discovered</span>
+                  <strong className="text-slate-800 text-base font-black">{selectedCrawlReport.pagesDiscovered}</strong>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pages Crawled</span>
+                  <strong className="text-emerald-600 text-base font-black">{selectedCrawlReport.pagesCrawled}</strong>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pages Skipped</span>
+                  <strong className="text-rose-600 text-base font-black">{selectedCrawlReport.pagesSkipped}</strong>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[9px] text-slate-400 font-semibold block uppercase">Crawl Duration</span>
+                  <strong className="text-indigo-600 text-base font-black">
+                    {((selectedCrawlReport.crawlDurationMs || 0) / 1000).toFixed(1)}s
+                  </strong>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[9px] text-slate-400 font-semibold block uppercase">Text Extracted</span>
+                  <strong className="text-amber-600 text-base font-black">
+                    {((selectedCrawlReport.totalTextExtracted || 0) / 1024).toFixed(1)} KB
+                  </strong>
+                </div>
+              </div>
+
+              {/* TOP REASONS PAGES WERE NOT CRAWLED */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Filter className="h-3.5 w-3.5 text-sky-600" />
+                  Top Reasons Pages Were Not Crawled
+                </h4>
+
+                {selectedCrawlReport.topFailureReasons && selectedCrawlReport.topFailureReasons.length > 0 ? (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {selectedCrawlReport.topFailureReasons.map((reason, idx) => (
+                      <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 font-mono">
+                            {reason.classification}
+                          </span>
+                          <span className="text-xs font-black text-slate-900">
+                            {reason.count} {reason.count === 1 ? 'page' : 'pages'} ({reason.percentage}%)
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-semibold text-slate-700">{reason.label}</p>
+                        {reason.sampleReason && (
+                          <p className="text-[10px] text-slate-500 leading-snug truncate" title={reason.sampleReason}>
+                            {reason.sampleReason}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs text-center font-medium">
+                    ✓ All discovered pages were successfully audited with zero crawl errors or exclusions.
+                  </div>
+                )}
+              </div>
+
+              {/* DETAILED SKIPPED & FAILED PAGES INVENTORY */}
+              {selectedCrawlReport.skippedPages && selectedCrawlReport.skippedPages.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileCheck className="h-3.5 w-3.5 text-slate-500" />
+                      Skipped & Failed Pages Inventory ({selectedCrawlReport.skippedPages.length})
+                    </h4>
+
+                    {/* Filter / Search input */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <div className="relative flex-1 sm:w-48">
+                        <input
+                          type="text"
+                          placeholder="Filter skipped URLs..."
+                          value={crawlReportSearch}
+                          onChange={(e) => setCrawlReportSearch(e.target.value)}
+                          className="text-xs pl-7 pr-3 py-1 bg-slate-50 border border-slate-200 rounded-lg w-full focus:outline-none focus:border-sky-500"
+                        />
+                        <Search className="h-3 w-3 text-slate-400 absolute left-2 top-2" />
+                      </div>
+
+                      <select
+                        value={crawlReportFilter}
+                        onChange={(e) => setCrawlReportFilter(e.target.value)}
+                        className="text-xs py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-sky-500"
+                      >
+                        <option value="ALL">All Categories</option>
+                        <option value="403">403</option>
+                        <option value="404">404</option>
+                        <option value="429">429</option>
+                        <option value="Robots Blocked">Robots Blocked</option>
+                        <option value="Timeout">Timeout</option>
+                        <option value="JavaScript Required">JavaScript Required</option>
+                        <option value="Redirect Loop">Redirect Loop</option>
+                        <option value="Capped">Capped</option>
+                        <option value="Unknown">Unknown</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs max-h-[260px] overflow-y-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-600 font-bold z-10">
+                        <tr>
+                          <th className="p-2.5">Skipped URL</th>
+                          <th className="p-2.5">Status Code</th>
+                          <th className="p-2.5">Classification</th>
+                          <th className="p-2.5">Failure Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-150 bg-white">
+                        {selectedCrawlReport.skippedPages
+                          .filter(p => {
+                            const matchesSearch = !crawlReportSearch ||
+                              p.url.toLowerCase().includes(crawlReportSearch.toLowerCase()) ||
+                              p.failureReason.toLowerCase().includes(crawlReportSearch.toLowerCase());
+                            const matchesFilter = crawlReportFilter === 'ALL' || p.classification === crawlReportFilter;
+                            return matchesSearch && matchesFilter;
+                          })
+                          .map((page, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="p-2.5 max-w-[240px]">
+                                <a
+                                  href={page.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] text-sky-600 hover:underline flex items-center gap-1 truncate font-medium"
+                                  title={page.url}
+                                >
+                                  <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                                  {page.url}
+                                </a>
+                              </td>
+                              <td className="p-2.5 whitespace-nowrap">
+                                <span className="font-mono text-[10px] text-slate-600 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                  {page.statusCode ? `HTTP ${page.statusCode}` : '—'}
+                                </span>
+                              </td>
+                              <td className="p-2.5 whitespace-nowrap">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  page.classification === 'Robots Blocked' ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                    : page.classification === '403' ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                    : page.classification === '404' ? 'bg-slate-100 text-slate-700 border-slate-200'
+                                    : page.classification === '429' ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                    : page.classification === 'Timeout' ? 'bg-orange-50 text-orange-800 border-orange-200'
+                                    : page.classification === 'JavaScript Required' ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                    : page.classification === 'Redirect Loop' ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}>
+                                  {page.classification}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-[11px] text-slate-600 max-w-[260px] truncate" title={page.failureReason}>
+                                {page.failureReason}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+              <button
+                onClick={() => {
+                  const summaryText = `Crawl Diagnostics Report for ${activeProspect?.websiteUrl || ''}\nCoverage: ${selectedCrawlReport.coveragePercentage}% (${selectedCrawlReport.healthDetails?.health || ''})\nPages Crawled: ${selectedCrawlReport.pagesCrawled}/${selectedCrawlReport.pagesDiscovered}\nSkipped: ${selectedCrawlReport.pagesSkipped}\nTop Reasons:\n${(selectedCrawlReport.topFailureReasons || []).map(r => `- ${r.label}: ${r.count} pages (${r.percentage}%)`).join('\n')}`;
+                  navigator.clipboard.writeText(summaryText);
+                  setCopiedDiagnostics(true);
+                  setTimeout(() => setCopiedDiagnostics(false), 2000);
+                }}
+                className="text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              >
+                {copiedDiagnostics ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-slate-400" />}
+                {copiedDiagnostics ? 'Copied Summary!' : 'Copy Summary'}
+              </button>
+
+              <button
+                onClick={() => setShowCrawlReportModal(false)}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+              >
+                Close Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Extracted Page Content Preview Modal */}
       {selectedPageSnippet && (

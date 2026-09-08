@@ -1,5 +1,12 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import {
+  CrawlClassification,
+  CrawlDiagnosticsReport,
+  SkippedPageRecord,
+  classifyCrawlFailure,
+  generateCrawlDiagnosticsReport
+} from './crawlDiagnostics';
 
 export interface ScrapeResult {
   url: string;
@@ -7,6 +14,17 @@ export interface ScrapeResult {
   text: string;
   html: string;
   status: number;
+}
+
+export interface ScrapeAttemptResult {
+  success: boolean;
+  url: string;
+  title: string;
+  text: string;
+  html: string;
+  status: number | null;
+  failureReason?: string;
+  classification?: CrawlClassification;
 }
 
 export interface DiscoveredPage {
@@ -18,15 +36,12 @@ export interface DiscoveredPage {
   textLength: number;
   snippet?: string;
   discoveredFrom?: string;
+  statusCode?: number | null;
+  failureReason?: string;
+  classification?: string;
 }
 
-export interface CrawlDiagnostics {
-  pagesDiscovered: number;
-  pagesCrawled: number;
-  pagesSkipped: number;
-  crawlDurationMs: number;
-  totalTextExtracted: number;
-  coveragePercentage: number;
+export interface CrawlDiagnostics extends CrawlDiagnosticsReport {
   warningMessage?: string;
 }
 
@@ -149,10 +164,71 @@ function isDisallowedExtension(url: string): boolean {
   }
 }
 
-export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
+async function fetchRobotsDisallowedPaths(baseUrl: string): Promise<string[]> {
+  try {
+    const robotsUrl = new URL('/robots.txt', baseUrl).toString();
+    const res = await axios.get(robotsUrl, { ...AXIOS_CONFIG, timeout: 2500 });
+    if (res.status === 200 && typeof res.data === 'string') {
+      const lines = res.data.split('\n');
+      const disallowed: string[] = [];
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (/^disallow:\s*/i.test(line)) {
+          const pathPart = line.replace(/^disallow:\s*/i, '').trim();
+          if (pathPart && pathPart !== '/' && !pathPart.includes('*')) {
+            disallowed.push(pathPart.toLowerCase());
+          }
+        }
+      }
+      return disallowed;
+    }
+  } catch {
+    // Non-blocking fallback if robots.txt unreachable
+  }
+  return [];
+}
+
+function isPathRobotsDisallowed(url: string, disallowedPaths: string[]): boolean {
+  if (!disallowedPaths.length) return false;
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    return disallowedPaths.some(dis => pathname.startsWith(dis));
+  } catch {
+    return false;
+  }
+}
+
+export async function scrapeUrlWithDiagnostics(
+  url: string,
+  isRobotsBlocked: boolean = false
+): Promise<ScrapeAttemptResult> {
   const normalized = normalizeUrl(url);
+
   if (isDisallowedExtension(normalized)) {
-    return null;
+    return {
+      success: false,
+      url: normalized,
+      title: normalized,
+      text: '',
+      html: '',
+      status: null,
+      classification: 'Unknown',
+      failureReason: 'Omitted disallowed binary/media file extension.'
+    };
+  }
+
+  if (isRobotsBlocked) {
+    const failure = classifyCrawlFailure({ isRobotsBlocked: true });
+    return {
+      success: false,
+      url: normalized,
+      title: normalized,
+      text: '',
+      html: '',
+      status: null,
+      classification: failure.classification as CrawlClassification,
+      failureReason: failure.failureReason
+    };
   }
 
   try {
@@ -173,16 +249,48 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
     }
 
     const response = await axios.get(finalUrl, config);
-    if (response.status >= 400 || typeof response.data !== 'string') {
-      return null;
+    const html = typeof response.data === 'string' ? response.data : '';
+
+    if (response.status >= 400) {
+      const failure = classifyCrawlFailure({ statusCode: response.status, html });
+      return {
+        success: false,
+        url: normalized,
+        title: normalized,
+        text: '',
+        html,
+        status: response.status,
+        classification: failure.classification as CrawlClassification,
+        failureReason: failure.failureReason
+      };
     }
 
-    const html = response.data;
-    const $ = cheerio.load(html);
-    const title = $('title').text().trim() || new URL(normalized).pathname || normalized;
     const text = cleanText(html);
+    const $ = cheerio.load(html || '');
+    const title = $('title').text().trim() || new URL(normalized).pathname || normalized;
+
+    // Check for SPA shells needing JavaScript
+    if (text.length < 50) {
+      const failure = classifyCrawlFailure({
+        statusCode: response.status,
+        html,
+        textLength: text.length
+      });
+
+      return {
+        success: false,
+        url: normalized,
+        title,
+        text,
+        html,
+        status: response.status,
+        classification: failure.classification as CrawlClassification,
+        failureReason: failure.failureReason
+      };
+    }
 
     return {
+      success: true,
       url: normalized,
       title,
       text,
@@ -190,8 +298,39 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
       status: response.status
     };
   } catch (error: any) {
+    const statusCode = error.response?.status || null;
+    const responseHtml = typeof error.response?.data === 'string' ? error.response.data : '';
+    const failure = classifyCrawlFailure({
+      statusCode,
+      errorMessage: error.message || String(error),
+      html: responseHtml
+    });
+
+    return {
+      success: false,
+      url: normalized,
+      title: normalized,
+      text: '',
+      html: responseHtml,
+      status: statusCode,
+      classification: failure.classification as CrawlClassification,
+      failureReason: failure.failureReason
+    };
+  }
+}
+
+export async function scrapeUrl(url: string): Promise<ScrapeResult | null> {
+  const result = await scrapeUrlWithDiagnostics(url);
+  if (!result.success || result.text.length < 50) {
     return null;
   }
+  return {
+    url: result.url,
+    title: result.title,
+    text: result.text,
+    html: result.html,
+    status: result.status || 200
+  };
 }
 
 function extractLinksFromHtml(html: string, currentUrl: string, baseDomain: string): { url: string; anchorText: string }[] {
@@ -240,6 +379,9 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
   const baseDomain = new URL(normalizedBase).hostname.replace(/^www\./i, '');
   const fallbackName = baseDomain.split('.')[0].toUpperCase() || 'Target Company';
 
+  // 0. Pre-fetch robots.txt rules
+  const disallowedPaths = await fetchRobotsDisallowedPaths(normalizedBase);
+
   // Tracking containers
   const discoveredMap = new Map<string, {
     url: string;
@@ -252,6 +394,12 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
 
   const crawledPages: CrawledPage[] = [];
   const crawledUrls = new Set<string>();
+  const failedScrapes = new Map<string, {
+    title: string;
+    statusCode: number | null;
+    failureReason: string;
+    classification: CrawlClassification;
+  }>();
 
   // 1. Initialize with Homepage (Depth 0)
   const homeCategory = classifyUrl(normalizedBase);
@@ -264,31 +412,57 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
   });
 
   // 2. Scrape Homepage
-  const homepageResult = await scrapeUrl(normalizedBase);
-  if (!homepageResult || homepageResult.text.length < 50) {
+  const isHomeBlocked = isPathRobotsDisallowed(normalizedBase, disallowedPaths);
+  const homepageAttempt = await scrapeUrlWithDiagnostics(normalizedBase, isHomeBlocked);
+
+  if (!homepageAttempt.success || homepageAttempt.text.length < 50) {
     const elapsed = Date.now() - startTime;
-    return {
-      companyName: fallbackName,
-      websiteUrl: normalizedBase,
-      pages: [],
-      discoveredPages: [
+    failedScrapes.set(normalizedBase, {
+      title: homepageAttempt.title || fallbackName,
+      statusCode: homepageAttempt.status,
+      failureReason: homepageAttempt.failureReason || 'Homepage request blocked or returned insufficient text.',
+      classification: homepageAttempt.classification || 'Unknown'
+    });
+
+    const failedPageRecord: DiscoveredPage = {
+      url: normalizedBase,
+      title: fallbackName,
+      category: 'Homepage',
+      depth: 0,
+      status: 'Failed',
+      textLength: homepageAttempt.text?.length || 0,
+      statusCode: homepageAttempt.status,
+      failureReason: homepageAttempt.failureReason || 'Homepage request blocked or returned insufficient text.',
+      classification: homepageAttempt.classification || 'Unknown',
+      snippet: homepageAttempt.failureReason
+    };
+
+    const initialReport = generateCrawlDiagnosticsReport({
+      pagesDiscovered: 1,
+      pagesCrawled: 0,
+      pagesSkipped: 1,
+      crawlDurationMs: elapsed,
+      totalTextExtracted: 0,
+      skippedPages: [
         {
           url: normalizedBase,
           title: fallbackName,
           category: 'Homepage',
           depth: 0,
-          status: 'Failed',
-          textLength: 0,
-          snippet: 'Homepage request blocked or returned no content.'
+          statusCode: homepageAttempt.status,
+          failureReason: homepageAttempt.failureReason || 'Homepage request blocked or returned insufficient text.',
+          classification: homepageAttempt.classification || 'Unknown'
         }
-      ],
+      ]
+    });
+
+    return {
+      companyName: fallbackName,
+      websiteUrl: normalizedBase,
+      pages: [],
+      discoveredPages: [failedPageRecord],
       diagnostics: {
-        pagesDiscovered: 1,
-        pagesCrawled: 0,
-        pagesSkipped: 1,
-        crawlDurationMs: elapsed,
-        totalTextExtracted: 0,
-        coveragePercentage: 0,
+        ...initialReport,
         warningMessage: 'Direct website crawler was blocked or returned no textual content.'
       },
       combinedContent: `<crawling_failed domain="${baseDomain}" companyName="${fallbackName}" url="${normalizedBase}" />`
@@ -297,16 +471,16 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
 
   // Record successful homepage
   crawledPages.push({
-    url: homepageResult.url,
-    title: homepageResult.title,
+    url: homepageAttempt.url,
+    title: homepageAttempt.title,
     category: 'Homepage',
     depth: 0,
-    text: homepageResult.text
+    text: homepageAttempt.text
   });
-  crawledUrls.add(homepageResult.url);
+  crawledUrls.add(homepageAttempt.url);
 
   // Discover Level 1 internal links from Homepage
-  const level1Links = extractLinksFromHtml(homepageResult.html, homepageResult.url, baseDomain);
+  const level1Links = extractLinksFromHtml(homepageAttempt.html, homepageAttempt.url, baseDomain);
   for (const link of level1Links) {
     if (!discoveredMap.has(link.url)) {
       const cls = classifyUrl(link.url, link.anchorText);
@@ -316,7 +490,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
         category: cls.category,
         weight: cls.weight,
         depth: 1,
-        discoveredFrom: homepageResult.url
+        discoveredFrom: homepageAttempt.url
       });
     }
   }
@@ -324,9 +498,8 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
   // Helper to get remaining un-crawled candidates sorted by priority
   const getSortedQueue = () => {
     return Array.from(discoveredMap.values())
-      .filter(item => !crawledUrls.has(item.url) && item.depth <= maxDepth)
+      .filter(item => !crawledUrls.has(item.url) && !failedScrapes.has(item.url) && item.depth <= maxDepth)
       .sort((a, b) => {
-        // High priority weight first; if tied, lower depth first
         if (b.weight !== a.weight) {
           return b.weight - a.weight;
         }
@@ -344,7 +517,8 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     
     // Concurrently fetch the batch
     const scrapeTasks = currentBatch.map(async item => {
-      const res = await scrapeUrl(item.url);
+      const isBlocked = isPathRobotsDisallowed(item.url, disallowedPaths);
+      const res = await scrapeUrlWithDiagnostics(item.url, isBlocked);
       return { item, res };
     });
 
@@ -355,7 +529,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
         const { item, res } = result.value;
         crawledUrls.add(item.url);
 
-        if (res && res.text.length > 50) {
+        if (res.success && res.text.length > 50) {
           crawledPages.push({
             url: res.url,
             title: res.title || item.title,
@@ -381,6 +555,14 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
               }
             }
           }
+        } else {
+          // Record failed scrape attempt
+          failedScrapes.set(item.url, {
+            title: res.title || item.title,
+            statusCode: res.status,
+            failureReason: res.failureReason || 'Failed to extract textual content.',
+            classification: res.classification || 'Unknown'
+          });
         }
       }
     }
@@ -391,23 +573,95 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
   const totalCrawled = crawledPages.length;
   const totalSkipped = Math.max(0, totalDiscovered - totalCrawled);
   const totalTextExtracted = crawledPages.reduce((acc, p) => acc + p.text.length, 0);
-  const coveragePercentage = totalDiscovered > 0 ? Math.min(100, Math.round((totalCrawled / totalDiscovered) * 100)) : 100;
+  const coveragePercentage = totalDiscovered > 0
+    ? Math.min(100, Math.round((totalCrawled / totalDiscovered) * 100))
+    : 100;
 
-  // Build Discovered Pages Inventory for Evidence Vault
+  // Build Discovered Pages Inventory for Evidence Vault & Diagnostics
   const discoveredPages: DiscoveredPage[] = Array.from(discoveredMap.values()).map(item => {
-    const isCrawled = crawledUrls.has(item.url);
+    const isCrawled = crawledPages.some(p => p.url === item.url);
+    const failedMatch = failedScrapes.get(item.url);
     const crawledMatch = crawledPages.find(p => p.url === item.url);
+
+    if (isCrawled && crawledMatch) {
+      return {
+        url: item.url,
+        title: crawledMatch.title || item.title,
+        category: item.category,
+        depth: item.depth,
+        status: 'Crawled',
+        textLength: crawledMatch.text.length,
+        statusCode: 200,
+        snippet: crawledMatch.text.slice(0, 160) + '...',
+        discoveredFrom: item.discoveredFrom
+      };
+    }
+
+    if (failedMatch) {
+      return {
+        url: item.url,
+        title: failedMatch.title || item.title,
+        category: item.category,
+        depth: item.depth,
+        status: 'Failed',
+        textLength: 0,
+        statusCode: failedMatch.statusCode,
+        failureReason: failedMatch.failureReason,
+        classification: failedMatch.classification,
+        snippet: failedMatch.failureReason,
+        discoveredFrom: item.discoveredFrom
+      };
+    }
+
+    // Skipped due to budget cap or robots
+    const isDisallowed = isPathRobotsDisallowed(item.url, disallowedPaths);
+    const cappedClassification: CrawlClassification = isDisallowed ? 'Robots Blocked' : 'Capped';
+    const cappedReason = isDisallowed
+      ? 'Disallowed by website robots.txt rules.'
+      : 'Discovered link omitted due to max crawl budget of 20 prioritized pages.';
+
     return {
       url: item.url,
-      title: crawledMatch?.title || item.title,
+      title: item.title,
       category: item.category,
       depth: item.depth,
-      status: isCrawled ? 'Crawled' : 'Skipped (Capped)',
-      textLength: crawledMatch?.text.length || 0,
-      snippet: crawledMatch ? crawledMatch.text.slice(0, 160) + '...' : undefined,
+      status: 'Skipped (Capped)',
+      textLength: 0,
+      statusCode: null,
+      failureReason: cappedReason,
+      classification: cappedClassification,
+      snippet: cappedReason,
       discoveredFrom: item.discoveredFrom
     };
   });
+
+  // Extract skipped pages array for diagnostic report
+  const skippedPagesList: SkippedPageRecord[] = discoveredPages
+    .filter(p => p.status !== 'Crawled')
+    .map(p => ({
+      url: p.url,
+      title: p.title,
+      category: p.category,
+      depth: p.depth,
+      statusCode: p.statusCode ?? null,
+      failureReason: p.failureReason || 'Not crawled',
+      classification: (p.classification as any) || 'Unknown',
+      discoveredFrom: p.discoveredFrom
+    }));
+
+  // Generate full diagnostics report
+  const diagnosticsReport = generateCrawlDiagnosticsReport({
+    pagesDiscovered: totalDiscovered,
+    pagesCrawled: totalCrawled,
+    pagesSkipped: totalSkipped,
+    crawlDurationMs: elapsed,
+    totalTextExtracted,
+    skippedPages: skippedPagesList
+  });
+
+  const warningMessage = diagnosticsReport.coverageWarning || (totalCrawled <= 1
+    ? 'Limited website coverage may reduce analysis quality.'
+    : undefined);
 
   // 4. Build Structured Multi-Page XML Context for Gemini
   let combinedContent = `<website url="${normalizedBase}" pagesDiscovered="${totalDiscovered}" pagesCrawled="${totalCrawled}" coverage="${coveragePercentage}%">\n\n`;
@@ -418,11 +672,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
   });
   combinedContent += `</website>`;
 
-  const companyNameCandidate = homepageResult.title.split('|')[0].split('-')[0].trim() || fallbackName;
-
-  const warningMessage = totalCrawled <= 1
-    ? 'Limited website coverage may reduce analysis quality.'
-    : undefined;
+  const companyNameCandidate = homepageAttempt.title.split('|')[0].split('-')[0].trim() || fallbackName;
 
   return {
     companyName: companyNameCandidate,
@@ -430,12 +680,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     pages: crawledPages,
     discoveredPages,
     diagnostics: {
-      pagesDiscovered: totalDiscovered,
-      pagesCrawled: totalCrawled,
-      pagesSkipped: totalSkipped,
-      crawlDurationMs: elapsed,
-      totalTextExtracted,
-      coveragePercentage,
+      ...diagnosticsReport,
       warningMessage
     },
     combinedContent
