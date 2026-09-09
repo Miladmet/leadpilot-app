@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TypeScript wrapper for LeadPilot Crawl Diagnostics
  */
 import {
@@ -7,8 +7,13 @@ import {
   RENDERING_FRAMEWORKS,
   RENDERING_METHODS,
   COVERAGE_IMPACT,
+  BUSINESS_PAGE_CATEGORIES,
   classifyCrawlFailure,
   detectRenderingDiagnostics,
+  getAdaptiveCrawlLimit,
+  computeBusinessCoverage,
+  computeOpportunityReadiness,
+  computeCoverageReason,
   getCoverageHealth,
   aggregateTopFailureReasons,
   generateCrawlDiagnosticsReport
@@ -49,6 +54,15 @@ export interface RenderingDiagnostics {
   signals: string[];
 }
 
+export interface CoverageReason {
+  primaryReason: string;
+  cappedCount: number;
+  robotsCount: number;
+  timeoutCount: number;
+  jsCount: number;
+  explanation: string;
+}
+
 export interface SkippedPageRecord {
   url: string;
   title?: string;
@@ -81,15 +95,20 @@ export interface CrawlDiagnosticsReport {
   pagesCrawled: number;
   pagesSkipped: number;
   sitemapDiscoveredCount?: number;
+  crawlLimit?: number;
   crawlDurationMs: number;
   totalTextExtracted: number;
   coveragePercentage: number;
+  rawCoveragePercentage: number;
+  businessCoveragePercentage: number;
+  opportunityReadinessScore: number;
   coverageHealth: CoverageHealthTier;
   healthDetails: CoverageHealthInfo;
   hasCoverageWarning: boolean;
   coverageWarning: string | null;
   isSpeculativeSuppressed: boolean;
   suppressionReason: string | null;
+  coverageReason?: CoverageReason;
   topFailureReasons: FailureReasonSummary[];
   skippedPages: SkippedPageRecord[];
   renderingDiagnostics?: RenderingDiagnostics | null;
@@ -101,10 +120,14 @@ export {
   RENDERING_FRAMEWORKS,
   RENDERING_METHODS,
   COVERAGE_IMPACT,
+  BUSINESS_PAGE_CATEGORIES,
   classifyCrawlFailure,
   detectRenderingDiagnostics,
+  getAdaptiveCrawlLimit,
+  computeBusinessCoverage,
+  computeOpportunityReadiness,
+  computeCoverageReason,
   getCoverageHealth,
   aggregateTopFailureReasons,
   generateCrawlDiagnosticsReport
 };
-

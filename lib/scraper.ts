@@ -3,12 +3,15 @@ import * as cheerio from 'cheerio';
 import {
   CrawlClassification,
   CrawlDiagnosticsReport,
+  CoverageReason,
   RenderingDiagnostics,
   SkippedPageRecord,
   classifyCrawlFailure,
   detectRenderingDiagnostics,
+  getAdaptiveCrawlLimit,
   generateCrawlDiagnosticsReport
 } from './crawlDiagnostics';
+
 
 export interface ScrapeResult {
   url: string;
@@ -85,14 +88,17 @@ const PRIORITY_CATEGORIES: { category: string; weight: number; keywords: string[
   { category: 'Pricing', weight: 90, keywords: ['pricing', 'price', 'plans', 'plan', 'tier', 'cost', 'subscription', 'rates'] },
   { category: 'About', weight: 85, keywords: ['about', 'about-us', 'company', 'story', 'mission', 'team', 'who-we-are', 'leadership'] },
   { category: 'Contact', weight: 80, keywords: ['contact', 'contact-us', 'reach-us', 'book', 'demo', 'get-in-touch', 'talk-to-us', 'schedule'] },
+  { category: 'Locations', weight: 82, keywords: ['location', 'locations', 'office', 'offices', 'branch', 'branches', 'area', 'areas', 'region', 'regions', 'near-me', 'find-us'] },
   { category: 'Case Studies', weight: 75, keywords: ['case-study', 'case-studies', 'case_study', 'customer-stories', 'stories', 'customers', 'portfolio', 'work', 'results'] },
-  { category: 'Blog', weight: 70, keywords: ['blog', 'article', 'articles', 'post', 'posts', 'news', 'press', 'insights'] },
-  { category: 'Products', weight: 65, keywords: ['product', 'products', 'app', 'apps', 'tool', 'tools', 'platform', 'software', 'feature', 'features'] },
-  { category: 'FAQ', weight: 60, keywords: ['faq', 'faqs', 'frequently-asked-questions', 'help', 'support', 'q-and-a', 'docs', 'documentation'] },
+  { category: 'Resources', weight: 68, keywords: ['resource', 'resources', 'resource-center', 'guide', 'guides', 'whitepaper', 'ebook', 'webinar', 'download', 'template'] },
+  { category: 'Blog', weight: 65, keywords: ['blog', 'article', 'articles', 'post', 'posts', 'news', 'press', 'insights'] },
+  { category: 'Products', weight: 60, keywords: ['product', 'products', 'app', 'apps', 'tool', 'tools', 'platform', 'software', 'feature', 'features'] },
+  { category: 'FAQ', weight: 55, keywords: ['faq', 'faqs', 'frequently-asked-questions', 'help', 'support', 'q-and-a', 'docs', 'documentation'] },
   { category: 'Careers', weight: 50, keywords: ['career', 'careers', 'job', 'jobs', 'hiring', 'join-us', 'work-with-us', 'openings'] },
   { category: 'Terms', weight: 30, keywords: ['terms', 'terms-of-service', 'tos', 'terms-and-conditions', 'legal'] },
   { category: 'Privacy', weight: 25, keywords: ['privacy', 'privacy-policy', 'privacy-notice', 'gdpr'] }
 ];
+
 
 const DISALLOWED_EXTENSIONS = [
   '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.ico',
@@ -229,13 +235,14 @@ export async function fetchSitemapUrls(
   sitemapUrls: string[],
   baseDomain: string,
   disallowedPaths: string[],
-  maxUrls: number = 50
+  maxUrls: number = 200
 ): Promise<string[]> {
   const discovered: Set<string> = new Set();
   const queue = [...sitemapUrls];
   const processedSitemaps = new Set<string>();
 
-  while (queue.length > 0 && discovered.size < maxUrls && processedSitemaps.size < 3) {
+  while (queue.length > 0 && discovered.size < maxUrls && processedSitemaps.size < 5) {
+
     const currentSitemap = queue.shift();
     if (!currentSitemap || processedSitemaps.has(currentSitemap)) continue;
     processedSitemaps.add(currentSitemap);
@@ -292,7 +299,7 @@ function isPathRobotsDisallowed(url: string, disallowedPaths: string[]): boolean
 export async function scrapeUrlWithDiagnostics(
   url: string,
   isRobotsBlocked: boolean = false,
-  maxRetries: number = 2
+  maxRetries: number = 3
 ): Promise<ScrapeAttemptResult> {
   const normalized = normalizeUrl(url);
 
@@ -351,7 +358,7 @@ export async function scrapeUrlWithDiagnostics(
       if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
         if (attempt < maxRetries) {
           attempt++;
-          await new Promise(resolve => setTimeout(resolve, attempt * 300));
+          await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 2000 : 5000));
           continue;
         }
         const failure = classifyCrawlFailure({ statusCode: response.status, html });
@@ -449,7 +456,7 @@ export async function scrapeUrlWithDiagnostics(
 
       if (isTransient && attempt < maxRetries) {
         attempt++;
-        await new Promise(resolve => setTimeout(resolve, attempt * 300));
+        await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 2000 : 5000));
         continue;
       }
 
@@ -546,7 +553,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
 
   // 0. Pre-fetch robots.txt rules and discover sitemap.xml
   const { disallowedPaths, sitemapUrls } = await fetchRobotsInfo(normalizedBase);
-  const discoveredSitemapUrls = await fetchSitemapUrls(sitemapUrls, baseDomain, disallowedPaths, 50);
+  const discoveredSitemapUrls = await fetchSitemapUrls(sitemapUrls, baseDomain, disallowedPaths, 200);
 
   // Tracking containers
   const discoveredMap = new Map<string, {
@@ -567,6 +574,10 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     classification: CrawlClassification;
   }>();
 
+  // Category counters for business coverage and readiness scoring
+  const crawledCategories: Record<string, number> = {};
+  const discoveredCategories: Record<string, number> = {};
+
   // 1. Initialize with Homepage (Depth 0)
   const homeCategory = classifyUrl(normalizedBase);
   discoveredMap.set(normalizedBase, {
@@ -576,6 +587,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     weight: homeCategory.weight,
     depth: 0,
   });
+  discoveredCategories['Homepage'] = (discoveredCategories['Homepage'] || 0) + 1;
 
   // Ingest discovered sitemap URLs with prioritized weights
   let sitemapDiscoveredCount = 0;
@@ -590,9 +602,14 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
         depth: 1,
         discoveredFrom: 'sitemap.xml'
       });
+      discoveredCategories[cls.category] = (discoveredCategories[cls.category] || 0) + 1;
       sitemapDiscoveredCount++;
     }
   }
+
+  // Adaptive crawl limit based on total URLs discovered
+  const adaptiveCrawlLimit = getAdaptiveCrawlLimit(discoveredMap.size);
+
 
   // 2. Scrape Homepage
   const isHomeBlocked = isPathRobotsDisallowed(normalizedBase, disallowedPaths);
@@ -663,6 +680,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     text: homepageAttempt.text
   });
   crawledUrls.add(homepageAttempt.url);
+  crawledCategories['Homepage'] = (crawledCategories['Homepage'] || 0) + 1;
 
   // Discover Level 1 internal links from Homepage
   const level1Links = extractLinksFromHtml(homepageAttempt.html, homepageAttempt.url, baseDomain);
@@ -677,6 +695,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
         depth: 1,
         discoveredFrom: homepageAttempt.url
       });
+      discoveredCategories[cls.category] = (discoveredCategories[cls.category] || 0) + 1;
     }
   }
 
@@ -692,13 +711,13 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
       });
   };
 
-  // 3. Multi-Page BFS Crawler Loop (Batches of 5, up to maxPages)
+  // 3. Multi-Page BFS Crawler Loop (Batches of 5, up to adaptiveCrawlLimit)
   const BATCH_SIZE = 5;
-  while (crawledPages.length < maxPages) {
+  while (crawledPages.length < adaptiveCrawlLimit) {
     const queue = getSortedQueue();
     if (queue.length === 0) break;
 
-    const currentBatch = queue.slice(0, Math.min(BATCH_SIZE, maxPages - crawledPages.length));
+    const currentBatch = queue.slice(0, Math.min(BATCH_SIZE, adaptiveCrawlLimit - crawledPages.length));
     
     // Concurrently fetch the batch
     const scrapeTasks = currentBatch.map(async item => {
@@ -722,6 +741,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
             depth: item.depth,
             text: res.text
           });
+          crawledCategories[item.category] = (crawledCategories[item.category] || 0) + 1;
 
           // If this was a depth 1 page and depth limit allows, discover depth 2 links
           if (item.depth === 1 && maxDepth >= 2) {
@@ -737,6 +757,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
                   depth: 2,
                   discoveredFrom: res.url
                 });
+                discoveredCategories[cls.category] = (discoveredCategories[cls.category] || 0) + 1;
               }
             }
           }
@@ -754,14 +775,12 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     }
   }
 
+
   const elapsed = Date.now() - startTime;
   const totalDiscovered = discoveredMap.size;
   const totalCrawled = crawledPages.length;
   const totalSkipped = Math.max(0, totalDiscovered - totalCrawled);
   const totalTextExtracted = crawledPages.reduce((acc, p) => acc + p.text.length, 0);
-  const coveragePercentage = totalDiscovered > 0
-    ? Math.min(100, Math.round((totalCrawled / totalDiscovered) * 100))
-    : 100;
 
   // Build Discovered Pages Inventory for Evidence Vault & Diagnostics
   const discoveredPages: DiscoveredPage[] = Array.from(discoveredMap.values()).map(item => {
@@ -804,7 +823,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     const cappedClassification: CrawlClassification = isDisallowed ? 'Robots Blocked' : 'Capped';
     const cappedReason = isDisallowed
       ? 'Disallowed by website robots.txt rules.'
-      : 'Discovered link omitted due to max crawl budget of 20 prioritized pages.';
+      : `Discovered link omitted due to adaptive crawl limit of ${adaptiveCrawlLimit} prioritized pages.`;
 
     return {
       url: item.url,
@@ -835,14 +854,17 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
       discoveredFrom: p.discoveredFrom
     }));
 
-  // Generate full diagnostics report
+  // Generate full diagnostics report with intelligent 3-metric coverage system
   const diagnosticsReport = generateCrawlDiagnosticsReport({
     pagesDiscovered: totalDiscovered,
     pagesCrawled: totalCrawled,
     pagesSkipped: totalSkipped,
     sitemapDiscoveredCount,
+    crawlLimit: adaptiveCrawlLimit,
     crawlDurationMs: elapsed,
     totalTextExtracted,
+    crawledCategories,
+    discoveredCategories,
     skippedPages: skippedPagesList,
     renderingDiagnostics: homepageAttempt.renderingDiagnostics || null
   });
@@ -851,8 +873,9 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     ? 'Limited website coverage may reduce analysis quality.'
     : undefined);
 
+
   // 4. Build Structured Multi-Page XML Context for Gemini
-  let combinedContent = `<website url="${normalizedBase}" pagesDiscovered="${totalDiscovered}" pagesCrawled="${totalCrawled}" coverage="${coveragePercentage}%">\n\n`;
+  let combinedContent = `<website url="${normalizedBase}" pagesDiscovered="${totalDiscovered}" pagesCrawled="${totalCrawled}" rawCoverage="${diagnosticsReport.rawCoveragePercentage}%" businessCoverage="${diagnosticsReport.businessCoveragePercentage}%" readiness="${diagnosticsReport.opportunityReadinessScore}">\n\n`;
   crawledPages.forEach(p => {
     combinedContent += `<page url="${p.url}" title="${p.title}" category="${p.category}" depth="${p.depth}">\n`;
     combinedContent += `${p.text}\n`;

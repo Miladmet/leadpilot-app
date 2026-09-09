@@ -10,10 +10,15 @@ const {
   PRIORITY_CATEGORIES,
   classifyUrl,
   classifyCrawlFailure,
+  getAdaptiveCrawlLimit,
+  computeBusinessCoverage,
+  computeOpportunityReadiness,
+  computeCoverageReason,
   getCoverageHealth,
   aggregateTopFailureReasons,
   generateCrawlDiagnosticsReport
 } = require('../lib/crawlDiagnosticsCore');
+
 
 
 console.log('================================================================');
@@ -129,24 +134,50 @@ runTest('COVERAGE_HEALTH_TIERS_NEW_BRACKETS', () => {
 });
 
 // 10. Coverage Warning Below 60%
+// 10. Coverage Warning — new threshold: business coverage < 40%
 runTest('COVERAGE_WARNING_BELOW_60', () => {
-  const repUnder = generateCrawlDiagnosticsReport({ pagesDiscovered: 10, pagesCrawled: 5 }); // 50%
-  assert.strictEqual(repUnder.hasCoverageWarning, true);
-  assert.ok(repUnder.coverageWarning.includes('below the recommended 60%'));
+  // No crawledCategories / discoveredCategories → businessCoverage falls to 0% → warning fires
+  const repUnder = generateCrawlDiagnosticsReport({ pagesDiscovered: 10, pagesCrawled: 5 });
+  assert.strictEqual(repUnder.hasCoverageWarning, true,
+    `hasCoverageWarning should be true when no business pages provided (biz=${repUnder.businessCoveragePercentage}%)`);
+  assert.ok(repUnder.coverageWarning && repUnder.coverageWarning.includes('Business Coverage Warning'),
+    `coverageWarning should mention 'Business Coverage Warning', got: "${repUnder.coverageWarning}"`);
 
-  const repOver = generateCrawlDiagnosticsReport({ pagesDiscovered: 10, pagesCrawled: 7 }); // 70%
-  assert.strictEqual(repOver.hasCoverageWarning, false);
+  // When business pages are provided and coverage is high → no warning
+  const repOver = generateCrawlDiagnosticsReport({
+    pagesDiscovered: 10, pagesCrawled: 7,
+    crawledCategories: { Homepage: 1, Services: 2, Pricing: 1, About: 1, Contact: 1 },
+    discoveredCategories: { Homepage: 1, Services: 2, Pricing: 1, About: 1, Contact: 1 }
+  });
+  assert.strictEqual(repOver.hasCoverageWarning, false,
+    `hasCoverageWarning should be false when all business pages crawled (biz=${repOver.businessCoveragePercentage}%)`);
   assert.strictEqual(repOver.coverageWarning, null);
 });
 
-// 11. Speculative Opportunity Values Suppressed Below 25%
+// 11. Intelligent Suppression — requires all 3 conditions (readiness<30 AND biz<20 AND text<2000)
 runTest('SPECULATIVE_SUPPRESSION_BELOW_25', () => {
-  const repSuppressed = generateCrawlDiagnosticsReport({ pagesDiscovered: 10, pagesCrawled: 2 }); // 20%
-  assert.strictEqual(repSuppressed.isSpeculativeSuppressed, true);
-  assert.ok(repSuppressed.suppressionReason.includes('suppressed due to insufficient website coverage'));
+  // All 3 failure conditions met → suppress
+  const repSuppressed = generateCrawlDiagnosticsReport({
+    pagesDiscovered: 10, pagesCrawled: 0,
+    totalTextExtracted: 0,
+    crawledCategories: {},
+    discoveredCategories: { General: 10 },
+    skippedPages: Array(10).fill({ classification: 'Robots Blocked' })
+  });
+  assert.strictEqual(repSuppressed.isSpeculativeSuppressed, true,
+    `Should suppress when readiness=${repSuppressed.opportunityReadinessScore}, biz=${repSuppressed.businessCoveragePercentage}, text=${repSuppressed.totalTextExtracted}`);
+  assert.ok(repSuppressed.suppressionReason && repSuppressed.suppressionReason.includes('Readiness Score'),
+    `suppressionReason should mention Readiness Score, got: "${repSuppressed.suppressionReason}"`);
 
-  const repAllowed = generateCrawlDiagnosticsReport({ pagesDiscovered: 10, pagesCrawled: 3 }); // 30%
-  assert.strictEqual(repAllowed.isSpeculativeSuppressed, false);
+  // Good readiness → no suppression even with low raw coverage
+  const repAllowed = generateCrawlDiagnosticsReport({
+    pagesDiscovered: 100, pagesCrawled: 5, // only 5% raw, but critical pages hit
+    totalTextExtracted: 10000,
+    crawledCategories: { Homepage: 1, Services: 1, Pricing: 1, About: 1, Contact: 1 },
+    discoveredCategories: { Homepage: 1, Services: 2, Pricing: 1, About: 1, Contact: 1, Blog: 94 }
+  });
+  assert.strictEqual(repAllowed.isSpeculativeSuppressed, false,
+    `Should NOT suppress when readiness=${repAllowed.opportunityReadinessScore} (critical pages found)`);
   assert.strictEqual(repAllowed.suppressionReason, null);
 });
 
@@ -179,12 +210,15 @@ runTest('TOP_REASONS_AGGREGATION', () => {
 
 // 13. Full Diagnostics Report Structure with Sitemap Telemetry
 runTest('FULL_DIAGNOSTICS_REPORT_INTEGRITY', () => {
+  // Provide business categories so health score is based on actual business coverage
   const report = generateCrawlDiagnosticsReport({
     pagesDiscovered: 20,
     pagesCrawled: 16,
     sitemapDiscoveredCount: 8,
     crawlDurationMs: 4200,
     totalTextExtracted: 35000,
+    crawledCategories: { Homepage: 1, Services: 2, Pricing: 1, About: 1, Contact: 1 },
+    discoveredCategories: { Homepage: 1, Services: 2, Pricing: 1, About: 1, Contact: 1 },
     skippedPages: [
       { url: 'https://example.com/admin', statusCode: 403, classification: '403', failureReason: '403 Forbidden' },
       { url: 'https://example.com/dead', statusCode: 404, classification: '404', failureReason: '404 Not Found' },
@@ -197,13 +231,16 @@ runTest('FULL_DIAGNOSTICS_REPORT_INTEGRITY', () => {
   assert.strictEqual(report.pagesCrawled, 16);
   assert.strictEqual(report.pagesSkipped, 4);
   assert.strictEqual(report.sitemapDiscoveredCount, 8);
-  assert.strictEqual(report.coveragePercentage, 80);
-  assert.strictEqual(report.coverageHealth, 'Good');
+  assert.strictEqual(report.coveragePercentage, 80,  'rawCoverage should be 80%');
+  assert.ok(report.businessCoveragePercentage > 60,  `businessCoverage should be >60%, got ${report.businessCoveragePercentage}`);
+  assert.ok(['Good', 'Excellent'].includes(report.coverageHealth),
+    `coverageHealth should be Good or Excellent, got '${report.coverageHealth}'`);
   assert.strictEqual(report.hasCoverageWarning, false);
   assert.strictEqual(report.isSpeculativeSuppressed, false);
   assert.strictEqual(report.topFailureReasons.length, 4);
   assert.strictEqual(report.skippedPages.length, 4);
 });
+
 
 // 14. Page Prioritization Hierarchy Verification
 runTest('PAGE_PRIORITIZATION_HIERARCHY', () => {
@@ -356,6 +393,127 @@ runTest('CSR_INFORMATIONAL_MESSAGE', () => {
     result.message.includes('Coverage may be lower than expected'),
     `Message should warn about coverage. Got: "${result.message}"`
   );
+});
+
+// ============================================================
+// INTELLIGENT CRAWL COVERAGE ENGINE TESTS (25-34)
+// ============================================================
+
+console.log('\n--- Adaptive Crawl Limits ---');
+
+// 25. ADAPTIVE_LIMIT_SMALL_SITE
+runTest('ADAPTIVE_LIMIT_SMALL_SITE', () => {
+  assert.strictEqual(getAdaptiveCrawlLimit(1), 1,   '1 URL → crawl all = 1');
+  assert.strictEqual(getAdaptiveCrawlLimit(12), 12, '12 URLs → crawl all = 12');
+  assert.strictEqual(getAdaptiveCrawlLimit(49), 49, '49 URLs → crawl all = 49');
+});
+
+// 26. ADAPTIVE_LIMIT_MEDIUM_SITE
+runTest('ADAPTIVE_LIMIT_MEDIUM_SITE', () => {
+  assert.strictEqual(getAdaptiveCrawlLimit(50), 50,   '50 URLs → 50');
+  assert.strictEqual(getAdaptiveCrawlLimit(100), 50,  '100 URLs → 50');
+  assert.strictEqual(getAdaptiveCrawlLimit(199), 50,  '199 URLs → 50');
+});
+
+// 27. ADAPTIVE_LIMIT_LARGE_SITE
+runTest('ADAPTIVE_LIMIT_LARGE_SITE', () => {
+  assert.strictEqual(getAdaptiveCrawlLimit(200), 100,  '200 URLs → 100');
+  assert.strictEqual(getAdaptiveCrawlLimit(500), 100,  '500 URLs → 100');
+  assert.strictEqual(getAdaptiveCrawlLimit(999), 100,  '999 URLs → 100');
+});
+
+// 28. ADAPTIVE_LIMIT_XLARGE_SITE
+runTest('ADAPTIVE_LIMIT_XLARGE_SITE', () => {
+  assert.strictEqual(getAdaptiveCrawlLimit(1000), 150, '1000 URLs → 150');
+  assert.strictEqual(getAdaptiveCrawlLimit(5000), 150, '5000 URLs → 150');
+  assert.strictEqual(getAdaptiveCrawlLimit(99999), 150,'99999 URLs → 150');
+});
+
+console.log('\n--- Business Coverage Calculation ---');
+
+// 29. BUSINESS_COVERAGE_CALCULATION
+runTest('BUSINESS_COVERAGE_CALCULATION', () => {
+  const crawledCategories = { Homepage: 1, Services: 2, Pricing: 1, About: 1 };
+  const discoveredCategories = { Homepage: 1, Services: 3, Pricing: 1, About: 1, Contact: 1 };
+  const pct = computeBusinessCoverage(crawledCategories, discoveredCategories);
+  // crawledBusiness = 5, discoveredBusiness = 7, denominator = max(7, 5) = 7
+  // pct = round(5/7 * 100) = 71
+  assert.ok(pct >= 60 && pct <= 80, `Business coverage should be ~71%, got ${pct}%`);
+});
+
+console.log('\n--- Opportunity Readiness Score ---');
+
+// 30. OPPORTUNITY_READINESS_FULL
+runTest('OPPORTUNITY_READINESS_FULL', () => {
+  const categories = { Homepage: 1, Services: 1, Pricing: 1, About: 1, Contact: 1 };
+  const score = computeOpportunityReadiness(categories, 10000);
+  // 40 + 20 + 15 + 10 + 10 + 5 = 100
+  assert.strictEqual(score, 100, `Full readiness should be 100, got ${score}`);
+});
+
+// 31. OPPORTUNITY_READINESS_HOMEPAGE_ONLY
+runTest('OPPORTUNITY_READINESS_HOMEPAGE_ONLY', () => {
+  const categories = { Homepage: 1 };
+  const score = computeOpportunityReadiness(categories, 1000);
+  // 40 only (text not >5000)
+  assert.strictEqual(score, 40, `Homepage-only readiness should be 40, got ${score}`);
+});
+
+console.log('\n--- Suppression Logic ---');
+
+// 32. SUPPRESSION_LARGE_SITE_NOT_SUPPRESSED
+runTest('SUPPRESSION_LARGE_SITE_NOT_SUPPRESSED', () => {
+  // Large site with 200 discovered but good business coverage — should NOT suppress
+  const report = generateCrawlDiagnosticsReport({
+    pagesDiscovered: 200,
+    pagesCrawled: 50,
+    pagesSkipped: 150,
+    totalTextExtracted: 45000,
+    crawledCategories: { Homepage: 1, Services: 3, Pricing: 1, About: 1, Contact: 1 },
+    discoveredCategories: { Homepage: 1, Services: 5, Pricing: 2, About: 1, Contact: 2, Blog: 100, General: 89 },
+    skippedPages: [],
+    crawlLimit: 50
+  });
+  assert.ok(!report.isSpeculativeSuppressed,
+    `Large site with good business pages should NOT be suppressed. readiness=${report.opportunityReadinessScore}, biz=${report.businessCoveragePercentage}`);
+  assert.ok(report.opportunityReadinessScore >= 75,
+    `Readiness should be >=75, got ${report.opportunityReadinessScore}`);
+});
+
+// 33. SUPPRESSION_NO_CRITICAL_PAGES
+runTest('SUPPRESSION_NO_CRITICAL_PAGES', () => {
+  // Blocked site — no homepage, no text, no critical pages
+  const report = generateCrawlDiagnosticsReport({
+    pagesDiscovered: 10,
+    pagesCrawled: 0,
+    pagesSkipped: 10,
+    totalTextExtracted: 0,
+    crawledCategories: {},
+    discoveredCategories: { General: 10 },
+    skippedPages: Array(10).fill({ classification: 'Robots Blocked' }),
+    crawlLimit: 10
+  });
+  assert.ok(report.isSpeculativeSuppressed,
+    `Should be suppressed: readiness=${report.opportunityReadinessScore}, biz=${report.businessCoveragePercentage}, text=${report.totalTextExtracted}`);
+});
+
+console.log('\n--- Coverage Reason Classification ---');
+
+// 34. COVERAGE_REASON_CLASSIFICATION
+runTest('COVERAGE_REASON_CLASSIFICATION', () => {
+  const skipped = [
+    { classification: 'Capped' },
+    { classification: 'Capped' },
+    { classification: 'Capped' },
+    { classification: 'Robots Blocked' },
+    { classification: 'Timeout' }
+  ];
+  const reason = computeCoverageReason(skipped, 50);
+  assert.strictEqual(reason.primaryReason, 'Crawl limit reached', `Primary reason should be 'Crawl limit reached', got '${reason.primaryReason}'`);
+  assert.strictEqual(reason.cappedCount, 3, `cappedCount should be 3, got ${reason.cappedCount}`);
+  assert.strictEqual(reason.robotsCount, 1, `robotsCount should be 1, got ${reason.robotsCount}`);
+  assert.strictEqual(reason.timeoutCount, 1, `timeoutCount should be 1, got ${reason.timeoutCount}`);
+  assert.ok(reason.explanation.includes('50-page cap'), `Explanation should mention crawl limit cap. Got: "${reason.explanation}"`);
 });
 
 console.log('================================================================');

@@ -224,15 +224,27 @@ interface CrawlDiagnosticsData {
   pagesCrawled: number;
   pagesSkipped: number;
   sitemapDiscoveredCount?: number;
+  crawlLimit?: number;
   crawlDurationMs: number;
   totalTextExtracted: number;
   coveragePercentage: number;
+  rawCoveragePercentage?: number;
+  businessCoveragePercentage?: number;
+  opportunityReadinessScore?: number;
   coverageHealth?: string;
   healthDetails?: any;
   hasCoverageWarning?: boolean;
   coverageWarning?: string | null;
   isSpeculativeSuppressed?: boolean;
   suppressionReason?: string | null;
+  coverageReason?: {
+    primaryReason: string;
+    cappedCount: number;
+    robotsCount: number;
+    timeoutCount: number;
+    jsCount: number;
+    explanation: string;
+  } | null;
   topFailureReasons?: Array<{
     classification: string;
     label: string;
@@ -263,6 +275,7 @@ interface CrawlDiagnosticsData {
     signals: string[];
   } | null;
 }
+
 
 
 interface Activity {
@@ -949,20 +962,39 @@ export default function Dashboard() {
       })).sort((a, b) => b.count - a.count);
     }
 
+    const rawCovPct = parsed?.rawCoveragePercentage ?? pct;
+    const bizCovPct = parsed?.businessCoveragePercentage ?? pct;
+    const readiness = parsed?.opportunityReadinessScore ?? (
+      // Fallback readiness computation from available data
+      (crawled >= 1 ? 40 : 0) + (pct >= 50 ? 35 : pct >= 20 ? 15 : 0)
+    );
+
+    const bizHealthInfo = getCoverageHealth(bizCovPct);
+
+    // New intelligent suppression: only if readiness AND business coverage AND text are all insufficient
+    const isNewSuppressed = parsed
+      ? (parsed.isSpeculativeSuppressed ?? false)
+      : (readiness < 30 && bizCovPct < 20 && (parsed?.totalTextExtracted ?? 0) < 2000);
+
     return {
       pagesDiscovered: discovered,
       pagesCrawled: crawled,
       pagesSkipped: skipped,
       sitemapDiscoveredCount: parsed?.sitemapDiscoveredCount ?? 0,
+      crawlLimit: parsed?.crawlLimit ?? undefined,
       crawlDurationMs: parsed?.crawlDurationMs ?? p?.crawlDurationMs ?? 0,
       totalTextExtracted: parsed?.totalTextExtracted ?? p?.totalTextExtracted ?? 0,
       coveragePercentage: pct,
-      coverageHealth: healthInfo.health,
-      healthDetails: healthInfo,
-      hasCoverageWarning: pct < 60,
-      coverageWarning: pct < 60 ? `Crawl Coverage Warning: ${pct}% is below 60% threshold.` : null,
-      isSpeculativeSuppressed: pct < 25,
-      suppressionReason: pct < 25 ? 'Speculative opportunity values suppressed (<25% coverage).' : null,
+      rawCoveragePercentage: rawCovPct,
+      businessCoveragePercentage: bizCovPct,
+      opportunityReadinessScore: readiness,
+      coverageHealth: bizHealthInfo.health,
+      healthDetails: bizHealthInfo,
+      hasCoverageWarning: bizCovPct < 40,
+      coverageWarning: bizCovPct < 40 ? `Business Coverage Warning: ${bizCovPct}% of key business pages analyzed.` : null,
+      isSpeculativeSuppressed: isNewSuppressed,
+      suppressionReason: isNewSuppressed ? `Opportunity values suppressed: Readiness Score ${readiness}/100. Critical business pages not reached.` : null,
+      coverageReason: parsed?.coverageReason ?? null,
       topFailureReasons: topFailureReasons || [],
       skippedPages: skippedPages || [],
       warningMessage: crawled <= 1 ? 'Limited website coverage may reduce analysis quality.' : undefined,
@@ -970,6 +1002,7 @@ export default function Dashboard() {
     };
 
   };
+
 
 
   // Trigger modal drawer
@@ -2727,14 +2760,58 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Coverage warning when below 60% */}
-                    {diag.coveragePercentage < 60 && (
+                    {/* Coverage Intelligence Row — 3 Metrics */}
+                    <div className="mt-2.5 p-2.5 rounded-xl border border-sky-100 bg-sky-50 shadow-2xs">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600">📊 Coverage Intelligence</span>
+                        {diag.crawlLimit && (
+                          <span className="text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full">
+                            Adaptive Limit: {diag.crawlLimit} pages
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs text-center">
+                          <span className="text-[9px] text-slate-400 font-semibold block uppercase">Raw Coverage</span>
+                          <strong className="text-slate-700 text-sm font-black">{diag.rawCoveragePercentage ?? diag.coveragePercentage}%</strong>
+                          <span className="text-[9px] text-slate-400 block">of sitemap</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs text-center">
+                          <span className="text-[9px] text-slate-400 font-semibold block uppercase">Business Coverage</span>
+                          <strong className={`text-sm font-black ${
+                            (diag.businessCoveragePercentage ?? 0) >= 60 ? 'text-emerald-600'
+                            : (diag.businessCoveragePercentage ?? 0) >= 40 ? 'text-amber-600'
+                            : 'text-rose-600'
+                          }`}>{diag.businessCoveragePercentage ?? diag.coveragePercentage}%</strong>
+                          <span className="text-[9px] text-slate-400 block">key pages</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs text-center">
+                          <span className="text-[9px] text-slate-400 font-semibold block uppercase">Opportunity Readiness</span>
+                          <strong className={`text-sm font-black ${
+                            (diag.opportunityReadinessScore ?? 0) >= 75 ? 'text-emerald-600'
+                            : (diag.opportunityReadinessScore ?? 0) >= 50 ? 'text-amber-600'
+                            : 'text-rose-600'
+                          }`}>{diag.opportunityReadinessScore ?? 0}/100</strong>
+                          <span className="text-[9px] text-slate-400 block">
+                            {(diag.opportunityReadinessScore ?? 0) >= 75 ? 'High' : (diag.opportunityReadinessScore ?? 0) >= 50 ? 'Medium' : 'Low'}
+                          </span>
+                        </div>
+                      </div>
+                      {diag.coverageReason && diag.coverageReason.primaryReason !== 'No pages skipped' && (
+                        <div className="mt-2 text-[10px] text-sky-800 bg-sky-100 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                          <span className="font-bold">Coverage Reason:</span> {diag.coverageReason.explanation}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Coverage warning when business coverage below 40% */}
+                    {(diag.businessCoveragePercentage ?? diag.coveragePercentage) < 40 && (
                       <div className="mb-2.5 p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between gap-2 shadow-2xs">
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                           <div>
-                            <span className="font-bold text-xs">Coverage Warning ({diag.coveragePercentage}% &lt; 60%):</span>{' '}
-                            <span className="text-[11px]">Limited website crawl coverage may omit service offerings, pricing structures, or technical stack defects. Recommendations carry reduced certainty.</span>
+                            <span className="font-bold text-xs">Business Coverage Warning ({diag.businessCoveragePercentage ?? diag.coveragePercentage}% &lt; 40%):</span>{' '}
+                            <span className="text-[11px]">Key business pages (homepage, services, pricing, contact) may be missing from the analysis.</span>
                           </div>
                         </div>
                         <button
@@ -2749,14 +2826,14 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* Prevent speculative opportunity values when coverage < 25% */}
-                    {diag.coveragePercentage < 25 && (
+                    {/* Suppress only when readiness-based suppression is active */}
+                    {diag.isSpeculativeSuppressed && (
                       <div className="mb-2.5 p-2.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-950 text-xs flex items-center justify-between gap-2 shadow-2xs">
                         <div className="flex items-center gap-2">
                           <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
                           <div>
-                            <span className="font-bold text-xs">Speculative Values Suppressed (&lt;25% Coverage):</span>{' '}
-                            <span className="text-[11px]">Crawl coverage is insufficient ({diag.coveragePercentage}%). Revenue projections and contract values have been withheld to protect agency credibility.</span>
+                            <span className="font-bold text-xs">Opportunity Values Suppressed (Readiness: {diag.opportunityReadinessScore}/100):</span>{' '}
+                            <span className="text-[11px]">Critical business pages were not reached and text extraction was insufficient. Revenue projections withheld to protect agency credibility.</span>
                           </div>
                         </div>
                         <span className="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
@@ -5452,27 +5529,27 @@ export default function Dashboard() {
                 </p>
               </div>
 
-              {/* Coverage Warning when below 60% */}
-              {selectedCrawlReport.coveragePercentage < 60 && (
+              {/* Coverage Warning when business coverage below 40% */}
+              {(selectedCrawlReport.businessCoveragePercentage ?? selectedCrawlReport.coveragePercentage) < 40 && (
                 <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-start gap-2.5 shadow-2xs">
                   <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <h5 className="font-bold text-xs uppercase tracking-wider">Coverage Warning: Under 60% Threshold</h5>
+                    <h5 className="font-bold text-xs uppercase tracking-wider">Business Coverage Warning: Under 40% Threshold</h5>
                     <p className="mt-0.5 leading-relaxed text-amber-800 text-[11px]">
-                      {selectedCrawlReport.coverageWarning || 'Limited website coverage may omit service offerings, pricing structures, or technical stack defects. Recommendations carry reduced certainty.'}
+                      {selectedCrawlReport.coverageWarning || 'Key business pages (homepage, services, pricing, contact) may not have been reached. Opportunity analysis may be incomplete.'}
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Speculative Opportunity Value Suppression Alert when below 25% */}
-              {selectedCrawlReport.coveragePercentage < 25 && (
+              {/* Speculative Opportunity Value Suppression — readiness-based */}
+              {selectedCrawlReport.isSpeculativeSuppressed && (
                 <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-950 text-xs flex items-start gap-2.5 shadow-2xs">
                   <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
                   <div>
-                    <h5 className="font-bold text-xs uppercase tracking-wider">Speculative Opportunity Values Suppressed (&lt;25% Coverage)</h5>
+                    <h5 className="font-bold text-xs uppercase tracking-wider">Opportunity Values Suppressed (Readiness: {selectedCrawlReport.opportunityReadinessScore ?? 0}/100)</h5>
                     <p className="mt-0.5 leading-relaxed text-rose-800 text-[11px]">
-                      Because crawl coverage is Insufficient ({selectedCrawlReport.coveragePercentage}%), speculative revenue calculations and contract ranges have been withheld. This safeguards agency credibility during prospective client discussions.
+                      {selectedCrawlReport.suppressionReason || 'Critical business pages were not reached and text extraction was insufficient. Speculative revenue values withheld to protect agency credibility.'}
                     </p>
                   </div>
                 </div>
@@ -5506,8 +5583,59 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* COVERAGE INTELLIGENCE CARD */}
+              <div className="p-4 rounded-2xl border border-sky-200 bg-sky-50 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📊</span>
+                    Coverage Intelligence
+                  </h4>
+                  <div className="flex items-center gap-1.5">
+                    {selectedCrawlReport.crawlLimit && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200 uppercase tracking-wider">
+                        Adaptive Limit: {selectedCrawlReport.crawlLimit} pages
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs text-center">
+                    <span className="text-[9px] text-slate-400 font-semibold block uppercase">Raw Coverage</span>
+                    <strong className="text-slate-700 text-base font-black">{selectedCrawlReport.rawCoveragePercentage ?? selectedCrawlReport.coveragePercentage}%</strong>
+                    <span className="text-[9px] text-slate-500 block">of all sitemap URLs</span>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs text-center">
+                    <span className="text-[9px] text-slate-400 font-semibold block uppercase">Business Coverage</span>
+                    <strong className={`text-base font-black ${
+                      (selectedCrawlReport.businessCoveragePercentage ?? 0) >= 60 ? 'text-emerald-600'
+                      : (selectedCrawlReport.businessCoveragePercentage ?? 0) >= 40 ? 'text-amber-600'
+                      : 'text-rose-600'
+                    }`}>{selectedCrawlReport.businessCoveragePercentage ?? selectedCrawlReport.coveragePercentage}%</strong>
+                    <span className="text-[9px] text-slate-500 block">homepage · services · pricing · about</span>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs text-center">
+                    <span className="text-[9px] text-slate-400 font-semibold block uppercase">Opportunity Readiness</span>
+                    <strong className={`text-base font-black ${
+                      (selectedCrawlReport.opportunityReadinessScore ?? 0) >= 75 ? 'text-emerald-600'
+                      : (selectedCrawlReport.opportunityReadinessScore ?? 0) >= 50 ? 'text-amber-600'
+                      : 'text-rose-600'
+                    }`}>{selectedCrawlReport.opportunityReadinessScore ?? 0}/100</strong>
+                    <span className="text-[9px] text-slate-500 block">{(selectedCrawlReport.opportunityReadinessScore ?? 0) >= 75 ? 'High — suppression inactive' : (selectedCrawlReport.opportunityReadinessScore ?? 0) >= 50 ? 'Medium' : 'Low'}</span>
+                  </div>
+                </div>
+                {selectedCrawlReport.coverageReason && selectedCrawlReport.coverageReason.primaryReason !== 'No pages skipped' && (
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 text-[11px] text-slate-700">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Coverage Reason</span>
+                    <span className="font-semibold text-slate-800">{selectedCrawlReport.coverageReason.primaryReason}</span>
+                    {' — '}
+                    <span className="text-slate-600">{selectedCrawlReport.coverageReason.explanation}</span>
+                  </div>
+                )}
+              </div>
+
               {/* RENDERING DIAGNOSTICS CARD */}
               {selectedCrawlReport.renderingDiagnostics && (
+
                 <div className={`p-4 rounded-2xl border space-y-3 ${
                   selectedCrawlReport.renderingDiagnostics.isJavaScriptHeavy
                     ? 'bg-violet-50 border-violet-200'
