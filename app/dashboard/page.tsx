@@ -251,6 +251,17 @@ interface CrawlDiagnosticsData {
     discoveredFrom?: string;
   }>;
   warningMessage?: string;
+  renderingDiagnostics?: {
+    framework: string;
+    renderingMethod: string;
+    isJavaScriptHeavy: boolean;
+    coverageImpact: string;
+    textExtracted: number;
+    htmlSizeBytes: number;
+    scriptCount: number;
+    message: string | null;
+    signals: string[];
+  } | null;
 }
 
 
@@ -954,8 +965,10 @@ export default function Dashboard() {
       suppressionReason: pct < 25 ? 'Speculative opportunity values suppressed (<25% coverage).' : null,
       topFailureReasons: topFailureReasons || [],
       skippedPages: skippedPages || [],
-      warningMessage: crawled <= 1 ? 'Limited website coverage may reduce analysis quality.' : undefined
+      warningMessage: crawled <= 1 ? 'Limited website coverage may reduce analysis quality.' : undefined,
+      renderingDiagnostics: parsed?.renderingDiagnostics ?? null
     };
+
   };
 
 
@@ -2778,9 +2791,61 @@ export default function Dashboard() {
                         </strong>
                       </div>
                     </div>
+
+                    {/* Rendering Diagnostics Row */}
+                    {diag.renderingDiagnostics && (
+                      <div className={`mt-2.5 p-2.5 rounded-xl border text-xs flex flex-col gap-1.5 shadow-2xs ${
+                        diag.renderingDiagnostics.isJavaScriptHeavy
+                          ? 'bg-violet-50 border-violet-200'
+                          : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            🔍 Rendering Diagnostics
+                          </span>
+                          {diag.renderingDiagnostics.isJavaScriptHeavy && (
+                            <span className="text-[9px] font-bold bg-violet-200 text-violet-900 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              JavaScript-Heavy
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Framework</span>
+                            <strong className="text-slate-700">{diag.renderingDiagnostics.framework}</strong>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Rendering</span>
+                            <strong className="text-slate-700 text-[11px] leading-tight block">{diag.renderingDiagnostics.renderingMethod}</strong>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">JS Heavy</span>
+                            <strong className={diag.renderingDiagnostics.isJavaScriptHeavy ? 'text-violet-700' : 'text-emerald-600'}>
+                              {diag.renderingDiagnostics.isJavaScriptHeavy ? 'Yes' : 'No'}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Coverage Impact</span>
+                            <strong className={
+                              diag.renderingDiagnostics.coverageImpact === 'High' ? 'text-rose-600'
+                              : diag.renderingDiagnostics.coverageImpact === 'Medium' ? 'text-amber-600'
+                              : 'text-emerald-600'
+                            }>
+                              {diag.renderingDiagnostics.coverageImpact}
+                            </strong>
+                          </div>
+                        </div>
+                        {diag.renderingDiagnostics.isJavaScriptHeavy && diag.renderingDiagnostics.message && (
+                          <p className="text-[10px] text-violet-800 mt-0.5 leading-relaxed italic">
+                            ℹ️ {diag.renderingDiagnostics.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
-              })()}
+})()}
+
 
 
               {/* SPECULATIVE CAVEAT BANNER IF EVIDENCE IS LOW */}
@@ -5440,6 +5505,73 @@ export default function Dashboard() {
                   </strong>
                 </div>
               </div>
+
+              {/* RENDERING DIAGNOSTICS CARD */}
+              {selectedCrawlReport.renderingDiagnostics && (
+                <div className={`p-4 rounded-2xl border space-y-3 ${
+                  selectedCrawlReport.renderingDiagnostics.isJavaScriptHeavy
+                    ? 'bg-violet-50 border-violet-200'
+                    : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🔍</span>
+                      Rendering Diagnostics
+                    </h4>
+                    <div className="flex items-center gap-1.5">
+                      {selectedCrawlReport.renderingDiagnostics.isJavaScriptHeavy ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-200 text-violet-900 border border-violet-300 uppercase tracking-wider">
+                          JavaScript-Heavy
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase tracking-wider">
+                          Standard HTML
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                        selectedCrawlReport.renderingDiagnostics.coverageImpact === 'High'
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : selectedCrawlReport.renderingDiagnostics.coverageImpact === 'Medium'
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      }`}>
+                        {selectedCrawlReport.renderingDiagnostics.coverageImpact} Impact
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase">Framework</span>
+                      <strong className="text-slate-800 text-sm">{selectedCrawlReport.renderingDiagnostics.framework}</strong>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase">Rendering Method</span>
+                      <strong className="text-slate-800 text-[11px] leading-tight block">{selectedCrawlReport.renderingDiagnostics.renderingMethod}</strong>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase">JS Heavy</span>
+                      <strong className={selectedCrawlReport.renderingDiagnostics.isJavaScriptHeavy ? 'text-violet-700 text-sm' : 'text-emerald-600 text-sm'}>
+                        {selectedCrawlReport.renderingDiagnostics.isJavaScriptHeavy ? 'Yes' : 'No'}
+                      </strong>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase">Text Extracted</span>
+                      <strong className="text-amber-600 text-sm">{selectedCrawlReport.renderingDiagnostics.textExtracted.toLocaleString()} chars</strong>
+                    </div>
+                  </div>
+
+                  {selectedCrawlReport.renderingDiagnostics.isJavaScriptHeavy && selectedCrawlReport.renderingDiagnostics.message && (
+                    <div className="flex items-start gap-2 p-3 bg-violet-100 border border-violet-200 rounded-xl">
+                      <span className="text-lg shrink-0">ℹ️</span>
+                      <p className="text-[11px] text-violet-900 leading-relaxed">
+                        {selectedCrawlReport.renderingDiagnostics.message}
+                        {' '}This is an informational notice — the website was not excluded from the analysis, but content coverage may reflect what was available in the static HTML response.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* TOP REASONS PAGES WERE NOT CRAWLED */}
               <div className="space-y-2.5">

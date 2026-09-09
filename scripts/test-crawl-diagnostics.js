@@ -7,11 +7,14 @@ const assert = require('assert');
 const {
   CRAWL_CLASSIFICATIONS,
   COVERAGE_HEALTH_TIERS,
+  PRIORITY_CATEGORIES,
+  classifyUrl,
   classifyCrawlFailure,
   getCoverageHealth,
   aggregateTopFailureReasons,
   generateCrawlDiagnosticsReport
 } = require('../lib/crawlDiagnosticsCore');
+
 
 console.log('================================================================');
 console.log('       TEST SUITE: Crawl Coverage Diagnostics Engine            ');
@@ -265,6 +268,94 @@ runTest('SITEMAP_XML_EXTRACTION', async () => {
   assert.ok(extracted.includes('https://example.com/case-studies'));
   assert.ok(!extracted.includes('https://external-domain.com/out'));
   assert.ok(!extracted.includes('https://example.com/document.pdf'));
+});
+
+// ================================================================
+// RENDERING DIAGNOSTICS ENGINE TESTS (Tests 16-24)
+// ================================================================
+const { detectRenderingDiagnostics, RENDERING_FRAMEWORKS, RENDERING_METHODS, COVERAGE_IMPACT } = require('../lib/crawlDiagnosticsCore');
+
+// 16. Detect Next.js framework
+runTest('DETECT_NEXTJS_FRAMEWORK', () => {
+  const html = '<html><head></head><body><div id="__next"></div><script>window.__NEXT_DATA__ = {"page":"/"}</script></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 5 });
+  assert.strictEqual(result.framework, 'Next.js', `Expected 'Next.js', got '${result.framework}'`);
+  assert.ok(result.signals.length > 0, 'Should have at least one signal');
+});
+
+// 17. Detect React framework
+runTest('DETECT_REACT_FRAMEWORK', () => {
+  const html = '<html><body><div id="root" data-reactroot=""></div><script src="/react-dom.production.min.js"></script></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 0 });
+  assert.strictEqual(result.framework, 'React', `Expected 'React', got '${result.framework}'`);
+});
+
+// 18. Detect Angular framework
+runTest('DETECT_ANGULAR_FRAMEWORK', () => {
+  const html = '<html><body ng-version="14.0.0"><app-root></app-root></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 0 });
+  assert.strictEqual(result.framework, 'Angular', `Expected 'Angular', got '${result.framework}'`);
+});
+
+// 19. Detect Vue framework
+runTest('DETECT_VUE_FRAMEWORK', () => {
+  const html = '<html><body><div id="app" data-v-a1b2c3d></div><script src="/vue.js"></script></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 0 });
+  assert.strictEqual(result.framework, 'Vue', `Expected 'Vue', got '${result.framework}'`);
+});
+
+// 20. Detect Nuxt framework
+runTest('DETECT_NUXT_FRAMEWORK', () => {
+  const html = '<html><body><div id="__nuxt"></div><script>window.__NUXT__ = {}</script></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 0 });
+  assert.strictEqual(result.framework, 'Nuxt', `Expected 'Nuxt', got '${result.framework}'`);
+});
+
+// 21. Detect Remix framework
+runTest('DETECT_REMIX_FRAMEWORK', () => {
+  const html = '<html><body><script>window.__remixContext = {"state":{}}</script></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 0 });
+  assert.strictEqual(result.framework, 'Remix', `Expected 'Remix', got '${result.framework}'`);
+});
+
+// 22. Coverage impact: High (CSR + tiny text)
+runTest('JAVASCRIPT_HEAVY_COVERAGE_IMPACT', () => {
+  const html = '<html><body><div id="root"></div></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 30 });
+  assert.strictEqual(result.isJavaScriptHeavy, true, 'Should be JS-heavy for CSR with short text');
+  assert.strictEqual(result.coverageImpact, 'High', `Expected 'High', got '${result.coverageImpact}'`);
+  assert.strictEqual(result.renderingMethod, 'Client-Side Rendering (CSR)');
+});
+
+// 23. CSR non-failure: isJavaScriptHeavy should NOT cause a failure classification
+runTest('CSR_NON_FAILURE_CLASSIFICATION', () => {
+  const html = '<html><body><div id="__next"></div></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 10 });
+  // The detection result itself is informational — it contains no classification field
+  assert.strictEqual(result.isJavaScriptHeavy, true);
+  assert.ok(!('classification' in result) || result.classification === undefined,
+    'detectRenderingDiagnostics should NOT return a crawl failure classification');
+  // Only classifyCrawlFailure should produce a classification
+  const failure = classifyCrawlFailure({ statusCode: 200, html, textLength: 10 });
+  // The old SPA-shell detection might still classify — that's acceptable, 
+  // but the scraper no longer uses it as a hard failure when isJavaScriptHeavy=true
+  assert.ok(result.framework !== 'None', 'Should have detected a framework');
+});
+
+// 24. CSR informational message
+runTest('CSR_INFORMATIONAL_MESSAGE', () => {
+  const html = '<html><body><div id="root"></div></body></html>';
+  const result = detectRenderingDiagnostics({ html, textLength: 20 });
+  assert.ok(result.isJavaScriptHeavy, 'Should be JS-heavy');
+  assert.ok(result.message !== null, 'Should produce an informational message');
+  assert.ok(
+    result.message.includes('client-side rendering'),
+    `Message should mention client-side rendering. Got: "${result.message}"`
+  );
+  assert.ok(
+    result.message.includes('Coverage may be lower than expected'),
+    `Message should warn about coverage. Got: "${result.message}"`
+  );
 });
 
 console.log('================================================================');

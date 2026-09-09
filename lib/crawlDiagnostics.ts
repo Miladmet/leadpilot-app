@@ -4,7 +4,11 @@
 import {
   CRAWL_CLASSIFICATIONS,
   COVERAGE_HEALTH_TIERS,
+  RENDERING_FRAMEWORKS,
+  RENDERING_METHODS,
+  COVERAGE_IMPACT,
   classifyCrawlFailure,
+  detectRenderingDiagnostics,
   getCoverageHealth,
   aggregateTopFailureReasons,
   generateCrawlDiagnosticsReport
@@ -22,6 +26,28 @@ export type CrawlClassification =
   | 'Capped';
 
 export type CoverageHealthTier = 'Excellent' | 'Good' | 'Moderate' | 'Limited' | 'Insufficient';
+
+export type FrameworkType = 'Next.js' | 'React' | 'Angular' | 'Vue' | 'Nuxt' | 'Remix' | 'None' | 'Unknown';
+
+export type RenderingMethodType =
+  | 'Client-Side Rendering (CSR)'
+  | 'Server-Side Rendering (SSR) / Static'
+  | 'Hybrid (SSR + CSR)'
+  | 'Server-Rendered HTML';
+
+export type CoverageImpactType = 'Low' | 'Medium' | 'High';
+
+export interface RenderingDiagnostics {
+  framework: FrameworkType;
+  renderingMethod: RenderingMethodType;
+  isJavaScriptHeavy: boolean;
+  coverageImpact: CoverageImpactType;
+  textExtracted: number;
+  htmlSizeBytes: number;
+  scriptCount: number;
+  message: string | null;
+  signals: string[];
+}
 
 export interface SkippedPageRecord {
   url: string;
@@ -66,13 +92,19 @@ export interface CrawlDiagnosticsReport {
   suppressionReason: string | null;
   topFailureReasons: FailureReasonSummary[];
   skippedPages: SkippedPageRecord[];
+  renderingDiagnostics?: RenderingDiagnostics | null;
 }
 
 export {
   CRAWL_CLASSIFICATIONS,
   COVERAGE_HEALTH_TIERS,
+  RENDERING_FRAMEWORKS,
+  RENDERING_METHODS,
+  COVERAGE_IMPACT,
   classifyCrawlFailure,
+  detectRenderingDiagnostics,
   getCoverageHealth,
   aggregateTopFailureReasons,
   generateCrawlDiagnosticsReport
 };
+

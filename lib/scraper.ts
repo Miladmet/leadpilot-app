@@ -3,8 +3,10 @@ import * as cheerio from 'cheerio';
 import {
   CrawlClassification,
   CrawlDiagnosticsReport,
+  RenderingDiagnostics,
   SkippedPageRecord,
   classifyCrawlFailure,
+  detectRenderingDiagnostics,
   generateCrawlDiagnosticsReport
 } from './crawlDiagnostics';
 
@@ -25,7 +27,9 @@ export interface ScrapeAttemptResult {
   status: number | null;
   failureReason?: string;
   classification?: CrawlClassification;
+  renderingDiagnostics?: RenderingDiagnostics;
 }
+
 
 export interface DiscoveredPage {
   url: string;
@@ -382,8 +386,30 @@ export async function scrapeUrlWithDiagnostics(
       const $ = cheerio.load(html || '');
       const title = $('title').text().trim() || deriveTitleFromUrl(normalized);
 
-      // Check for SPA shells needing JavaScript (Empty initial DOM)
-      if (text.length < 50) {
+      // Compute rendering diagnostics for every successful page
+      const renderingDiagnostics = detectRenderingDiagnostics({
+        html,
+        textLength: text.length,
+        statusCode: response.status,
+        htmlSizeBytes: Buffer.byteLength(html, 'utf8')
+      }) as RenderingDiagnostics;
+
+      // If JavaScript-heavy on 200 OK: treat as informational, NOT a failure.
+      // Page content will be limited but we should not drop it from coverage.
+      if (renderingDiagnostics.isJavaScriptHeavy && text.length < 50) {
+        return {
+          success: true,
+          url: normalized,
+          title,
+          text: text || renderingDiagnostics.message || '',
+          html,
+          status: response.status,
+          renderingDiagnostics
+        };
+      }
+
+      // Non-JS pages with very little text (true empty response / scraping block)
+      if (!renderingDiagnostics.isJavaScriptHeavy && text.length < 50) {
         const failure = classifyCrawlFailure({
           statusCode: response.status,
           html,
@@ -408,8 +434,10 @@ export async function scrapeUrlWithDiagnostics(
         title,
         text,
         html,
-        status: response.status
+        status: response.status,
+        renderingDiagnostics
       };
+
     } catch (error: any) {
       const statusCode = error.response?.status || null;
       const responseHtml = typeof error.response?.data === 'string' ? error.response.data : '';
@@ -570,7 +598,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
   const isHomeBlocked = isPathRobotsDisallowed(normalizedBase, disallowedPaths);
   const homepageAttempt = await scrapeUrlWithDiagnostics(normalizedBase, isHomeBlocked);
 
-  if (!homepageAttempt.success || homepageAttempt.text.length < 50) {
+  if (!homepageAttempt.success) {
     const elapsed = Date.now() - startTime;
     failedScrapes.set(normalizedBase, {
       title: homepageAttempt.title || fallbackName,
@@ -598,6 +626,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
       pagesSkipped: 1,
       crawlDurationMs: elapsed,
       totalTextExtracted: 0,
+      renderingDiagnostics: homepageAttempt.renderingDiagnostics || null,
       skippedPages: [
         {
           url: normalizedBase,
@@ -623,6 +652,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
       combinedContent: `<crawling_failed domain="${baseDomain}" companyName="${fallbackName}" url="${normalizedBase}" />`
     };
   }
+
 
   // Record successful homepage
   crawledPages.push({
@@ -684,7 +714,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
         const { item, res } = result.value;
         crawledUrls.add(item.url);
 
-        if (res.success && res.text.length > 50) {
+        if (res.success) {
           crawledPages.push({
             url: res.url,
             title: res.title || item.title,
@@ -719,6 +749,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
             classification: res.classification || 'Unknown'
           });
         }
+
       }
     }
   }
@@ -812,7 +843,8 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     sitemapDiscoveredCount,
     crawlDurationMs: elapsed,
     totalTextExtracted,
-    skippedPages: skippedPagesList
+    skippedPages: skippedPagesList,
+    renderingDiagnostics: homepageAttempt.renderingDiagnostics || null
   });
 
   const warningMessage = diagnosticsReport.coverageWarning || (totalCrawled <= 1
