@@ -5,7 +5,7 @@ const { BLOG_ARTICLES } = require('../lib/blogArticlesCore');
 
 const HOST = 'www.leadpilotsoftware.com';
 const BASE_URL = `https://${HOST}`;
-const KEY = 'f739e7196b504df88f4d058547bc2c75';
+const KEY = '0015633a6b514672894d7c28934bdb4b';
 const KEY_LOCATION = `${BASE_URL}/${KEY}.txt`;
 
 const coreRoutes = [
