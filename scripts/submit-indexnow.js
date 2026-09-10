@@ -76,16 +76,25 @@ async function run() {
   console.log(`Submitting ${urlList.length} URLs to IndexNow protocol for ${HOST}...`);
   console.log(`Key verification file: ${KEY_LOCATION}\n`);
 
+  let success = false;
   try {
     console.log('Sending to api.indexnow.org...');
     const res1 = await submitToIndexNow('api.indexnow.org', '/indexnow');
     console.log(`[api.indexnow.org] Status: ${res1.statusCode} (${res1.statusMessage})`);
+    if (res1.statusCode === 200 || res1.statusCode === 202) success = true;
 
     console.log('Sending to www.bing.com/indexnow...');
     const res2 = await submitToIndexNow('www.bing.com', '/indexnow');
     console.log(`[bing.com] Status: ${res2.statusCode} (${res2.statusMessage})`);
+    if (res2.statusCode === 200 || res2.statusCode === 202) success = true;
 
-    console.log('\n✓ IndexNow submission successfully dispatched to Microsoft Bing & partners!');
+    if (success) {
+      console.log('\n✅ IndexNow submission successfully dispatched and accepted by Microsoft Bing & partners!');
+    } else {
+      console.log('\n⚠️ IndexNow submission returned errors (e.g. 403 Forbidden).');
+      console.log('Ensure that your site is deployed and the key file is accessible at:');
+      console.log(KEY_LOCATION);
+    }
   } catch (err) {
     console.error('Submission error:', err);
   }
