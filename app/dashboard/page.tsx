@@ -60,6 +60,7 @@ import {
 
 import { 
   BarChart3, 
+  Puzzle,
   Search, 
   History, 
   Mail, 
@@ -273,6 +274,12 @@ interface CrawlDiagnosticsData {
     scriptCount: number;
     message: string | null;
     signals: string[];
+  } | null;
+  mcpDiagnostics?: {
+    mcpDetected: boolean;
+    mcpEndpoint: string | null;
+    mcpVersion: string | null;
+    mcpStatus: 'Available' | 'Not Found' | 'Invalid' | 'Error';
   } | null;
 }
 
@@ -998,7 +1005,8 @@ export default function Dashboard() {
       topFailureReasons: topFailureReasons || [],
       skippedPages: skippedPages || [],
       warningMessage: crawled <= 1 ? 'Limited website coverage may reduce analysis quality.' : undefined,
-      renderingDiagnostics: parsed?.renderingDiagnostics ?? null
+      renderingDiagnostics: parsed?.renderingDiagnostics ?? null,
+      mcpDiagnostics: parsed?.mcpDiagnostics ?? null
     };
 
   };
@@ -2917,6 +2925,45 @@ export default function Dashboard() {
                             ℹ️ {diag.renderingDiagnostics.message}
                           </p>
                         )}
+                      </div>
+                    )}
+
+                    {/* WebMCP Detection Row */}
+                    {diag.mcpDiagnostics && (
+                      <div className={`mt-2.5 p-2.5 rounded-xl border text-xs flex flex-col gap-1.5 shadow-2xs ${
+                        diag.mcpDiagnostics.mcpStatus === 'Available'
+                          ? 'bg-blue-50 border-blue-200'
+                          : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                            <Puzzle className="h-3.5 w-3.5 text-blue-500" />
+                            MCP Detection
+                          </span>
+                          {diag.mcpDiagnostics.mcpStatus === 'Available' && (
+                            <span className="text-[9px] font-bold bg-blue-200 text-blue-900 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              MCP Enabled
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Status</span>
+                            <strong className={diag.mcpDiagnostics.mcpStatus === 'Available' ? 'text-blue-700' : 'text-slate-600'}>
+                              {diag.mcpDiagnostics.mcpStatus}
+                            </strong>
+                          </div>
+                          <div className="col-span-2 sm:col-span-1">
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Endpoint</span>
+                            <strong className="text-slate-700 text-[10px] break-all">
+                              {diag.mcpDiagnostics.mcpEndpoint ? new URL(diag.mcpDiagnostics.mcpEndpoint).pathname : 'None'}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Version</span>
+                            <strong className="text-slate-700">{diag.mcpDiagnostics.mcpVersion || '-'}</strong>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -5698,6 +5745,54 @@ export default function Dashboard() {
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* MCP DETECTION CARD */}
+              {selectedCrawlReport.mcpDiagnostics && (
+                <div className={`p-4 rounded-2xl border space-y-3 ${
+                  selectedCrawlReport.mcpDiagnostics.mcpStatus === 'Available'
+                    ? 'bg-blue-50 border-blue-200'
+                    : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Puzzle className="h-4 w-4 text-blue-600" />
+                      WebMCP Discovery
+                    </h4>
+                    <div className="flex items-center gap-1.5">
+                      {selectedCrawlReport.mcpDiagnostics.mcpStatus === 'Available' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-200 text-blue-900 border border-blue-300 uppercase tracking-wider">
+                          MCP Endpoint Detected
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 border border-slate-300 uppercase tracking-wider">
+                          Not Detected
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase">Status</span>
+                      <strong className={selectedCrawlReport.mcpDiagnostics.mcpStatus === 'Available' ? 'text-blue-700 text-sm' : 'text-slate-800 text-sm'}>
+                        {selectedCrawlReport.mcpDiagnostics.mcpStatus}
+                      </strong>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs col-span-2">
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase">Endpoint Location</span>
+                      <strong className="text-slate-800 text-[11px] leading-tight block break-all">
+                        {selectedCrawlReport.mcpDiagnostics.mcpEndpoint || 'N/A'}
+                      </strong>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase">MCP Version</span>
+                      <strong className="text-slate-800 text-sm">
+                        {selectedCrawlReport.mcpDiagnostics.mcpVersion || '-'}
+                      </strong>
+                    </div>
+                  </div>
                 </div>
               )}
 

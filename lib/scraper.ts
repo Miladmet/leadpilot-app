@@ -545,14 +545,62 @@ function extractLinksFromHtml(html: string, currentUrl: string, baseDomain: stri
   return links;
 }
 
+import { WebMCPDiagnostics } from './crawlDiagnostics';
+
+export async function probeWebMCP(baseUrl: string): Promise<WebMCPDiagnostics> {
+  const paths = ['/.webmcp', '/webmcp.json', '/.well-known/webmcp', '/.well-known/mcp'];
+  
+  for (const path of paths) {
+    try {
+      const endpoint = `${baseUrl}${path}`;
+      const response = await axios.get(endpoint, { 
+        timeout: 3000, 
+        validateStatus: () => true 
+      });
+      
+      if (response.status === 200) {
+        if (typeof response.data === 'object' && response.data !== null) {
+          // Detect MCP version or signature
+          const mcpVersion = response.data.mcpVersion || response.data.version || '1.0';
+          return {
+            mcpDetected: true,
+            mcpEndpoint: endpoint,
+            mcpVersion: String(mcpVersion),
+            mcpStatus: 'Available'
+          };
+        } else {
+          return {
+            mcpDetected: false,
+            mcpEndpoint: endpoint,
+            mcpVersion: null,
+            mcpStatus: 'Invalid'
+          };
+        }
+      }
+    } catch (err) {
+      continue; // Ignore network errors and try next path
+    }
+  }
+
+  return {
+    mcpDetected: false,
+    mcpEndpoint: null,
+    mcpVersion: null,
+    mcpStatus: 'Not Found'
+  };
+}
 export async function crawlWebsite(targetUrl: string, maxPages: number = 20, maxDepth: number = 2): Promise<CrawlData> {
   const startTime = Date.now();
   const normalizedBase = normalizeUrl(targetUrl);
   const baseDomain = new URL(normalizedBase).hostname.replace(/^www\./i, '');
   const fallbackName = baseDomain.split('.')[0].toUpperCase() || 'Target Company';
 
-  // 0. Pre-fetch robots.txt rules and discover sitemap.xml
-  const { disallowedPaths, sitemapUrls } = await fetchRobotsInfo(normalizedBase);
+  // 0. Pre-fetch robots.txt rules, discover sitemap.xml, and probe WebMCP
+  const [robotsData, mcpDiagnostics] = await Promise.all([
+    fetchRobotsInfo(normalizedBase),
+    probeWebMCP(normalizedBase).catch(() => null)
+  ]);
+  const { disallowedPaths, sitemapUrls } = robotsData;
   const discoveredSitemapUrls = await fetchSitemapUrls(sitemapUrls, baseDomain, disallowedPaths, 200);
 
   // Tracking containers
@@ -644,6 +692,7 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
       crawlDurationMs: elapsed,
       totalTextExtracted: 0,
       renderingDiagnostics: homepageAttempt.renderingDiagnostics || null,
+      mcpDiagnostics: mcpDiagnostics,
       skippedPages: [
         {
           url: normalizedBase,
@@ -866,7 +915,8 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     crawledCategories,
     discoveredCategories,
     skippedPages: skippedPagesList,
-    renderingDiagnostics: homepageAttempt.renderingDiagnostics || null
+    renderingDiagnostics: homepageAttempt.renderingDiagnostics || null,
+    mcpDiagnostics: mcpDiagnostics
   });
 
   const warningMessage = diagnosticsReport.coverageWarning || (totalCrawled <= 1

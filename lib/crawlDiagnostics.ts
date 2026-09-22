@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TypeScript wrapper for LeadPilot Crawl Diagnostics
  */
 import {
@@ -90,6 +90,13 @@ export interface CoverageHealthInfo {
   description: string;
 }
 
+export interface WebMCPDiagnostics {
+  mcpDetected: boolean;
+  mcpEndpoint: string | null;
+  mcpVersion: string | null;
+  mcpStatus: 'Available' | 'Not Found' | 'Invalid' | 'Error';
+}
+
 export interface CrawlDiagnosticsReport {
   pagesDiscovered: number;
   pagesCrawled: number;
@@ -112,6 +119,7 @@ export interface CrawlDiagnosticsReport {
   topFailureReasons: FailureReasonSummary[];
   skippedPages: SkippedPageRecord[];
   renderingDiagnostics?: RenderingDiagnostics | null;
+  mcpDiagnostics?: WebMCPDiagnostics | null;
 }
 
 export {
