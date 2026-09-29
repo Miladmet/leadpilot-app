@@ -74,6 +74,7 @@ model Prospect {
   totalTextExtracted   Int      @default(0)
   crawledPagesData     String   @default("[]") // JSON of Array<{ url, title, category, depth, status, textLength }>
   crawlDiagnostics     String   @default("{}") // JSON of { pagesDiscovered, pagesCrawled, pagesSkipped, crawlDurationMs, textExtractedBytes, warningMessage }
+  mcpBusinessData      String?  // JSON string containing extracted MCPBusinessData
 
   // 3c. Analysis Versioning & Change Detection
   analysisVersion      Int      @default(1)

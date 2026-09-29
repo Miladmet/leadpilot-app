@@ -263,6 +263,9 @@ export async function POST(req: NextRequest) {
       totalTextExtracted: sanitizeInt(crawlData.diagnostics.totalTextExtracted, 0),
       crawledPagesData: JSON.stringify(crawlData.discoveredPages || []),
       crawlDiagnostics: JSON.stringify(crawlData.diagnostics || {}),
+      mcpBusinessData: crawlData.diagnostics?.mcpDiagnostics?.businessData
+        ? JSON.stringify(crawlData.diagnostics.mcpDiagnostics.businessData)
+        : null,
 
       // NEW: Versioning & Change Detection
       analysisVersion: sanitizeInt(versionNumber, 1),
@@ -311,6 +314,7 @@ export async function POST(req: NextRequest) {
           crawlDiagnostics,
           opportunityRange,
           revenueAssumptions,
+          mcpBusinessData,
           ...corePayload
         } = prospectPayload;
 
