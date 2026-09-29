@@ -5806,42 +5806,59 @@ export default function Dashboard() {
                     <div className="mt-2 bg-white p-3 rounded-xl border border-blue-100 shadow-2xs space-y-2">
                       <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Extracted Business Data</h5>
                       <div className="grid grid-cols-2 gap-3">
-                        {selectedCrawlReport.mcpDiagnostics.businessData.companyName && (
-                          <div>
-                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Company Name</span>
-                            <strong className="text-slate-800 text-xs">{selectedCrawlReport.mcpDiagnostics.businessData.companyName}</strong>
-                          </div>
-                        )}
-                        {selectedCrawlReport.mcpDiagnostics.businessData.productName && (
-                          <div>
-                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Product Name</span>
-                            <strong className="text-slate-800 text-xs">{selectedCrawlReport.mcpDiagnostics.businessData.productName}</strong>
-                          </div>
-                        )}
-                        {selectedCrawlReport.mcpDiagnostics.businessData.category && (
-                          <div>
-                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Category</span>
-                            <strong className="text-slate-800 text-xs">{selectedCrawlReport.mcpDiagnostics.businessData.category}</strong>
-                          </div>
-                        )}
-                        {selectedCrawlReport.mcpDiagnostics.businessData.pricing?.plans && (
-                          <div>
-                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pricing Plans</span>
-                            <strong className="text-slate-800 text-xs">{selectedCrawlReport.mcpDiagnostics.businessData.pricing.plans.join(', ')}</strong>
-                          </div>
-                        )}
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-semibold block uppercase">Company Name</span>
+                          <strong className={`text-xs ${selectedCrawlReport.mcpDiagnostics.businessData.companyName ? 'text-slate-800' : 'text-slate-400 italic font-normal'}`}>
+                            {selectedCrawlReport.mcpDiagnostics.businessData.companyName || 'Not specified'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-semibold block uppercase">Product Name</span>
+                          <strong className={`text-xs ${selectedCrawlReport.mcpDiagnostics.businessData.productName ? 'text-slate-800' : 'text-slate-400 italic font-normal'}`}>
+                            {selectedCrawlReport.mcpDiagnostics.businessData.productName || 'Not specified'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-semibold block uppercase">Category</span>
+                          <strong className={`text-xs ${selectedCrawlReport.mcpDiagnostics.businessData.category ? 'text-slate-800' : 'text-slate-400 italic font-normal'}`}>
+                            {selectedCrawlReport.mcpDiagnostics.businessData.category || 'Not specified'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pricing Plans</span>
+                          <strong className={`text-xs ${selectedCrawlReport.mcpDiagnostics.businessData.pricing?.plans && selectedCrawlReport.mcpDiagnostics.businessData.pricing.plans.length > 0 ? 'text-slate-800' : 'text-slate-400 italic font-normal'}`}>
+                            {selectedCrawlReport.mcpDiagnostics.businessData.pricing?.plans && selectedCrawlReport.mcpDiagnostics.businessData.pricing.plans.length > 0
+                              ? selectedCrawlReport.mcpDiagnostics.businessData.pricing.plans.join(', ')
+                              : 'Not specified'}
+                          </strong>
+                        </div>
                       </div>
                       
-                      {selectedCrawlReport.mcpDiagnostics.businessData.features && selectedCrawlReport.mcpDiagnostics.businessData.features.length > 0 && (
-                        <div className="pt-1">
-                          <span className="text-[9px] text-slate-400 font-semibold block uppercase mb-1">Key Features</span>
+                      <div className="pt-1">
+                        <span className="text-[9px] text-slate-400 font-semibold block uppercase mb-1">Key Features</span>
+                        {selectedCrawlReport.mcpDiagnostics.businessData.features && selectedCrawlReport.mcpDiagnostics.businessData.features.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {selectedCrawlReport.mcpDiagnostics.businessData.features.map((feat, idx) => (
                               <span key={idx} className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">{feat}</span>
                             ))}
                           </div>
-                        </div>
-                      )}
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">No features listed</span>
+                        )}
+                      </div>
+                      
+                      <div className="pt-1">
+                        <span className="text-[9px] text-slate-400 font-semibold block uppercase mb-1">Integrations</span>
+                        {selectedCrawlReport.mcpDiagnostics.businessData.integrations && selectedCrawlReport.mcpDiagnostics.businessData.integrations.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {selectedCrawlReport.mcpDiagnostics.businessData.integrations.map((integration, idx) => (
+                              <span key={idx} className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">{integration}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">No integrations listed</span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
