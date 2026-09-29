@@ -545,7 +545,30 @@ function extractLinksFromHtml(html: string, currentUrl: string, baseDomain: stri
   return links;
 }
 
-import { WebMCPDiagnostics } from './crawlDiagnostics';
+import { WebMCPDiagnostics, MCPBusinessData } from './crawlDiagnostics';
+
+export async function fetchMCPBusinessData(endpoint: string): Promise<MCPBusinessData> {
+  const response = await axios.get(endpoint, {
+    timeout: 3000,
+    validateStatus: () => true
+  });
+
+  if (response.status !== 200 || typeof response.data !== 'object' || response.data === null) {
+    throw new Error('Invalid or missing WebMCP endpoint data');
+  }
+
+  const dataRoot = response.data.businessData || response.data;
+  const businessData: MCPBusinessData = {};
+
+  if (dataRoot.companyName) businessData.companyName = dataRoot.companyName;
+  if (dataRoot.productName) businessData.productName = dataRoot.productName;
+  if (dataRoot.pricing) businessData.pricing = dataRoot.pricing;
+  if (Array.isArray(dataRoot.features)) businessData.features = dataRoot.features;
+  if (Array.isArray(dataRoot.integrations)) businessData.integrations = dataRoot.integrations;
+  if (dataRoot.category) businessData.category = dataRoot.category;
+
+  return businessData;
+}
 
 export async function probeWebMCP(baseUrl: string): Promise<WebMCPDiagnostics> {
   const paths = ['/.webmcp', '/webmcp.json', '/.well-known/webmcp', '/.well-known/mcp'];
@@ -563,23 +586,22 @@ export async function probeWebMCP(baseUrl: string): Promise<WebMCPDiagnostics> {
           // Detect MCP version or signature
           const mcpVersion = response.data.mcpVersion || response.data.version || '1.0';
           
-          // Try to extract MCPBusinessData
-          const dataRoot = response.data.businessData || response.data;
-          const businessData = {
-            companyName: dataRoot.companyName,
-            productName: dataRoot.productName,
-            pricing: dataRoot.pricing,
-            features: dataRoot.features,
-            integrations: dataRoot.integrations,
-            category: dataRoot.category
-          };
+          let extractedData = null;
+          try {
+            const rawData = await fetchMCPBusinessData(endpoint);
+            if (Object.keys(rawData).length > 0) {
+              extractedData = rawData;
+            }
+          } catch (e) {
+            // Fallback gracefully if data parsing fails
+          }
 
           return {
             mcpDetected: true,
             mcpEndpoint: endpoint,
             mcpVersion: String(mcpVersion),
             mcpStatus: 'Available',
-            businessData: Object.keys(businessData).some(k => (businessData as any)[k] !== undefined) ? businessData : null
+            businessData: extractedData
           };
         } else {
           return {
