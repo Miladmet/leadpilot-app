@@ -562,11 +562,24 @@ export async function probeWebMCP(baseUrl: string): Promise<WebMCPDiagnostics> {
         if (typeof response.data === 'object' && response.data !== null) {
           // Detect MCP version or signature
           const mcpVersion = response.data.mcpVersion || response.data.version || '1.0';
+          
+          // Try to extract MCPBusinessData
+          const dataRoot = response.data.businessData || response.data;
+          const businessData = {
+            companyName: dataRoot.companyName,
+            productName: dataRoot.productName,
+            pricing: dataRoot.pricing,
+            features: dataRoot.features,
+            integrations: dataRoot.integrations,
+            category: dataRoot.category
+          };
+
           return {
             mcpDetected: true,
             mcpEndpoint: endpoint,
             mcpVersion: String(mcpVersion),
-            mcpStatus: 'Available'
+            mcpStatus: 'Available',
+            businessData: Object.keys(businessData).some(k => (businessData as any)[k] !== undefined) ? businessData : null
           };
         } else {
           return {

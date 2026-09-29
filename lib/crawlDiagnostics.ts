@@ -90,11 +90,23 @@ export interface CoverageHealthInfo {
   description: string;
 }
 
+export interface MCPBusinessData {
+  companyName?: string;
+  productName?: string;
+  pricing?: {
+    plans: string[];
+  };
+  features?: string[];
+  integrations?: string[];
+  category?: string;
+}
+
 export interface WebMCPDiagnostics {
   mcpDetected: boolean;
   mcpEndpoint: string | null;
   mcpVersion: string | null;
   mcpStatus: 'Available' | 'Not Found' | 'Invalid' | 'Error';
+  businessData?: MCPBusinessData | null;
 }
 
 export interface CrawlDiagnosticsReport {

@@ -280,6 +280,14 @@ interface CrawlDiagnosticsData {
     mcpEndpoint: string | null;
     mcpVersion: string | null;
     mcpStatus: 'Available' | 'Not Found' | 'Invalid' | 'Error';
+    businessData?: {
+      companyName?: string;
+      productName?: string;
+      pricing?: { plans: string[] };
+      features?: string[];
+      integrations?: string[];
+      category?: string;
+    } | null;
   } | null;
 }
 
@@ -5793,6 +5801,49 @@ export default function Dashboard() {
                       </strong>
                     </div>
                   </div>
+
+                  {selectedCrawlReport.mcpDiagnostics.businessData && (
+                    <div className="mt-2 bg-white p-3 rounded-xl border border-blue-100 shadow-2xs space-y-2">
+                      <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Extracted Business Data</h5>
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedCrawlReport.mcpDiagnostics.businessData.companyName && (
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Company Name</span>
+                            <strong className="text-slate-800 text-xs">{selectedCrawlReport.mcpDiagnostics.businessData.companyName}</strong>
+                          </div>
+                        )}
+                        {selectedCrawlReport.mcpDiagnostics.businessData.productName && (
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Product Name</span>
+                            <strong className="text-slate-800 text-xs">{selectedCrawlReport.mcpDiagnostics.businessData.productName}</strong>
+                          </div>
+                        )}
+                        {selectedCrawlReport.mcpDiagnostics.businessData.category && (
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Category</span>
+                            <strong className="text-slate-800 text-xs">{selectedCrawlReport.mcpDiagnostics.businessData.category}</strong>
+                          </div>
+                        )}
+                        {selectedCrawlReport.mcpDiagnostics.businessData.pricing?.plans && (
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">Pricing Plans</span>
+                            <strong className="text-slate-800 text-xs">{selectedCrawlReport.mcpDiagnostics.businessData.pricing.plans.join(', ')}</strong>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {selectedCrawlReport.mcpDiagnostics.businessData.features && selectedCrawlReport.mcpDiagnostics.businessData.features.length > 0 && (
+                        <div className="pt-1">
+                          <span className="text-[9px] text-slate-400 font-semibold block uppercase mb-1">Key Features</span>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedCrawlReport.mcpDiagnostics.businessData.features.map((feat, idx) => (
+                              <span key={idx} className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">{feat}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
