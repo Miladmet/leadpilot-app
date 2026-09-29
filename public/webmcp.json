@@ -1,0 +1,22 @@
+{
+  "mcpVersion": "1.0",
+  "businessData": {
+    "companyName": "LeadPilot",
+    "productName": "Intelligent Crawl Engine",
+    "category": "Agency Prospecting Software",
+    "pricing": {
+      "plans": ["Starter", "Agency", "Enterprise"]
+    },
+    "features": [
+      "AI Website Audits",
+      "Automated Proposals",
+      "Opportunity Readiness Scoring",
+      "WebMCP Discovery Layer"
+    ],
+    "integrations": [
+      "Salesforce",
+      "HubSpot",
+      "Slack"
+    ]
+  }
+}
