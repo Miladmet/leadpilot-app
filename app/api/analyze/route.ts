@@ -282,16 +282,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 1b. Customer-Supplied Information
-    if (uploadedFiles && uploadedFiles.length > 0) {
-      generatedEvidenceSources.push({
-        type: 'Customer-Supplied Information',
-        confidence: 95, // High confidence for explicit uploads
-        evidenceCount: uploadedFiles.length * 5, // Simulated density
-        lastUpdated: new Date().toISOString()
-      });
-    }
-
     // 2. MCP Evidence
     const mcpBiz = crawlData.diagnostics?.mcpDiagnostics?.businessData;
     if (mcpBiz) {
@@ -303,18 +293,44 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. Schema.org
+    // 3. Schema.org Structured Data
     generatedEvidenceSources.push({
       type: 'Schema.org Structured Data',
-      confidence: 95,
+      confidence: 90,
       evidenceCount: 5,
       lastUpdated: new Date().toISOString()
     });
 
-    // 4. Public Business Information
+    // 4. Google Business Profile Signals
+    generatedEvidenceSources.push({
+      type: 'Google Business Profile Signals',
+      confidence: 85,
+      evidenceCount: 3,
+      lastUpdated: new Date().toISOString()
+    });
+
+    // 5. Customer-Supplied Information
+    generatedEvidenceSources.push({
+      type: 'Customer-Supplied Information',
+      confidence: 95,
+      evidenceCount: 2,
+      lastUpdated: new Date().toISOString()
+    });
+
+    // 6. Uploaded Documents
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      generatedEvidenceSources.push({
+        type: 'Uploaded Documents',
+        confidence: 100,
+        evidenceCount: uploadedFiles.length * 4,
+        lastUpdated: new Date().toISOString()
+      });
+    }
+
+    // 7. Public Business Information
     generatedEvidenceSources.push({
       type: 'Public Business Information',
-      confidence: 85,
+      confidence: 80,
       evidenceCount: 8,
       lastUpdated: new Date().toISOString()
     });
