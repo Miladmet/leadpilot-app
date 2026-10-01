@@ -180,19 +180,37 @@ model Proposals {
 }
 
 model OutreachMessages {
-  id              String    @id @default(uuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prospectId      String?
-  prospect        Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-  channel         String    @default("Email") // Email, LinkedIn
-  recipient       String    @default("")
-  subject         String?
-  body            String    @default("")
-  status          String    @default("Draft") // Draft, Scheduled, Sent, Failed
-  sentAt          DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                   String    @id @default(uuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospectId           String?
+  prospect             Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  
+  // Outreach Intelligence Engine Fields
+  opportunityTitle     String    @default("")
+  problemRef           String    @default("")
+  evidenceRef          String    @default("")
+  serviceRef           String    @default("")
+  
+  coldEmail            String    @default("")
+  linkedInMessage      String    @default("")
+  followUpSequence     String    @default("")
+  discoveryQuestions   String    @default("")
+  proposalCoverLetter  String    @default("")
+  
+  outreachConfidence   Int       @default(0)
+  personalizationScore Int       @default(0)
+  evidenceSources      String    @default("[]")
+
+  // Legacy fallback fields
+  channel              String    @default("Email")
+  recipient            String    @default("")
+  subject              String?
+  body                 String    @default("")
+  status               String    @default("Draft")
+  sentAt               DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 }
 
 model Subscriptions {

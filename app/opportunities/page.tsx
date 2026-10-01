@@ -160,6 +160,27 @@ export default function OpportunitiesPage() {
     }
   };
 
+  const handleGenerateOutreach = async (opp: Opportunity) => {
+    setGeneratingFor(`outreach-${opp.id}`);
+    try {
+      const res = await fetch('/api/outreach/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opportunity: opp })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/outreach/${data.outreach.id}`);
+      } else {
+        console.error('Failed to generate outreach');
+        setGeneratingFor(null);
+      }
+    } catch (e) {
+      console.error(e);
+      setGeneratingFor(null);
+    }
+  };
+
   const renderCard = (opp: Opportunity) => (
     <div key={opp.id} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-3 hover:border-emerald-300 transition-colors">
       <div className="flex justify-between items-start gap-2">
@@ -199,17 +220,30 @@ export default function OpportunitiesPage() {
         </span>
       </div>
 
-      <button
-        onClick={() => handleGenerateProposal(opp)}
-        disabled={generatingFor === opp.id}
-        className="mt-2 w-full text-[10px] font-black uppercase tracking-wider py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
-      >
-        {generatingFor === opp.id ? (
-          <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> Generating...</>
-        ) : (
-          <>Generate Proposal</>
-        )}
-      </button>
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <button
+          onClick={() => handleGenerateProposal(opp)}
+          disabled={generatingFor !== null}
+          className="w-full text-[10px] font-black uppercase tracking-wider py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+        >
+          {generatingFor === opp.id ? (
+            <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> Gen...</>
+          ) : (
+            <>Proposal</>
+          )}
+        </button>
+        <button
+          onClick={() => handleGenerateOutreach(opp)}
+          disabled={generatingFor !== null}
+          className="w-full text-[10px] font-black uppercase tracking-wider py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+        >
+          {generatingFor === `outreach-${opp.id}` ? (
+            <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> Gen...</>
+          ) : (
+            <>Outreach</>
+          )}
+        </button>
+      </div>
     </div>
   );
 
