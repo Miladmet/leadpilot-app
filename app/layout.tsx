@@ -5,15 +5,15 @@ import { GlobalJsonLd } from '@/components/seo/JsonLd';
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.leadpilotsoftware.com'),
   title: {
-    default: 'LeadPilot Software | Turn Any Website Into a Client Proposal',
+    default: 'LeadPilot | Agency Revenue Intelligence Platform',
     template: '%s | LeadPilot Software'
   },
   description:
-    'LeadPilot Software helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.',
+    'LeadPilot is the Agency Revenue Intelligence Platform. Identify, prioritize, and close high-margin revenue opportunities instantly using verified evidence.',
   keywords: [
     'LeadPilot Software',
-    'agency prospecting software',
-    'website audit tool',
+    'agency revenue intelligence',
+    'opportunity intelligence',
     'proposal generator',
     'competitor gap analysis',
     'client acquisition software',

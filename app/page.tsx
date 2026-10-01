@@ -223,15 +223,15 @@ export default function Home() {
 
         {/* Hero Section */}
         <section className="py-12 sm:py-20 px-4 sm:px-6 max-w-5xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-sky-50 border border-sky-200 text-sky-700 text-xs font-bold px-3.5 py-1 rounded-full uppercase tracking-wider mb-4">
-            <ShieldCheck className="h-3.5 w-3.5 text-sky-600" />
-            <span>Evidence-Backed Agency Acceleration</span>
+          <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3.5 py-1 rounded-full uppercase tracking-wider mb-4">
+            <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+            <span>The Agency Revenue Intelligence Platform</span>
           </div>
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-slate-900 leading-tight tracking-tight max-w-4xl mx-auto">
-            Turn Any Company Website Into a Client Proposal in Under 60 Seconds.
+            Find Opportunities.<br className="hidden sm:block" /> Generate Proposals.<br className="hidden sm:block" /> Win Clients.
           </h1>
           <p className="mt-4 sm:mt-6 text-sm sm:text-xl text-slate-600 max-w-3xl mx-auto font-medium leading-relaxed">
-            LeadPilot Software helps agencies find opportunities, generate proposals, and win clients using evidence-backed analysis in under 60 seconds.
+            LeadPilot helps digital agencies identify, prioritize, and close high-margin revenue opportunities instantly—backed by hard evidence, not guesswork.
           </p>
 
           {/* Interactive Live Sample Scanner */}
@@ -679,45 +679,65 @@ export default function Home() {
           )}
         </section>
 
-        {/* 3 Core Value Pillars */}
+        {/* 5 Core Revenue Pillars */}
         <section className="py-16 bg-slate-100 border-t border-slate-200 px-6">
           <div className="max-w-5xl mx-auto space-y-12">
             <div className="text-center space-y-2 max-w-2xl mx-auto">
-              <span className="text-xs font-bold text-sky-600 uppercase tracking-wider block">The 3 Pillars</span>
-              <h2 className="text-3xl font-black text-slate-900">How LeadPilot Software Powers Your Agency</h2>
+              <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider block">The 5 Pillars</span>
+              <h2 className="text-3xl font-black text-slate-900">Revenue Intelligence For Agencies</h2>
               <p className="text-slate-600 text-sm">
-                Built from the ground up to replace guesswork with evidence-backed clarity.
+                Built from the ground up to focus on what matters most: what opportunity can be closed?
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-2xl font-bold">
-                  🔍
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <Search className="w-5 h-5" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900">1. Find Opportunities</h3>
-                <p className="text-slate-600 text-sm leading-relaxed">
-                  Scan any prospective client website in 60 seconds to uncover high-impact gaps in SEO, CRO, speed, and messaging.
+                <h3 className="text-lg font-black text-slate-900">1. Opportunity Intelligence</h3>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  Identify high-margin gaps and bottlenecks across multiple data streams, surfacing exactly where an agency can deliver value.
                 </p>
               </div>
 
-              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl font-bold">
-                  ⚡
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                  <FileText className="w-5 h-5" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900">2. Generate Proposals</h3>
-                <p className="text-slate-600 text-sm leading-relaxed">
-                  Automatically create client-ready audits, solution recommendations, pricing estimates, and proposals.
+                <h3 className="text-lg font-black text-slate-900">2. Proposal Intelligence</h3>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  Automatically generate compelling, tailored proposals that translate abstract problems into verified scopes of work.
                 </p>
               </div>
 
-              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-2xl font-bold">
-                  🏆
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Sparkles className="w-5 h-5" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900">3. Win Clients</h3>
-                <p className="text-slate-600 text-sm leading-relaxed">
-                  Generate personalized outreach, solution previews, and sales materials designed to help agencies close more business.
+                <h3 className="text-lg font-black text-slate-900">3. Outreach Intelligence</h3>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  Craft highly personalized, insight-driven sales outreach materials designed to capture attention and book meetings instantly.
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 md:col-start-2">
+                <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-black text-slate-900">4. Revenue Intelligence</h3>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  Calculate and quantify the estimated financial upside, ROI, and closing probability of every prospective opportunity.
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-black text-slate-900">5. Trust & Evidence</h3>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  Back every assertion with verifiable proof, utilizing the LeadPilot Trust Engine to guarantee transparency.
                 </p>
               </div>
             </div>
