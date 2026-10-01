@@ -2048,6 +2048,10 @@ export default function Dashboard() {
               {user.email?.toLowerCase() === 'admettre@gmail.com' ? 'DEVELOPER (UNLIMITED)' : user.subscriptionTier}
             </span>
           </span>
+          <Link href="/opportunities" className="hidden sm:inline-flex items-center gap-1.5 ml-4 text-xs font-bold text-slate-600 hover:text-emerald-600 transition-colors bg-white border border-slate-200 shadow-sm px-3 py-1.5 rounded-lg">
+            <TrendingUp className="w-4 h-4 text-emerald-500" />
+            Opportunity Pipeline
+          </Link>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
