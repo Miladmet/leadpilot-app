@@ -153,12 +153,28 @@ model Proposals {
   prospect              Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   title                 String    @default("Growth Strategy & System Optimization Proposal")
   status                String    @default("Draft") // Draft, Ready, Sent, Accepted
+  
+  // Proposal Intelligence Engine Fields
   executiveSummary      String    @default("")
+  problem               String    @default("")
+  evidence              String    @default("")
+  opportunity           String    @default("")
+  valueEstimate         String    @default("")
+  recommendedServices   String    @default("[]") // JSON array
+  timeline              String    @default("")
+  nextSteps             String    @default("")
+  
+  confidenceRating      Int       @default(0)
+  evidenceScore         Int       @default(0)
+  trustScore            Int       @default(0)
+
+  // Legacy fallback fields
   scopeOfWork           String    @default("")
   pricing               String    @default("")
   roiEstimate           String    @default("")
   plan30Day             String    @default("")
   plan90Day             String    @default("")
+  
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 }

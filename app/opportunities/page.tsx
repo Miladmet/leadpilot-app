@@ -37,6 +37,7 @@ export default function OpportunitiesPage() {
   const [prospects, setProspects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'revenue' | 'confidence' | 'fastest'>('revenue');
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -138,6 +139,27 @@ export default function OpportunitiesPage() {
   const mediumValue = opportunities.filter(o => o.potentialRevenue >= 1000 && !highValue.includes(o) && !quickWin.includes(o));
   const longTerm = opportunities.filter(o => !highValue.includes(o) && !quickWin.includes(o) && !mediumValue.includes(o));
 
+  const handleGenerateProposal = async (opp: Opportunity) => {
+    setGeneratingFor(opp.id);
+    try {
+      const res = await fetch('/api/proposals/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opportunity: opp })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/proposals/${data.proposal.id}`);
+      } else {
+        console.error('Failed to generate proposal');
+        setGeneratingFor(null);
+      }
+    } catch (e) {
+      console.error(e);
+      setGeneratingFor(null);
+    }
+  };
+
   const renderCard = (opp: Opportunity) => (
     <div key={opp.id} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-3 hover:border-emerald-300 transition-colors">
       <div className="flex justify-between items-start gap-2">
@@ -176,6 +198,18 @@ export default function OpportunitiesPage() {
           Effort: {opp.effort}
         </span>
       </div>
+
+      <button
+        onClick={() => handleGenerateProposal(opp)}
+        disabled={generatingFor === opp.id}
+        className="mt-2 w-full text-[10px] font-black uppercase tracking-wider py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+      >
+        {generatingFor === opp.id ? (
+          <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> Generating...</>
+        ) : (
+          <>Generate Proposal</>
+        )}
+      </button>
     </div>
   );
 
