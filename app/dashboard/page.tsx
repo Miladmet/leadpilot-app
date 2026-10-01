@@ -345,6 +345,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({ prospectsCount: 0, outreachCount: 0, avgOppScore: 0, avgBuyScore: 0 });
   
   const [url, setUrl] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState<{name: string, content: string, type: string}[]>([]);
   const [activeProspect, setActiveProspect] = useState<Prospect | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
@@ -635,9 +636,23 @@ export default function Dashboard() {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles = await Promise.all(
+      Array.from(files).map(async (f) => {
+        // Read text content natively for rapid testing and evidence context
+        const content = await f.text().catch(() => `[Binary Content from ${f.name}]`);
+        return { name: f.name, type: f.type, content };
+      })
+    );
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+  };
+
   const handleAnalyze = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!url) return;
+    if (!url && uploadedFiles.length === 0) return;
     setAnalyzing(true);
     setError('');
     setAnalysisError(null);
@@ -646,7 +661,7 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, uploadedFiles }),
       });
 
       const data = await res.json();
@@ -2322,33 +2337,61 @@ export default function Dashboard() {
             </div>
 
             {!batchMode ? (
-              /* Single Domain Form */
-              <form onSubmit={handleAnalyze} className="mt-4 flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. stripe.com or https://company.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="flex-1 pl-3.5 pr-4 py-3 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm shadow-2xs min-h-[44px]"
-                  disabled={analyzing}
-                />
-                <button
-                  type="submit"
-                  disabled={analyzing}
-                  className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 cursor-pointer"
-                >
-                  {analyzing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Running auditor checks...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Analyze Website</span>
-                    </>
-                  )}
-                </button>
+              /* Single Domain Form with Evidence Upload */
+              <form onSubmit={handleAnalyze} className="mt-4 flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. stripe.com or https://company.com"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    className="flex-1 pl-3.5 pr-4 py-3 border border-slate-300 rounded-xl focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm shadow-2xs min-h-[44px]"
+                    disabled={analyzing}
+                  />
+                  <button
+                    type="submit"
+                    disabled={analyzing || (!url && uploadedFiles.length === 0)}
+                    className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 cursor-pointer"
+                  >
+                    {analyzing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Running auditor checks...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Analyze Opportunities</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-3 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-100 transition-colors relative">
+                  <input 
+                    type="file" 
+                    multiple 
+                    accept=".pdf,.csv,.txt,.md,.json" 
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    disabled={analyzing}
+                  />
+                  <div className="flex flex-col items-center gap-1 pointer-events-none">
+                    <Zap className="h-4 w-4 text-emerald-500" />
+                    <span className="text-xs font-bold text-slate-700">Upload Customer Evidence</span>
+                    <span className="text-[10px] text-slate-500">PDFs, Capability Decks, Service Catalogs, Pricing Sheets</span>
+                  </div>
+                </div>
+
+                {uploadedFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {uploadedFiles.map((f, i) => (
+                      <span key={i} className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg border border-emerald-100 flex items-center gap-1">
+                        <FileCheck className="w-3 h-3" />
+                        {f.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </form>
             ) : (
               /* Batch Multi-Domain Form */
