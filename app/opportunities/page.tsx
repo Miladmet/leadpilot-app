@@ -181,6 +181,27 @@ export default function OpportunitiesPage() {
     }
   };
 
+  const handleSyncHubSpot = async (opp: Opportunity) => {
+    setGeneratingFor(`hubspot-${opp.id}`);
+    try {
+      const res = await fetch('/api/crm/sync/opportunity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opportunity: opp })
+      });
+      if (res.ok) {
+        alert('Successfully pushed to HubSpot!');
+      } else {
+        alert('Failed to sync with HubSpot.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error syncing with HubSpot.');
+    } finally {
+      setGeneratingFor(null);
+    }
+  };
+
   const renderCard = (opp: Opportunity) => (
     <div key={opp.id} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-3 hover:border-emerald-300 transition-colors">
       <div className="flex justify-between items-start gap-2">
@@ -244,6 +265,18 @@ export default function OpportunitiesPage() {
           )}
         </button>
       </div>
+
+      <button
+        onClick={() => handleSyncHubSpot(opp)}
+        disabled={generatingFor !== null}
+        className="w-full mt-2 text-[10px] font-black uppercase tracking-wider py-2 rounded-lg bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+      >
+        {generatingFor === `hubspot-${opp.id}` ? (
+          <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-orange-500"></div> Syncing...</>
+        ) : (
+          <>Send To HubSpot</>
+        )}
+      </button>
     </div>
   );
 
