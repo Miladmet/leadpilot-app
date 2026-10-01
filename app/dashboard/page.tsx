@@ -97,7 +97,8 @@ import {
   RefreshCw,
   Zap,
   CheckCircle2,
-  ListOrdered
+  ListOrdered,
+  BarChart2
 } from 'lucide-react';
 
 
@@ -2051,6 +2052,10 @@ export default function Dashboard() {
           <Link href="/opportunities" className="hidden sm:inline-flex items-center gap-1.5 ml-4 text-xs font-bold text-slate-600 hover:text-emerald-600 transition-colors bg-white border border-slate-200 shadow-sm px-3 py-1.5 rounded-lg">
             <TrendingUp className="w-4 h-4 text-emerald-500" />
             Opportunity Pipeline
+          </Link>
+          <Link href="/revenue" className="hidden sm:inline-flex items-center gap-1.5 ml-2 text-xs font-bold text-slate-600 hover:text-emerald-600 transition-colors bg-white border border-slate-200 shadow-sm px-3 py-1.5 rounded-lg">
+            <BarChart2 className="w-4 h-4 text-emerald-500" />
+            Revenue Dashboard
           </Link>
         </div>
 
