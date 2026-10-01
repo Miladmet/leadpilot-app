@@ -7,7 +7,6 @@ import { withTimeout, withRetry, TIMEOUT_LIMITS } from '@/lib/stability';
 import { normalizeWebsiteUrl, detectAnalysisChanges } from '@/lib/changeDetection';
 import { classifyAnalysisError } from '@/lib/analysisErrors';
 import { selfHealDatabaseSchema } from '@/lib/dbSelfHeal';
-import pdfParse from 'pdf-parse';
 
 export const maxDuration = 60; // 60s maximum execution duration on Vercel
 export const dynamic = 'force-dynamic';
@@ -137,6 +136,7 @@ export async function POST(req: NextRequest) {
         // Handle Base64 encoded PDFs
         if (f.name?.toLowerCase().endsWith('.pdf') && f.content?.includes('base64,')) {
           try {
+            const pdfParse = require('pdf-parse');
             const base64Data = f.content.split('base64,')[1];
             const buffer = Buffer.from(base64Data, 'base64');
             const parsed = await pdfParse(buffer);
