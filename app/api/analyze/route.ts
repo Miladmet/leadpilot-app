@@ -7,6 +7,7 @@ import { withTimeout, withRetry, TIMEOUT_LIMITS } from '@/lib/stability';
 import { normalizeWebsiteUrl, detectAnalysisChanges } from '@/lib/changeDetection';
 import { classifyAnalysisError } from '@/lib/analysisErrors';
 import { selfHealDatabaseSchema } from '@/lib/dbSelfHeal';
+import pdfParse from 'pdf-parse';
 
 export const maxDuration = 60; // 60s maximum execution duration on Vercel
 export const dynamic = 'force-dynamic';
@@ -129,7 +130,34 @@ export async function POST(req: NextRequest) {
 
     // Inject Uploaded Evidence
     if (uploadedFiles && uploadedFiles.length > 0) {
-      const evidenceText = uploadedFiles.map((f: any) => `[UPLOADED DOCUMENT: ${f.name}]\n${f.content}\n`).join('\n\n');
+      let evidenceTextParts = [];
+      for (const f of uploadedFiles) {
+        let extractedText = f.content || '';
+        
+        // Handle Base64 encoded PDFs
+        if (f.name?.toLowerCase().endsWith('.pdf') && f.content?.includes('base64,')) {
+          try {
+            const base64Data = f.content.split('base64,')[1];
+            const buffer = Buffer.from(base64Data, 'base64');
+            const parsed = await pdfParse(buffer);
+            extractedText = parsed.text;
+          } catch (e) {
+            console.error('Failed to parse PDF evidence', e);
+            extractedText = `[PDF Parsing Failed for ${f.name}]`;
+          }
+        } else if (f.content?.includes('base64,')) {
+          // It's a base64 of some other file (csv, md, txt), decode it normally
+          try {
+            const base64Data = f.content.split('base64,')[1];
+            extractedText = Buffer.from(base64Data, 'base64').toString('utf-8');
+          } catch (e) {
+             extractedText = `[File Decoding Failed]`;
+          }
+        }
+        evidenceTextParts.push(`[UPLOADED DOCUMENT: ${f.name}]\n${extractedText}\n`);
+      }
+      
+      const evidenceText = evidenceTextParts.join('\n\n');
       crawlData.combinedContent += `\n\n=== CUSTOMER UPLOADED EVIDENCE ===\n${evidenceText}`;
       crawlData.diagnostics.totalTextExtracted += evidenceText.length;
       crawlData.diagnostics.coveragePercentage = Math.min(100, crawlData.diagnostics.coveragePercentage + 60); // Heavy boost

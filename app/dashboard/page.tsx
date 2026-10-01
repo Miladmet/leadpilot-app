@@ -641,10 +641,19 @@ export default function Dashboard() {
     if (!files) return;
 
     const newFiles = await Promise.all(
-      Array.from(files).map(async (f) => {
-        // Read text content natively for rapid testing and evidence context
-        const content = await f.text().catch(() => `[Binary Content from ${f.name}]`);
-        return { name: f.name, type: f.type, content };
+      Array.from(files).map((f) => {
+        return new Promise<{name: string, type: string, content: string}>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            resolve({ 
+              name: f.name, 
+              type: f.type, 
+              content: evt.target?.result as string 
+            });
+          };
+          reader.onerror = () => resolve({ name: f.name, type: f.type, content: '' });
+          reader.readAsDataURL(f);
+        });
       })
     );
     setUploadedFiles(prev => [...prev, ...newFiles]);
