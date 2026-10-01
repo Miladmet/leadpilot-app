@@ -101,28 +101,25 @@ export async function POST(req: NextRequest) {
         );
         crawlData = { ...result };
       } catch (crawlErr: any) {
-        // CRAWL SAFETY: Do not continue opportunity generation if no uploaded files either.
+        // CRAWL SAFETY: If both crawler and uploads fail, we fallback to Speculative AI Knowledge (0% Trust).
         if (!uploadedFiles || uploadedFiles.length === 0) {
-          console.error('[Crawl Safety] Crawl failed or timed out:', crawlErr);
-          const isTimeout = crawlErr.code === 'ETIMEDOUT' || crawlErr.message?.includes('timed out');
-          const is403 = crawlErr.message?.includes('403');
-          const is404 = crawlErr.message?.includes('404');
-          const reason = isTimeout ? 'Operation timed out.' : is403 ? '403 Forbidden' : is404 ? '404 Not Found' : 'Blocked or unreachable';
-
-          return NextResponse.json(
-            {
-              error: 'Website Crawl Failed',
-              status: 'Website Crawl Failed',
-              reason,
-              diagnostics: {
-                url,
-                attemptedAt: new Date().toISOString(),
-                failureType: isTimeout ? 'Timeout' : 'Network/HTTP Error',
-                details: crawlErr.message || 'Target host blocked or failed crawl requests.'
-              }
-            },
-            { status: 422 }
-          );
+          console.error('[Fallback Engine] Crawl failed. No uploads detected. Falling back to Speculative AI Knowledge for:', url);
+          crawlData = {
+            websiteUrl: url,
+            companyName: fallbackName,
+            combinedContent: `<error crawling_failed="true" domain="${url}" companyName="${fallbackName}" />`,
+            discoveredPages: [],
+            diagnostics: {
+              pagesDiscovered: 0,
+              pagesCrawled: 0,
+              coveragePercentage: 0,
+              crawlDurationMs: 0,
+              totalTextExtracted: 0,
+              topFailureReasons: [
+                { classification: 'Network/Timeout', count: 1, sampleUrls: [url] }
+              ]
+            }
+          };
         }
       }
     }
@@ -167,15 +164,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (!crawlData.combinedContent || crawlData.combinedContent.trim().length === 0) {
-      return NextResponse.json(
-        {
-          error: 'Website Crawl Failed',
-          status: 'Website Crawl Failed',
-          reason: 'Empty Content Extracted',
-          diagnostics: { url, failureType: 'Content Extraction Failure' }
-        },
-        { status: 422 }
-      );
+      console.warn(`[Fallback Engine] No text extracted. Overriding with Speculative Fallback.`);
+      crawlData.combinedContent = `<error crawling_failed="true" domain="${url}" companyName="${fallbackName}" />`;
     }
 
     // 3. Perform AI Analysis with Gemini (60s timeout, 2 retries)
