@@ -1085,6 +1085,20 @@ export default function Dashboard() {
     tenantIsolationPassRate: 100
   });
 
+  let mcpTrustContribution;
+  if (activeProspect?.mcpBusinessData) {
+    try {
+      const parsedData = JSON.parse(activeProspect.mcpBusinessData);
+      const evidenceCount = Object.keys(parsedData).length;
+      if (evidenceCount > 0) {
+        mcpTrustContribution = {
+          evidenceCount,
+          confidenceBoost: Math.min(15, evidenceCount * 3)
+        };
+      }
+    } catch(e) {}
+  }
+
   const activeProspectTrust = activeProspect ? calculateTrustScore({
     verificationPassRate: activeProspect.verificationPassRate,
     evidenceQuality: activeProspect.evidenceQuality,
@@ -1092,7 +1106,8 @@ export default function Dashboard() {
     findingReliability: activeProspect.findingReliability,
     rlsCoveragePercent: 100,
     storageSecurityScore: 100,
-    tenantIsolationPassRate: 100
+    tenantIsolationPassRate: 100,
+    ...(mcpTrustContribution && { mcpTrustContribution })
   }) : null;
 
   // Transparent Opportunity Portfolio Engine (Suppressed when Crawl Coverage < 25%)

@@ -51,6 +51,7 @@ export interface TrustScoreResult {
     tenantIsolation?: TrustComponent;
     evidenceEngine?: TrustComponent;
     crawlReliability?: TrustComponent;
+    mcpConfiguration?: TrustComponent;
   };
   componentList: TrustComponent[];
   missingComponents: string[];
@@ -58,6 +59,15 @@ export interface TrustScoreResult {
   diagnostics: TrustDiagnostics;
   summary: string;
   calculatedAt: string;
+}
+
+export interface MCPTrustContribution {
+  evidenceCount: number;
+  confidenceBoost: number;
+}
+
+export function calculateMCPConfidenceBoost(mcpEvidenceCount: number): number {
+  return Math.min(15, mcpEvidenceCount * 3);
 }
 
 export interface TrustEngineInput {
@@ -76,6 +86,8 @@ export interface TrustEngineInput {
   evidenceQuality?: number;
   crawlCoveragePercent?: number;
   findingReliability?: number;
+
+  mcpTrustContribution?: MCPTrustContribution;
 }
 
 export const calculateTrustScore = core.calculateTrustScore as (input?: TrustEngineInput) => TrustScoreResult;
