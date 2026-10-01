@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       try {
         const result = await withTimeout(
           withRetry(
-            () => crawlWebsite(url),
+            () => crawlWebsite(url, 10, 1),
             { maxRetries: 3, backoffMs: 300, operationName: 'Crawl Engine' }
           ),
           TIMEOUT_LIMITS.CRAWL_MS,

@@ -573,47 +573,35 @@ export async function fetchMCPBusinessData(endpoint: string): Promise<MCPBusines
 export async function probeWebMCP(baseUrl: string): Promise<WebMCPDiagnostics> {
   const paths = ['/.webmcp', '/webmcp.json', '/.well-known/webmcp', '/.well-known/mcp'];
   
-  for (const path of paths) {
-    try {
-      const endpoint = `${baseUrl}${path}`;
-      const response = await axios.get(endpoint, { 
-        timeout: 3000, 
-        validateStatus: () => true 
-      });
-      
-      if (response.status === 200) {
-        if (typeof response.data === 'object' && response.data !== null) {
-          // Detect MCP version or signature
-          const mcpVersion = response.data.mcpVersion || response.data.version || '1.0';
-          
-          let extractedData = null;
-          try {
-            const rawData = await fetchMCPBusinessData(endpoint);
-            if (Object.keys(rawData).length > 0) {
-              extractedData = rawData;
-            }
-          } catch (e) {
-            // Fallback gracefully if data parsing fails
-          }
+  const promises = paths.map(async (path) => {
+    const endpoint = `${baseUrl}${path}`;
+    const response = await axios.get(endpoint, { timeout: 3000, validateStatus: () => true });
+    return { path, endpoint, response };
+  });
 
-          return {
-            mcpDetected: true,
-            mcpEndpoint: endpoint,
-            mcpVersion: String(mcpVersion),
-            mcpStatus: 'Available',
-            businessData: extractedData
-          };
-        } else {
-          return {
-            mcpDetected: false,
-            mcpEndpoint: endpoint,
-            mcpVersion: null,
-            mcpStatus: 'Invalid'
-          };
-        }
+  const results = await Promise.allSettled(promises);
+
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value.response.status === 200) {
+      const { response, endpoint } = result.value;
+      if (typeof response.data === 'object' && response.data !== null) {
+        const mcpVersion = response.data.mcpVersion || response.data.version || '1.0';
+        let extractedData = null;
+        try {
+          const rawData = await fetchMCPBusinessData(endpoint);
+          if (Object.keys(rawData).length > 0) {
+            extractedData = rawData;
+          }
+        } catch (e) {}
+
+        return {
+          mcpDetected: true,
+          mcpEndpoint: endpoint,
+          mcpVersion: String(mcpVersion),
+          mcpStatus: 'Available',
+          businessData: extractedData
+        };
       }
-    } catch (err) {
-      continue; // Ignore network errors and try next path
     }
   }
 
@@ -690,8 +678,8 @@ export async function crawlWebsite(targetUrl: string, maxPages: number = 20, max
     }
   }
 
-  // Adaptive crawl limit based on total URLs discovered
-  const adaptiveCrawlLimit = getAdaptiveCrawlLimit(discoveredMap.size);
+  // Adaptive crawl limit based on total URLs discovered, but capped by maxPages
+  const adaptiveCrawlLimit = Math.min(getAdaptiveCrawlLimit(discoveredMap.size), maxPages);
 
 
   // 2. Scrape Homepage
