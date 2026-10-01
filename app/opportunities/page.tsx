@@ -14,6 +14,9 @@ interface RecommendedService {
   confidence: number;
   expectedOutcome: string;
   explanation: string;
+  calculation?: string;
+  status?: string;
+  evidenceList?: string[];
 }
 
 interface Opportunity {
@@ -30,6 +33,15 @@ interface Opportunity {
   priority: string;
   whyThisMatters: string;
   source: string;
+  // Trust Framework Fields
+  calculationMethod: string;
+  evidenceUsed: string[];
+  status: string;
+  trustScore: number;
+  evidenceQuality: number;
+  coverage: string;
+  businessCoverage: string;
+  mcpEvidence: boolean;
 }
 
 export default function OpportunitiesPage() {
@@ -98,21 +110,42 @@ export default function OpportunitiesPage() {
           effort = 'Low';
         }
 
-        opps.push({
-          id: `${p.id}-${idx}`,
-          prospectId: p.id,
-          prospectName: p.companyName || 'Unknown Company',
-          websiteUrl: p.websiteUrl,
-          title: rec.serviceName,
-          description: rec.issue,
-          evidence: rec.explanation || 'Analyzed via engine.',
-          confidence: rec.confidence,
-          potentialRevenue: rec.estimatedValue || 0,
-          effort,
-          priority,
-          whyThisMatters: rec.impact,
-          source
-        });
+          // Trust Framework Ratings derivation
+          let trustRating = 'Review Required';
+          if (rec.confidence >= 90) trustRating = 'Trusted';
+          else if (rec.confidence >= 75) trustRating = 'Verified';
+          else if (rec.confidence < 50) trustRating = 'Low Confidence';
+
+          // Override with explicit status if available
+          if (rec.status && ['Trusted', 'Verified', 'Review Required', 'Low Confidence'].includes(rec.status)) {
+            trustRating = rec.status;
+          }
+
+          const hasMcp = evidenceSources.some((src: any) => src.type === 'MCP Evidence');
+
+          opps.push({
+            id: `${p.id}-${idx}`,
+            prospectId: p.id,
+            prospectName: p.companyName || 'Unknown Company',
+            websiteUrl: p.websiteUrl,
+            title: rec.serviceName,
+            description: rec.issue,
+            evidence: rec.explanation || 'Analyzed via engine.',
+            confidence: rec.confidence,
+            potentialRevenue: rec.estimatedValue || 0,
+            effort,
+            priority,
+            whyThisMatters: rec.impact,
+            source,
+            calculationMethod: rec.calculation || 'Algorithm estimated based on typical service fees.',
+            evidenceUsed: rec.evidenceList && rec.evidenceList.length > 0 ? rec.evidenceList : [rec.explanation || 'Analyzed via engine.'],
+            status: trustRating,
+            trustScore: Math.min(100, rec.confidence + (hasMcp ? 10 : 0)),
+            evidenceQuality: p.evidenceQuality || rec.confidence,
+            coverage: (rec.evidenceList?.length || 0) > 1 ? 'Multi-Page' : 'Single Page',
+            businessCoverage: hasBiz ? 'Extensive' : 'Standard',
+            mcpEvidence: hasMcp
+          });
       });
     });
     
@@ -240,6 +273,51 @@ export default function OpportunitiesPage() {
           Effort: {opp.effort}
         </span>
       </div>
+
+      <details className="mt-2 group">
+        <summary className="text-[10px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer list-none flex justify-between items-center p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+          <span>Trust Intelligence</span>
+          <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{opp.status}</span>
+        </summary>
+        <div className="p-3 bg-slate-50 border border-slate-100 rounded-b-lg -mt-1 space-y-3">
+          
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Opportunity Trust</span>
+              <span className="text-sm font-black text-slate-800">{opp.trustScore}/100</span>
+            </div>
+            <div>
+              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Evidence Quality</span>
+              <span className="text-sm font-black text-slate-800">{opp.evidenceQuality}/100</span>
+            </div>
+            <div>
+              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Coverage</span>
+              <span className="text-xs font-bold text-slate-700">{opp.coverage}</span>
+            </div>
+            <div>
+              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Verification</span>
+              <span className="text-xs font-bold text-slate-700">{opp.mcpEvidence ? 'MCP Verified' : opp.status}</span>
+            </div>
+          </div>
+
+          <div>
+            <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Why Generated</span>
+            <p className="text-[10px] text-slate-600 leading-relaxed bg-white p-2 rounded border border-slate-100">{opp.whyThisMatters}</p>
+          </div>
+
+          <div>
+            <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Calculation Method</span>
+            <p className="text-[10px] font-mono text-slate-600 leading-relaxed bg-white p-2 rounded border border-slate-100">{opp.calculationMethod}</p>
+          </div>
+
+          <div>
+            <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Evidence Used</span>
+            <ul className="text-[10px] text-slate-600 leading-relaxed bg-white p-2 rounded border border-slate-100 list-disc pl-4 space-y-1">
+              {opp.evidenceUsed.map((ev, i) => <li key={i}>{ev}</li>)}
+            </ul>
+          </div>
+        </div>
+      </details>
 
       <div className="grid grid-cols-2 gap-2 mt-2">
         <button
