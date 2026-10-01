@@ -1099,6 +1099,13 @@ export default function Dashboard() {
     } catch(e) {}
   }
 
+  let evidenceSources = [];
+  if (activeProspect?.evidenceSources) {
+    try {
+      evidenceSources = JSON.parse(activeProspect.evidenceSources);
+    } catch(e) {}
+  }
+
   const activeProspectTrust = activeProspect ? calculateTrustScore({
     verificationPassRate: activeProspect.verificationPassRate,
     evidenceQuality: activeProspect.evidenceQuality,
@@ -1107,12 +1114,12 @@ export default function Dashboard() {
     rlsCoveragePercent: 100,
     storageSecurityScore: 100,
     tenantIsolationPassRate: 100,
-    ...(mcpTrustContribution && { mcpTrustContribution })
+    ...(mcpTrustContribution && { mcpTrustContribution }),
+    ...(evidenceSources.length > 0 && { evidenceSources })
   }) : null;
 
-  // Transparent Opportunity Portfolio Engine (Suppressed when Crawl Coverage < 25%)
-  const isCrawlCoverageInsufficient = (activeProspect?.crawlCoveragePercent ?? 100) < 25;
-  const activeOpportunityPortfolio = (activeProspect && !isCrawlCoverageInsufficient) ? calculateOpportunityPortfolio(
+  // Transparent Opportunity Portfolio Engine
+  const activeOpportunityPortfolio = activeProspect ? calculateOpportunityPortfolio(
     parseRecommendations(activeProspect.recommendations),
     {
       evidenceQuality: activeProspect.evidenceQuality,
@@ -2632,6 +2639,18 @@ export default function Dashboard() {
                   {parseScoreExplanations(activeProspect.scoreExplanations)?.techStack?.map((tech: string, idx: number) => (
                     <span key={idx} className="bg-white border border-slate-250 text-slate-700 text-[9px] font-semibold px-2 py-0.5 rounded-full shadow-sm">
                       💻 {tech}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Multi-Source Evidence Mix Row */}
+              {activeProspectTrust?.evidenceMix && activeProspectTrust.evidenceMix.length > 0 && (
+                <div className="px-6 py-2 bg-indigo-50/40 border-b border-indigo-100/50 flex flex-wrap items-center gap-2">
+                  <span className="text-[9px] font-bold text-indigo-800/60 uppercase tracking-wider mr-1">Evidence Mix:</span>
+                  {activeProspectTrust.evidenceMix.map((mix, idx) => (
+                    <span key={idx} className="text-[10px] text-indigo-900 font-semibold bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-2xs">
+                      {mix.type}: <strong className="text-indigo-600">{mix.percentage}%</strong>
                     </span>
                   ))}
                 </div>

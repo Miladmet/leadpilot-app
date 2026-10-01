@@ -54,6 +54,7 @@ export interface TrustScoreResult {
     mcpConfiguration?: TrustComponent;
   };
   componentList: TrustComponent[];
+  evidenceMix?: EvidenceMixItem[];
   missingComponents: string[];
   invalidComponents: InvalidComponentDetail[];
   diagnostics: TrustDiagnostics;
@@ -64,6 +65,20 @@ export interface TrustScoreResult {
 export interface MCPTrustContribution {
   evidenceCount: number;
   confidenceBoost: number;
+}
+
+export type EvidenceSourceType = 'Website Evidence' | 'MCP Evidence' | 'Schema.org Structured Data' | 'Google Business Profile Signals' | 'Customer-Supplied Information' | 'Uploaded Documents' | 'Public Business Information' | 'Business Evidence';
+
+export interface EvidenceSource {
+  type: EvidenceSourceType;
+  confidence: number;
+  evidenceCount: number;
+  lastUpdated: string;
+}
+
+export interface EvidenceMixItem {
+  type: EvidenceSourceType;
+  percentage: number;
 }
 
 export function calculateMCPConfidenceBoost(mcpEvidenceCount: number): number {
@@ -88,6 +103,7 @@ export interface TrustEngineInput {
   findingReliability?: number;
 
   mcpTrustContribution?: MCPTrustContribution;
+  evidenceSources?: EvidenceSource[];
 }
 
 export const calculateTrustScore = core.calculateTrustScore as (input?: TrustEngineInput) => TrustScoreResult;
