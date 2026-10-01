@@ -675,14 +675,18 @@ export default function Dashboard() {
 
       const data = await res.json();
       if (!res.ok) {
+        const detailedMessage = data.reason 
+          ? `${data.error || 'Verification check failed'}: ${data.reason}`
+          : (data.error || 'Verification check failed. Verify domain.');
+          
         setAnalysisError({
           classification: data.classification || 'ANALYSIS_ERROR',
-          userMessage: data.error || 'Verification check failed. Verify domain.',
+          userMessage: detailedMessage,
           referenceCode: data.referenceCode,
           isRetryable: data.isRetryable ?? false,
           adminDetails: data.adminDetails
         });
-        setError(data.error || 'Verification check failed. Verify domain.');
+        setError(detailedMessage);
         return;
       }
 
