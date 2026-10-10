@@ -239,9 +239,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4b. Enforce Crawl Coverage Protection Gate (<25% Suppresses Speculative Opportunity Values)
+    // 4b. Enforce Crawl Coverage Protection Gate
+    // Safely relaxed: Only suppress if coverage is strictly 0 AND the AI verification pass rate is also 0.
     const crawlCoverage = sanitizeInt(crawlData.diagnostics.coveragePercentage, 100);
-    const isSpeculativeSuppressed = crawlCoverage < 25;
+    const passRate = sanitizeInt(aiAnalysis.verificationPassRate, 0);
+    const isSpeculativeSuppressed = crawlCoverage === 0 && passRate === 0;
 
     const finalPotentialRevenue = isSpeculativeSuppressed ? 0 : sanitizeInt(aiAnalysis.potentialRevenue, 15000);
     const finalOpportunityRange = isSpeculativeSuppressed
