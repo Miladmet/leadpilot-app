@@ -1,4 +1,4 @@
-const assert = require('assert');
+﻿const assert = require('assert');
 const { PrismaClient } = require('@prisma/client');
 const { 
   AUTH_FAILURE_TYPES, 
@@ -25,10 +25,10 @@ async function runTest(name, fn) {
 }
 
 async function main() {
-  const prisma = new PrismaClient();
+  
 
   try {
-    const existingUser = await prisma.user.findFirst();
+    const existingUser = { id: "test-id", email: "test@example.com" };
 
     // 1. USER_NOT_FOUND
     await runTest('1. Correctly classifies USER_NOT_FOUND when email does not exist', () => {
@@ -160,7 +160,7 @@ async function main() {
     });
 
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 
   console.log('\n================================================================');

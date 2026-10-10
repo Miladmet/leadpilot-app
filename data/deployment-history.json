@@ -1,5 +1,18 @@
 [
   {
+    "id": "DEPLOY_1791663124215",
+    "timestamp": "2026-10-10T20:12:04.154Z",
+    "commitId": "test-commit-sha",
+    "overallHealth": "FAILED",
+    "schemaStatus": "FAILED",
+    "apiStatus": "FAILED",
+    "securityStatus": "Healthy",
+    "trustStatus": "Healthy",
+    "storageStatus": "Healthy",
+    "missingColumnsCount": 0,
+    "missingTablesCount": 8
+  },
+  {
     "id": "DEPLOY_1788962324086",
     "timestamp": "2026-09-09T13:58:43.977Z",
     "commitId": "local-build",
