@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 import { crawlWebsite } from '@/lib/scraper';
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       try {
         const result = await withTimeout(
           withRetry(
-            () => crawlWebsite(url, 10, 1),
+            () => crawlWebsite(url, 40, 3),
             { maxRetries: 3, backoffMs: 300, operationName: 'Crawl Engine' }
           ),
           TIMEOUT_LIMITS.CRAWL_MS,
