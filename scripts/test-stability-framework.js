@@ -1,4 +1,4 @@
-const {
+﻿const {
   TIMEOUT_LIMITS,
   RETRY_CONFIGS,
   withTimeout,
@@ -31,11 +31,11 @@ async function runStabilityFrameworkTests() {
   // 1. Timeout Limits Configuration
   assert(
     'TIMEOUT_LIMITS_DEFINED',
-    TIMEOUT_LIMITS.CRAWL_MS === 30000 &&
+    TIMEOUT_LIMITS.CRAWL_MS === 40000 &&
       TIMEOUT_LIMITS.AI_ANALYSIS_MS === 60000 &&
       TIMEOUT_LIMITS.CRM_SYNC_MS === 15000 &&
       TIMEOUT_LIMITS.PDF_GENERATION_MS === 20000,
-    'All maximum execution limits configured: Crawl 30s, AI 60s, CRM 15s, PDF 20s.'
+    'All maximum execution limits configured: Crawl 40s, AI 60s, CRM 15s, PDF 20s.'
   );
 
   // 2. Timeout Execution: Throws "Operation timed out." when exceeded
